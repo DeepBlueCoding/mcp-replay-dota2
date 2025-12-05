@@ -54,6 +54,9 @@ class TestUseCaseTrackCarryFarm:
     @pytest.mark.use_case
     def test_item_purchases_have_timing(self, test_replay_path):
         """Item purchases include game_time for tracking progression."""
+        if not test_replay_path.exists():
+            pytest.skip("Replay file not available (run locally with replay)")
+
         from src.utils.combat_log_parser import combat_log_parser
 
         purchases = combat_log_parser.get_item_purchases(test_replay_path)
@@ -65,6 +68,9 @@ class TestUseCaseTrackCarryFarm:
     @pytest.mark.use_case
     def test_item_purchases_filter_by_hero(self, test_replay_path):
         """Can filter item purchases by specific hero."""
+        if not test_replay_path.exists():
+            pytest.skip("Replay file not available (run locally with replay)")
+
         from src.utils.combat_log_parser import combat_log_parser
 
         purchases = combat_log_parser.get_item_purchases(

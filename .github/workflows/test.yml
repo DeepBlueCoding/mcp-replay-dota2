@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master]
 
+env:
+  TEST_MATCH_ID: "8461956309"
+  REPLAY_DIR: ~/dota2/replays
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -34,5 +38,23 @@ jobs:
       - name: Type check with mypy
         run: uv run mypy src/ dota_match_mcp_server.py --ignore-missing-imports
 
+      - name: Cache test replay
+        id: cache-replay
+        uses: actions/cache@v4
+        with:
+          path: ~/dota2/replays
+          key: replay-${{ env.TEST_MATCH_ID }}
+
+      - name: Download test replay
+        if: steps.cache-replay.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/dota2/replays
+          uv run python -c "
+          import asyncio
+          from src.utils.replay_downloader import ReplayDownloader
+          downloader = ReplayDownloader()
+          asyncio.run(downloader.download_replay(${{ env.TEST_MATCH_ID }}))
+          "
+
       - name: Run tests
-        run: uv run pytest tests/ -v -m "not integration"
+        run: uv run pytest tests/ -v
