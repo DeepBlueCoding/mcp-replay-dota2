@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/dota2/replays
-          key: replay-${{ env.TEST_MATCH_ID }}
+          key: replay-${{ env.TEST_MATCH_ID }}-v2
 
       - name: Download test replay
         if: steps.cache-replay.outputs.cache-hit != 'true'
@@ -55,6 +55,22 @@ jobs:
           downloader = ReplayDownloader()
           asyncio.run(downloader.download_replay(${{ env.TEST_MATCH_ID }}))
           "
+
+      - name: Verify replay file
+        run: |
+          REPLAY_FILE=~/dota2/replays/${{ env.TEST_MATCH_ID }}.dem
+          if [ ! -f "$REPLAY_FILE" ]; then
+            echo "ERROR: Replay file not found!"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "$REPLAY_FILE")
+          echo "Replay file size: $SIZE bytes"
+          # Replay should be at least 100MB (this match is ~400MB)
+          if [ "$SIZE" -lt 100000000 ]; then
+            echo "ERROR: Replay file too small, likely corrupted"
+            exit 1
+          fi
+          echo "Replay file verified OK"
 
       - name: Run tests
         run: uv run pytest tests/ -v
