@@ -1172,7 +1172,7 @@ async def list_fights(match_id: int, ctx: Context) -> Dict[str, Any]:
 async def get_teamfights(
     match_id: int,
     min_deaths: int = 3,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get only teamfights from a Dota 2 match.
@@ -1248,7 +1248,7 @@ async def get_teamfights(
 async def get_fight(
     match_id: int,
     fight_id: str,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get detailed information about a specific fight.
@@ -1323,7 +1323,7 @@ async def get_fight(
 async def get_camp_stacks(
     match_id: int,
     hero_filter: Optional[str] = None,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get all neutral camp stacks in a Dota 2 match.
@@ -1385,7 +1385,7 @@ async def get_camp_stacks(
 
 
 @mcp.tool
-async def get_jungle_summary(match_id: int, ctx: Context = None) -> Dict[str, Any]:
+async def get_jungle_summary(match_id: int, ctx: Optional[Context] = None) -> Dict[str, Any]:
     """
     Get jungle activity summary for a Dota 2 match.
 
@@ -1434,7 +1434,7 @@ async def get_jungle_summary(match_id: int, ctx: Context = None) -> Dict[str, An
 
 
 @mcp.tool
-async def get_lane_summary(match_id: int, ctx: Context = None) -> Dict[str, Any]:
+async def get_lane_summary(match_id: int, ctx: Optional[Context] = None) -> Dict[str, Any]:
     """
     Get laning phase summary for a Dota 2 match.
 
@@ -1522,7 +1522,7 @@ async def get_lane_summary(match_id: int, ctx: Context = None) -> Dict[str, Any]
 async def get_cs_at_minute(
     match_id: int,
     minute: int,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get last hits, denies, gold, and level for all heroes at a specific minute.
@@ -1569,7 +1569,7 @@ async def get_cs_at_minute(
 async def get_hero_positions(
     match_id: int,
     minute: int,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get hero positions at a specific minute in a Dota 2 match.
@@ -1627,7 +1627,7 @@ async def get_hero_positions(
 async def get_snapshot_at_time(
     match_id: int,
     game_time: float,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get game state snapshot at a specific game time.
@@ -1707,7 +1707,7 @@ async def get_position_timeline(
     end_time: float,
     hero_filter: Optional[str] = None,
     interval_seconds: float = 1.0,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get hero positions over a time range at regular intervals.
@@ -1784,7 +1784,7 @@ async def get_fight_replay(
     start_time: float,
     end_time: float,
     interval_seconds: float = 0.5,
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """
     Get high-resolution replay data for a fight.

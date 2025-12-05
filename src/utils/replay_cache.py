@@ -188,7 +188,9 @@ class ReplayCache:
         """Get hero name from hero_id using constants."""
         try:
             from src.utils.constants_fetcher import constants_fetcher
-            heroes = constants_fetcher.get_heroes()
+            heroes = constants_fetcher.get_heroes_constants()
+            if not heroes:
+                return None
             for hero in heroes.values():
                 if hero.get('id') == hero_id:
                     name = hero.get('name', '')

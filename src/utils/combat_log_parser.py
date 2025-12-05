@@ -9,7 +9,7 @@ Uses replay_cache to avoid repeated parsing of large replay files.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from python_manta import CombatLogType, Team
 
@@ -193,7 +193,7 @@ class CombatLogParser:
                             "time": game_time,
                         })
 
-        hit_index = {}
+        hit_index: Dict[tuple, Optional[bool]] = {}
         for cast in ability_casts:
             key = (cast["caster"], cast["ability"], cast["tick"])
 
@@ -205,10 +205,11 @@ class CombatLogParser:
             # Check if offensive ability hit an enemy hero
             # Normalize ability names to handle modifier_ prefix difference
             cast_ability_normalized = self._normalize_ability_name(cast["ability"])
+            cast_time = float(cast["time"])
             hit = any(
                 d["caster"] == cast["caster"]
                 and self._normalize_ability_name(d["ability"]) == cast_ability_normalized
-                and cast["time"] <= d["time"] <= cast["time"] + time_window
+                and cast_time <= float(d["time"]) <= cast_time + time_window
                 for d in damage_effects
             )
             hit_index[key] = hit

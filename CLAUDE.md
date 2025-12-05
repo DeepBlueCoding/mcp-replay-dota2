@@ -2,6 +2,23 @@
 
 Guidance for working on this Dota 2 MCP Server codebase.
 
+## CRITICAL: Before Pushing Code
+
+**ALWAYS run the FULL CI pipeline locally before pushing:**
+
+```bash
+# 1. Lint check
+uv run ruff check src/ tests/ dota_match_mcp_server.py
+
+# 2. Type check
+uv run mypy src/ dota_match_mcp_server.py --ignore-missing-imports
+
+# 3. Tests (skip integration if no replay available)
+uv run pytest -m "not integration"
+```
+
+**ALL THREE must pass before committing.** Do not push code that fails any step.
+
 ## Commands
 
 ```bash
