@@ -139,9 +139,16 @@ def preparse_replay():
 # Combat Log Parser fixtures
 # =============================================================================
 
+def _require_replay():
+    """Skip test if replay is not available."""
+    if not REPLAY_PATH.exists():
+        pytest.skip("Replay file not available (run locally with replay)")
+
+
 @pytest.fixture(scope="session")
 def hero_deaths():
     """Cached hero deaths without position."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("deaths", [])
 
@@ -149,6 +156,7 @@ def hero_deaths():
 @pytest.fixture(scope="session")
 def hero_deaths_with_position():
     """Cached hero deaths with position data."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("deaths_with_position", [])
 
@@ -156,6 +164,7 @@ def hero_deaths_with_position():
 @pytest.fixture(scope="session")
 def objectives():
     """Cached objective kills (roshan, tormentor, towers, barracks)."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("objectives", ([], [], [], []))
 
@@ -163,6 +172,7 @@ def objectives():
 @pytest.fixture(scope="session")
 def rune_pickups():
     """Cached rune pickups."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("rune_pickups", [])
 
@@ -170,6 +180,7 @@ def rune_pickups():
 @pytest.fixture(scope="session")
 def combat_log_280_290():
     """Combat log from 280-290s (first blood area)."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_280_290", [])
 
@@ -177,6 +188,7 @@ def combat_log_280_290():
 @pytest.fixture(scope="session")
 def combat_log_280_290_earthshaker():
     """Combat log 280-290s filtered to earthshaker."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_280_290_es", [])
 
@@ -184,6 +196,7 @@ def combat_log_280_290_earthshaker():
 @pytest.fixture(scope="session")
 def combat_log_287_289_earthshaker():
     """Combat log 287-289s filtered to earthshaker."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_287_289_es", [])
 
@@ -191,6 +204,7 @@ def combat_log_287_289_earthshaker():
 @pytest.fixture(scope="session")
 def combat_log_280_300_ability():
     """Combat log 280-300s, ABILITY events only."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_280_300_ability", [])
 
@@ -198,6 +212,7 @@ def combat_log_280_300_ability():
 @pytest.fixture(scope="session")
 def combat_log_280_300_earthshaker_ability():
     """Combat log 280-300s, ABILITY events, earthshaker filter."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_280_300_es_ability", [])
 
@@ -205,6 +220,7 @@ def combat_log_280_300_earthshaker_ability():
 @pytest.fixture(scope="session")
 def combat_log_280_282_naga_ability():
     """Combat log 280-282s, ABILITY events, naga filter."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_280_282_naga_ability", [])
 
@@ -212,6 +228,7 @@ def combat_log_280_282_naga_ability():
 @pytest.fixture(scope="session")
 def combat_log_280_290_non_ability():
     """Combat log 280-290s, DAMAGE/MODIFIER_ADD/DEATH only."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_280_290_dmg_mod_death", [])
 
@@ -219,6 +236,7 @@ def combat_log_280_290_non_ability():
 @pytest.fixture(scope="session")
 def combat_log_0_600_ability():
     """Combat log 0-600s, ABILITY events only (full match abilities)."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_0_600_ability", [])
 
@@ -226,6 +244,7 @@ def combat_log_0_600_ability():
 @pytest.fixture(scope="session")
 def combat_log_320_370():
     """Combat log 320-370s (ability trigger area)."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_320_370", [])
 
@@ -233,6 +252,7 @@ def combat_log_320_370():
 @pytest.fixture(scope="session")
 def combat_log_360_370():
     """Combat log 360-370s."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_360_370", [])
 
@@ -240,6 +260,7 @@ def combat_log_360_370():
 @pytest.fixture(scope="session")
 def combat_log_trigger_only():
     """Combat log ABILITY_TRIGGER events only."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_trigger_only", [])
 
@@ -251,6 +272,7 @@ def combat_log_trigger_only():
 @pytest.fixture(scope="session")
 def fight_first_blood():
     """Fight detection result for first blood (earthshaker anchor)."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("fight_first_blood")
 
@@ -258,6 +280,7 @@ def fight_first_blood():
 @pytest.fixture(scope="session")
 def fight_first_blood_no_hero():
     """Fight detection for first blood without hero anchor."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("fight_first_blood_no_hero")
 
@@ -265,6 +288,7 @@ def fight_first_blood_no_hero():
 @pytest.fixture(scope="session")
 def fight_pango_nevermore():
     """Fight detection for pangolier vs nevermore."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("fight_pango_nf")
 
@@ -276,6 +300,7 @@ def fight_pango_nevermore():
 @pytest.fixture(scope="session")
 def match_info():
     """Cached match info."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("match_info")
 
@@ -283,6 +308,7 @@ def match_info():
 @pytest.fixture(scope="session")
 def draft():
     """Cached draft data."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("draft")
 
@@ -294,6 +320,7 @@ def draft():
 @pytest.fixture(scope="session")
 def timeline():
     """Cached timeline data."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("timeline")
 
@@ -301,6 +328,7 @@ def timeline():
 @pytest.fixture(scope="session")
 def stats_5min():
     """Stats at 5 minute mark."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("stats_5min")
 
@@ -308,6 +336,7 @@ def stats_5min():
 @pytest.fixture(scope="session")
 def stats_10min():
     """Stats at 10 minute mark."""
+    _require_replay()
     _ensure_parsed()
     return _cache.get("stats_10min")
 
