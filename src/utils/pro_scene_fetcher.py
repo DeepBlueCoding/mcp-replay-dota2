@@ -74,7 +74,7 @@ class ProSceneFetcher:
 
         logger.info("Fetching pro players from OpenDota...")
         async with OpenDota(format="json") as client:
-            players = await client.get_pro_players()
+            players = await client.get("proPlayers")
 
         self._save_to_cache(filename, players)
         logger.info(f"Cached {len(players)} pro players")
@@ -92,7 +92,7 @@ class ProSceneFetcher:
 
         logger.info("Fetching teams from OpenDota...")
         async with OpenDota(format="json") as client:
-            teams = await client.get_teams()
+            teams = await client.get("teams")
 
         self._save_to_cache(filename, teams)
         logger.info(f"Cached {len(teams)} teams")
@@ -112,9 +112,9 @@ class ProSceneFetcher:
 
         logger.info(f"Fetching team {team_id} details from OpenDota...")
         async with OpenDota(format="json") as client:
-            team = await client.get_team(team_id)
-            players = await client.get_team_players(team_id)
-            matches = await client.get_team_matches(team_id, limit=50)
+            team = await client.get(f"teams/{team_id}")
+            players = await client.get(f"teams/{team_id}/players")
+            matches = await client.get(f"teams/{team_id}/matches")
 
         data = {
             "team": team,
@@ -138,7 +138,7 @@ class ProSceneFetcher:
 
         logger.info("Fetching leagues from OpenDota...")
         async with OpenDota(format="json") as client:
-            leagues = await client.get_leagues()
+            leagues = await client.get("leagues")
 
         self._save_to_cache(filename, leagues)
         logger.info(f"Cached {len(leagues)} leagues")

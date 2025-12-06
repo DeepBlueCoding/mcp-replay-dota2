@@ -469,8 +469,8 @@ class ProSceneResource:
         """Get matches from a specific league/tournament with series grouping."""
         try:
             async with OpenDota(format="json") as client:
-                raw_matches = await client.get_league_matches(league_id, limit=limit)
-                league_data = await client.get_league(league_id)
+                raw_matches = await client.get(f"leagues/{league_id}/matches")
+                league_data = await client.get(f"leagues/{league_id}")
 
             league_name = None
             if league_data:
