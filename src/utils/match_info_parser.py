@@ -158,7 +158,8 @@ class MatchInfoParser:
         """
         try:
             parser = Parser(str(replay_path))
-            result = parser.parse(game_info=True)
+            # Parse with combat_log to get actual game duration (not playback time)
+            result = parser.parse(game_info=True, combat_log={})
 
             if not result.success:
                 logger.error(f"Failed to parse game info: {result.error}")
@@ -224,6 +225,11 @@ class MatchInfoParser:
 
             is_pro = game_info.radiant_team_id > 0 or game_info.dire_team_id > 0 or game_info.league_id > 0
 
+            # Get actual game duration from combat log (playback_time includes draft/pregame)
+            duration_seconds = game_info.playback_time
+            if result.combat_log and result.combat_log.entries:
+                duration_seconds = max(e.game_time for e in result.combat_log.entries)
+
             return MatchInfoResult(
                 match_id=game_info.match_id,
                 is_pro_match=is_pro,
@@ -231,8 +237,8 @@ class MatchInfoParser:
                 game_mode=game_info.game_mode,
                 game_mode_name=GAME_MODES.get(game_info.game_mode, f"Unknown ({game_info.game_mode})"),
                 winner=winner,
-                duration_seconds=game_info.playback_time,
-                duration_str=self._format_duration(game_info.playback_time),
+                duration_seconds=duration_seconds,
+                duration_str=self._format_duration(duration_seconds),
                 radiant_team=radiant_team,
                 dire_team=dire_team,
                 players=players,

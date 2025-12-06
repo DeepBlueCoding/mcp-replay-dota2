@@ -7,9 +7,12 @@ Provides MCP tools for analyzing specific Dota 2 matches using replay files.
 All tools require a match_id and work with actual match data.
 """
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 # Add project paths for imports
 project_root = Path(__file__).parent.parent
@@ -118,7 +121,9 @@ from src.resources.pro_scene_resources import pro_scene_resource
 from src.services.cache.replay_cache import ReplayCache as ReplayCacheV2
 from src.services.replay.replay_service import ReplayService
 from src.utils.combat_log_parser import combat_log_parser
+from src.utils.match_fetcher import match_fetcher
 from src.utils.match_info_parser import match_info_parser
+from src.utils.pro_scene_fetcher import pro_scene_fetcher
 from src.utils.replay_downloader import ReplayDownloader
 
 # Initialize v2 services (for new tools with progress reporting)
@@ -799,6 +804,38 @@ async def get_match_draft(match_id: int) -> Dict[str, Any]:
     }
 
 
+async def _get_pro_names_from_opendota(match_id: int) -> Dict[int, str]:
+    """Fetch pro player names from OpenDota match data and manual overrides.
+
+    Returns mapping of steam_id -> pro_name for players with known pro names.
+    """
+    pro_names: Dict[int, str] = {}
+
+    # Load manual pro name mappings first (account_id -> pro_name)
+    manual_names = pro_scene_fetcher.get_manual_pro_names()
+
+    try:
+        match_data = await match_fetcher.get_match(match_id)
+        if match_data and "players" in match_data:
+            for player in match_data["players"]:
+                account_id = player.get("account_id")
+                if not account_id:
+                    continue
+
+                steam_id = account_id + 76561197960265728
+
+                # Check OpenDota pro name first
+                pro_name = player.get("name")
+                if pro_name:
+                    pro_names[steam_id] = pro_name
+                # Fall back to manual mappings
+                elif str(account_id) in manual_names:
+                    pro_names[steam_id] = manual_names[str(account_id)]
+    except Exception as e:
+        logger.warning(f"Could not fetch pro names from OpenDota: {e}")
+    return pro_names
+
+
 @mcp.tool
 async def get_match_info(match_id: int) -> Dict[str, Any]:
     """
@@ -837,9 +874,20 @@ async def get_match_info(match_id: int) -> Dict[str, Any]:
             "error": "Could not parse match info from replay"
         }
 
+    result = match_info.model_dump()
+
+    # Enrich player names with pro names from OpenDota
+    pro_names = await _get_pro_names_from_opendota(match_id)
+    if pro_names:
+        for player_list in [result["players"], result["radiant_players"], result["dire_players"]]:
+            for player in player_list:
+                steam_id = player.get("steam_id")
+                if steam_id and steam_id in pro_names:
+                    player["player_name"] = pro_names[steam_id]
+
     return {
         "success": True,
-        **match_info.model_dump()
+        **result
     }
 
 

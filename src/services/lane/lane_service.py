@@ -91,20 +91,19 @@ class LaneService:
             return positions
 
         for player in best_snapshot.players:
-            hero_name = self._clean_hero_name(player.get('hero_name', ''))
+            hero_name = self._clean_hero_name(player.hero_name)
             if not hero_name:
                 continue
 
             # Determine team from player_id (0-4 = Radiant, 5-9 = Dire)
-            player_id = player.get('player_id', 0)
-            team = 'radiant' if player_id < 5 else 'dire'
+            team = 'radiant' if player.player_id < 5 else 'dire'
 
             pos = HeroPosition(
                 game_time=best_snapshot.game_time,
                 tick=best_snapshot.tick,
                 hero=hero_name,
-                x=player.get('position_x', 0.0),
-                y=player.get('position_y', 0.0),
+                x=player.position_x,
+                y=player.position_y,
                 team=team,
             )
             positions.append(pos)
@@ -143,15 +142,15 @@ class LaneService:
             return cs_data
 
         for player in best_snapshot.players:
-            hero_name = self._clean_hero_name(player.get('hero_name', ''))
+            hero_name = self._clean_hero_name(player.hero_name)
             if not hero_name:
                 continue
 
             cs_data[hero_name] = {
-                'last_hits': player.get('last_hits', 0),
-                'denies': player.get('denies', 0),
-                'gold': player.get('gold', 0),
-                'level': player.get('level', 1),
+                'last_hits': player.last_hits,
+                'denies': player.denies,
+                'gold': player.gold,
+                'level': player.level,
             }
 
         return cs_data

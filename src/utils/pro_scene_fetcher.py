@@ -154,6 +154,18 @@ class ProSceneFetcher:
         data = self._load_from_cache("team_aliases.json")
         return data if data else {}
 
+    def get_manual_pro_names(self) -> Dict[str, str]:
+        """Get manual pro name mappings (account_id -> pro_name)."""
+        data = self._load_from_cache("manual_pro_names.json")
+        return data if data else {}
+
+    def add_manual_pro_name(self, account_id: int, pro_name: str) -> None:
+        """Add a manual pro name mapping."""
+        names = self.get_manual_pro_names()
+        names[str(account_id)] = pro_name
+        self._save_to_cache("manual_pro_names.json", names)
+        logger.info(f"Added manual pro name '{pro_name}' for account {account_id}")
+
     def add_player_alias(self, account_id: int, alias: str) -> None:
         """Add a manual alias for a player."""
         aliases = self.get_player_aliases()

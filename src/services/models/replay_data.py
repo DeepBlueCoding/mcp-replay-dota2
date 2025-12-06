@@ -87,7 +87,10 @@ class ParsedReplayData:
 
     @property
     def duration_seconds(self) -> float:
-        """Get match duration in seconds."""
+        """Get match duration in seconds (actual game time, not playback time)."""
+        # Use max game_time from combat log (playback_time includes draft/pregame)
+        if self.combat_log and self.combat_log.entries:
+            return max(e.game_time for e in self.combat_log.entries)
         if self.game_info:
             return self.game_info.playback_time
         return 0.0
