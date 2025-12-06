@@ -92,7 +92,8 @@ class TestMatchInfoParser:
     def test_get_match_info_duration_format(self, match_info):
         assert match_info.duration_seconds > 0
         assert ":" in match_info.duration_str
-        assert match_info.duration_str == "77:52"
+        # Game time from combat_log (excludes draft/pregame)
+        assert match_info.duration_str == "59:07"
 
 
 class TestDraftParser:

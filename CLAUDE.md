@@ -55,24 +55,33 @@ data/
 
 ## Key Patterns
 
-### Always Reuse Parsed Replay Data
+### Use python-manta Types, Not Dicts
 
-Replay parsing is expensive (~8 min per file). The codebase has two caching layers:
+**CRITICAL**: Always use python-manta Pydantic models and access attributes directly:
 
-1. **`replay_cache`** (src/utils/replay_cache.py) - diskcache for production
-2. **`conftest.py`** fixtures - session-scoped for tests
-
-When writing tests, USE THE FIXTURES from conftest.py:
 ```python
-def test_something(hero_deaths, combat_log_280_290):  # fixtures inject cached data
-    assert len(hero_deaths) > 0
+# GOOD - python-manta types with attribute access
+from python_manta import EntitySnapshot, PlayerState, CombatLogEntry
+
+for player in snapshot.players:  # player is PlayerState
+    hero = player.hero_name      # attribute access
+    cs = player.last_hits
+
+# BAD - dict-style access (WILL FAIL)
+for player in snapshot.players:
+    hero = player.get('hero_name')  # NO! PlayerState is not a dict
+    hero = player['hero_name']       # NO!
 ```
 
-NEVER parse replays directly in tests. Add new fixtures to conftest.py if needed.
+### v2 Services Layer (src/services/)
+
+The v2 services use python-manta types directly:
+- `ReplayService` returns `ParsedReplayData` wrapping python-manta `ParseResult`
+- `EntitySnapshot.players` contains `List[PlayerState]` (Pydantic models)
+- `CombatLogResult.entries` contains `List[CombatLogEntry]` (Pydantic models)
 
 ### Single-Pass Parsing with python_manta v2
 
-Always use the v2 API with multiple collectors in one pass:
 ```python
 from python_manta import Parser, CombatLogType
 
@@ -85,20 +94,31 @@ result = parser.parse(
 deaths = [e for e in result.combat_log.entries if e.type == CombatLogType.DEATH]
 ```
 
-### Use Enum Types, Not Magic Numbers
+### Use Enums, Not Magic Numbers
 
 ```python
 # GOOD
 from python_manta import CombatLogType, Team
 if entry.type == CombatLogType.DEATH:
     ...
-if player.team == Team.RADIANT:
+if player.team == Team.RADIANT.value:
     ...
 
 # BAD - magic numbers
 if entry.type == 4:  # what is 4?
     ...
 ```
+
+### Tests: Use conftest.py Fixtures
+
+Replay parsing is expensive (~8 min per file). Use session-scoped fixtures:
+
+```python
+def test_something(hero_deaths, combat_log_280_290):  # fixtures inject cached data
+    assert len(hero_deaths) > 0
+```
+
+NEVER parse replays directly in tests.
 
 ### MCP Design: Resources vs Tools
 
@@ -128,8 +148,8 @@ Use `hero_fuzzy_search` for name matching.
 
 ### Adding New Parsers/Tools
 
-1. Use `replay_cache.get_parsed_data()` to get cached ParsedReplayData
-2. Extract what you need from the cached data
+1. Use `_replay_service.get_parsed_data(match_id)` to get `ParsedReplayData`
+2. Access python-manta types via attributes (not dicts)
 3. Return Pydantic models, not raw dicts
 
 ## Dependencies
