@@ -1525,7 +1525,7 @@
 <summary>🤖 AI Summary</summary>
 <p><strong>Match Analysis Tools</strong> (require <code>match_id</code>): <code>download_replay</code> (call first), <code>get_hero_deaths</code>, <code>get_combat_log</code>, <code>get_fight_combat_log</code>, <code>get_item_purchases</code>, <code>get_objective_kills</code>, <code>get_match_timeline</code>, <code>get_stats_at_minute</code>, <code>get_courier_kills</code>, <code>get_rune_pickups</code>, <code>get_match_draft</code>, <code>get_match_info</code>.</p>
 </details>
-<p><strong>Pro Scene Tools</strong>: <code>search_pro_player(query)</code>, <code>search_team(query)</code>, <code>get_pro_player(account_id)</code>, <code>get_pro_player_by_name(name)</code>, <code>get_team(team_id)</code>, <code>get_team_by_name(name)</code>, <code>get_team_matches(team_id)</code>, <code>get_leagues(tier?)</code>, <code>get_pro_matches(limit?)</code>, <code>get_league_matches(league_id)</code>.</p>
+<p><strong>Pro Scene Tools</strong>: <code>search_pro_player(query)</code>, <code>search_team(query)</code>, <code>get_pro_player(account_id)</code>, <code>get_pro_player_by_name(name)</code>, <code>get_team(team_id)</code>, <code>get_team_by_name(name)</code>, <code>get_team_matches(team_id)</code>, <code>get_leagues(tier?)</code>, <code>get_pro_matches(limit?, tier?, team_name?, league_name?, days_back?)</code>, <code>get_league_matches(league_id)</code>.</p>
 <p>Tools are functions the LLM can call. All tools take <code>match_id</code> as required parameter.</p>
 <h2 id="download_replay">download_replay<a class="headerlink" href="#download_replay" title="Permanent link">&para;</a></h2>
 <p>Pre-download and cache a replay file. <strong>Use this first</strong> before asking analysis questions about a new match. Replay files are large (50-400MB) and can take 1-5 minutes to download.</p>
@@ -1917,8 +1917,55 @@
 </code></pre></div></p>
 <hr />
 <h2 id="get_pro_matches">get_pro_matches<a class="headerlink" href="#get_pro_matches" title="Permanent link">&para;</a></h2>
-<p>Get recent professional matches with series grouping.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">limit</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+<p>Get recent professional matches with series grouping. By default returns ALL matches including low-tier leagues - use filters to narrow down results.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>limit</code></td>
+<td>int</td>
+<td>Maximum matches to return (default: 100)</td>
+</tr>
+<tr>
+<td><code>tier</code></td>
+<td>string</td>
+<td>Filter by league tier: <code>"premium"</code> (TI, Majors), <code>"professional"</code>, or <code>"amateur"</code></td>
+</tr>
+<tr>
+<td><code>team_name</code></td>
+<td>string</td>
+<td>Fuzzy match team name (e.g., "OG", "Spirit", "Navi")</td>
+</tr>
+<tr>
+<td><code>league_name</code></td>
+<td>string</td>
+<td>Contains match on league name (e.g., "SLAM", "ESL", "DreamLeague")</td>
+</tr>
+<tr>
+<td><code>days_back</code></td>
+<td>int</td>
+<td>Only return matches from the last N days</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># Get top-tier tournament matches only</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">tier</span><span class="o">=</span><span class="s2">&quot;premium&quot;</span><span class="p">)</span>
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="c1"># Find matches for a specific team</span>
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">team_name</span><span class="o">=</span><span class="s2">&quot;OG&quot;</span><span class="p">)</span>
+<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="c1"># Find matches in a specific tournament</span>
+<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;SLAM&quot;</span><span class="p">)</span>
+<a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a>
+<a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a><span class="c1"># Combine filters</span>
+<a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">tier</span><span class="o">=</span><span class="s2">&quot;premium&quot;</span><span class="p">,</span> <span class="n">team_name</span><span class="o">=</span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span> <span class="n">days_back</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Returns:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="p">{</span>
