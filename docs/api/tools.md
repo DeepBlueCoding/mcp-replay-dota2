@@ -4,7 +4,7 @@
 
     **Match Analysis Tools** (require `match_id`): `download_replay` (call first), `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, `get_rune_pickups`, `get_match_draft`, `get_match_info`.
 
-**Pro Scene Tools**: `search_pro_player(query)`, `search_team(query)`, `get_pro_player(account_id)`, `get_pro_player_by_name(name)`, `get_team(team_id)`, `get_team_by_name(name)`, `get_team_matches(team_id)`, `get_leagues(tier?)`, `get_pro_matches(limit?)`, `get_league_matches(league_id)`.
+**Pro Scene Tools**: `search_pro_player(query)`, `search_team(query)`, `get_pro_player(account_id)`, `get_pro_player_by_name(name)`, `get_team(team_id)`, `get_team_by_name(name)`, `get_team_matches(team_id)`, `get_leagues(tier?)`, `get_pro_matches(limit?, tier?, team_name?, league_name?, days_back?)`, `get_league_matches(league_id)`.
 
 Tools are functions the LLM can call. All tools take `match_id` as required parameter.
 
@@ -541,10 +541,30 @@ get_leagues(tier="premium")  # "premium", "professional", "amateur", or None for
 
 ## get_pro_matches
 
-Get recent professional matches with series grouping.
+Get recent professional matches with series grouping. By default returns ALL matches including low-tier leagues - use filters to narrow down results.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | int | Maximum matches to return (default: 100) |
+| `tier` | string | Filter by league tier: `"premium"` (TI, Majors), `"professional"`, or `"amateur"` |
+| `team_name` | string | Fuzzy match team name (e.g., "OG", "Spirit", "Navi") |
+| `league_name` | string | Contains match on league name (e.g., "SLAM", "ESL", "DreamLeague") |
+| `days_back` | int | Only return matches from the last N days |
 
 ```python
-get_pro_matches(limit=100)
+# Get top-tier tournament matches only
+get_pro_matches(tier="premium")
+
+# Find matches for a specific team
+get_pro_matches(team_name="OG")
+
+# Find matches in a specific tournament
+get_pro_matches(league_name="SLAM")
+
+# Combine filters
+get_pro_matches(tier="premium", team_name="Team Spirit", days_back=30)
 ```
 
 **Returns:**

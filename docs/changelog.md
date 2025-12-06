@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Pro scene tools: `search_pro_player`, `search_team`, `get_pro_player`, `get_pro_player_by_name`, `get_team`, `get_team_by_name`, `get_team_matches`, `get_leagues`, `get_pro_matches`, `get_league_matches`
 - Series grouping for pro matches (Bo1/Bo3/Bo5 detection, winner calculation)
 - Fuzzy search for players and teams with alias support
+- **NEW**: `get_pro_matches` filtering options: `tier`, `team_name`, `league_name`, `days_back` - helps narrow down results to relevant matches
 
 #### Match Analysis Tools
 - `get_match_heroes` - Get 10 heroes in match with KDA, items, stats
