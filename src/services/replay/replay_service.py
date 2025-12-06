@@ -91,7 +91,14 @@ class ReplayService:
         if progress:
             await progress(50, 100, "Parsing replay...")
 
-        data = self._parse_replay(match_id, replay_path, progress)
+        try:
+            data = self._parse_replay(match_id, replay_path, progress)
+        except ValueError as e:
+            # Parsing failed - delete corrupt replay so it can be re-downloaded
+            logger.error(f"Parsing failed for match {match_id}, deleting corrupt replay: {e}")
+            if replay_path.exists():
+                replay_path.unlink()
+            raise ValueError(f"Replay file corrupt, deleted for re-download: {e}")
 
         # Cache result
         if progress:
@@ -146,9 +153,20 @@ class ReplayService:
         return self._get_replay_path(match_id) is not None
 
     def _get_replay_path(self, match_id: int) -> Optional[Path]:
-        """Get path to replay if it exists."""
+        """Get path to replay if it exists and is valid size."""
         dem_file = self._replay_dir / f"{match_id}.dem"
-        return dem_file if dem_file.exists() else None
+        if not dem_file.exists():
+            return None
+
+        # Validate file size (min 10MB for valid replay)
+        min_size = 10 * 1024 * 1024  # 10 MB
+        file_size = dem_file.stat().st_size
+        if file_size < min_size:
+            logger.warning(f"Replay {match_id} too small ({file_size} bytes), deleting")
+            dem_file.unlink()
+            return None
+
+        return dem_file
 
     async def _download_replay(
         self,
@@ -234,7 +252,14 @@ class ReplayService:
                                 f"Downloading... {mb_done:.1f}/{mb_total:.1f} MB"
                             )
 
-            logger.info(f"Downloaded replay to {bz2_file}")
+            # Verify download completed
+            if total_size > 0 and downloaded != total_size:
+                logger.error(f"Incomplete download: got {downloaded} bytes, expected {total_size}")
+                if bz2_file.exists():
+                    bz2_file.unlink()
+                return None
+
+            logger.info(f"Downloaded replay to {bz2_file} ({downloaded} bytes)")
             return bz2_file
 
         except requests.RequestException as e:
@@ -257,7 +282,16 @@ class ReplayService:
                             break
                         f_out.write(chunk)
 
-            logger.info(f"Extracted replay to {output_file}")
+            # Verify extracted file is reasonable size (min 10MB for valid replay)
+            file_size = output_file.stat().st_size
+            min_size = 10 * 1024 * 1024  # 10 MB
+            if file_size < min_size:
+                logger.error(f"Extracted file too small: {file_size} bytes (min {min_size})")
+                if output_file.exists():
+                    output_file.unlink()
+                return None
+
+            logger.info(f"Extracted replay to {output_file} ({file_size / (1024*1024):.1f} MB)")
             return output_file
 
         except Exception as e:

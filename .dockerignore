@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# Build
+dist
+build
+*.egg-info
+
+# Cache directories (will be mounted as volumes)
+.cache
+
+# Documentation
+docs
+*.md
+!data/*.md
+
+# Tests (not needed in production image)
+tests
+
+# Development files
+*.dem
+replays/

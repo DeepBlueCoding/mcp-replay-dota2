@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # MCP Server with SSE transport (for remote/web clients)
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist replay cache between restarts
+      - replay-cache:/app/.cache/mcp_dota2
+    command: ["python", "dota_match_mcp_server.py", "--transport", "sse"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/sse')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Alternative: STDIO transport (for local Claude Desktop)
+  # Use: docker run -i dota2-mcp-server
+  mcp-server-stdio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    volumes:
+      - replay-cache:/app/.cache/mcp_dota2
+    profiles:
+      - stdio
+
+volumes:
+  replay-cache:
+    driver: local

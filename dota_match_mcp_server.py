@@ -19,8 +19,76 @@ sys.path.insert(0, str(mcp_dir))
 
 from fastmcp import Context, FastMCP
 
-# Create the MCP server instance
-mcp = FastMCP("Dota 2 Match Analysis Server")
+# Create the MCP server instance with coaching instructions
+COACHING_INSTRUCTIONS = """
+You are a Dota 2 coaching assistant analyzing professional and pub match replays.
+Your goal is to provide MEANINGFUL ANALYSIS, not just display raw data.
+
+## Analysis Philosophy
+- Never dump raw numbers in tables without context
+- Every statistic must be linked to an explanation of WHY it matters
+- Focus on PATTERNS and TRENDS, not isolated events
+- Provide actionable coaching advice the player can apply in future games
+
+## Workflow for Match Analysis
+1. Start with get_match_info for game context (duration, winner, skill level)
+2. Use get_draft to understand team compositions and expected playstyles
+3. Analyze objectives with get_objective_kills to understand game flow
+4. Review deaths with get_hero_deaths to identify patterns
+5. Use get_timeline for critical game moments and networth swings
+
+## Key Analysis Areas
+
+### Objectives & Map Control
+- First tower: Which team took it? Who rotated (mid with rune, supports via portal)?
+- Identify kill sequences around objectives (defenders TPing, smoke ganks)
+- Roshan timing and fights around the pit
+- High ground siege attempts and outcomes
+
+### Networth & Economy
+- Link networth swings to specific teamfights or objectives
+- Identify power spikes from key item completions
+- Explain WHEN a team gained/lost advantage and WHY
+
+### Death Pattern Recognition
+Look for REPETITIVE death patterns:
+- Supports dying out of position (warding without vision, solo rotations)
+- Deaths to smoke ganks (lack of defensive wards, predictable farming patterns)
+- Vision-related deaths (walking into unwarded areas, missing enemy movements)
+- High ground siege deaths (bad initiation, getting counter-initiated)
+- Same hero dying in similar situations multiple times
+
+### Teamfight Analysis
+- Who initiated? Was it a good or bad fight to take?
+- Key abilities used/missed
+- Positioning issues that led to deaths
+- Items that made the difference (BKB timing, save items)
+
+## Response Format
+- Lead with 2-3 key insights that answer "what went wrong/right"
+- Use game timestamps when discussing events (e.g., "At 15:23...")
+- Tables are OK when they support your explanation, not as standalone data
+- End with specific, actionable advice
+
+## Example Good Analysis
+"The Radiant support died 4 times between 10:00-15:00, all while placing wards alone.
+At 11:42, 12:58, and 14:15, they walked into unwarded jungle and died to smoke ganks.
+**Coaching point**: Place wards with a core nearby, or use smokes when moving into
+dangerous territory. Consider defensive ward spots that can be placed safely."
+
+## Example Bad Analysis (AVOID)
+"Here are the deaths:
+| Time | Hero | Killer |
+| 11:42 | CM | PA |
+| 12:58 | CM | PA |
+..."
+(Raw table without analysis adds no value)
+"""
+
+mcp = FastMCP(
+    name="Dota 2 Match Analysis Server",
+    instructions=COACHING_INSTRUCTIONS,
+)
 
 # Import business logic
 from src.models.combat_log import (
@@ -51,7 +119,6 @@ from src.services.cache.replay_cache import ReplayCache as ReplayCacheV2
 from src.services.replay.replay_service import ReplayService
 from src.utils.combat_log_parser import combat_log_parser
 from src.utils.match_info_parser import match_info_parser
-from src.utils.replay_cache import replay_cache
 from src.utils.replay_downloader import ReplayDownloader
 
 # Initialize v2 services (for new tools with progress reporting)
@@ -78,12 +145,6 @@ from src.services.seek.seek_service import SeekService
 _seek_service = SeekService()
 
 from src.utils.timeline_parser import timeline_parser
-
-# Purge expired replay cache entries on server start
-_expired_count = replay_cache.clear_expired()
-if _expired_count > 0:
-    import logging
-    logging.getLogger(__name__).info(f"Purged {_expired_count} expired replay cache entries")
 
 
 # Define MCP Resources
@@ -1866,11 +1927,38 @@ async def get_fight_replay(
 
 def main():
     """Main entry point for the server."""
-    if len(sys.argv) > 1 and sys.argv[1] == "--version":
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description="Dota 2 Match MCP Server")
+    parser.add_argument("--version", action="store_true", help="Show version")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse"],
+        default="stdio",
+        help="Transport mode: stdio (default) or sse for HTTP/SSE",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", 8081)),
+        help="Port for SSE transport (default: 8081 or PORT env var)",
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host for SSE transport (default: 0.0.0.0)",
+    )
+    args = parser.parse_args()
+
+    if args.version:
         print("Dota 2 Match MCP Server v1.0.0")
         return
 
     print("Dota 2 Match MCP Server starting...", file=sys.stderr)
+    print(f"Transport: {args.transport}", file=sys.stderr)
+    if args.transport == "sse":
+        print(f"Listening on: http://{args.host}:{args.port}", file=sys.stderr)
     print("Resources:", file=sys.stderr)
     print("   dota2://heroes/all", file=sys.stderr)
     print("   dota2://map", file=sys.stderr)
@@ -1913,7 +2001,10 @@ def main():
     print("   get_position_timeline (v2)", file=sys.stderr)
     print("   get_fight_replay (v2)", file=sys.stderr)
 
-    mcp.run()
+    if args.transport == "sse":
+        mcp.run(transport="sse", host=args.host, port=args.port)
+    else:
+        mcp.run()
 
 
 if __name__ == "__main__":
