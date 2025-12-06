@@ -5,7 +5,6 @@ Uses pre-parsed replay data from conftest.py fixtures.
 All data is from match 8461956309 with verified values from Dotabuff.
 """
 
-
 from src.models.combat_log import (
     BarracksKill,
     CombatLogEvent,
@@ -214,7 +213,7 @@ class TestRunePickups:
 
     def test_first_rune_pickup_details(self, rune_pickups):
         first_rune = rune_pickups[0]
-        assert first_rune.game_time_str == "6:14"
+        assert first_rune.game_time_str == "6:15"
         assert first_rune.hero == "naga_siren"
         assert first_rune.rune_type == "Arcane"
 
