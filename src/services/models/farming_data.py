@@ -18,37 +18,98 @@ class CreepKill(BaseModel):
     creep_type: str = Field(description="Creep type: lane, neutral, or other")
     neutral_camp: Optional[str] = Field(
         default=None,
-        description="Neutral camp type if applicable (e.g., 'satyr', 'centaur')"
+        description="Neutral camp type if applicable (e.g., 'large_troll', 'ancient_black_dragon')"
     )
+    camp_tier: Optional[str] = Field(
+        default=None,
+        description="Camp tier from python-manta: 'small', 'medium', 'hard', or 'ancient'"
+    )
+    position_x: Optional[float] = Field(
+        default=None, description="X coordinate where the kill occurred"
+    )
+    position_y: Optional[float] = Field(
+        default=None, description="Y coordinate where the kill occurred"
+    )
+    map_area: Optional[str] = Field(
+        default=None,
+        description="Map area where kill occurred (e.g., 'dire_jungle', 'radiant_jungle', 'radiant_safelane')"
+    )
+
+
+class MapPositionSnapshot(BaseModel):
+    """A position snapshot on the map."""
+
+    x: float = Field(description="X coordinate")
+    y: float = Field(description="Y coordinate")
+    area: str = Field(description="Map area (e.g., 'dire_jungle', 'radiant_safelane')")
+
+
+class CampClear(BaseModel):
+    """A single neutral camp clear within a minute."""
+
+    time_str: str = Field(description="Game time formatted as M:SS")
+    camp: str = Field(description="Camp type (e.g., 'large_troll', 'medium_satyr')")
+    tier: str = Field(description="Camp tier: small, medium, large, or ancient")
+    area: str = Field(description="Map area where camp was cleared")
+
+
+class MultiCampClear(BaseModel):
+    """Multiple camps cleared simultaneously (stacked or adjacent camps)."""
+
+    time_str: str = Field(description="Game time when multi-camp clear started (M:SS)")
+    camps: List[str] = Field(description="List of camp types cleared together")
+    duration_seconds: float = Field(description="Time span of all kills in this clear")
+    creeps_killed: int = Field(description="Total creeps killed across all camps")
+    area: str = Field(description="Map area where multi-camp clear occurred")
 
 
 class MinuteFarmingData(BaseModel):
     """Farming data for a single minute."""
 
     minute: int = Field(description="Game minute")
+
+    # Position at minute boundaries
+    position_at_start: Optional[MapPositionSnapshot] = Field(
+        default=None, description="Hero position at the start of this minute (X:00)"
+    )
+    position_at_end: Optional[MapPositionSnapshot] = Field(
+        default=None, description="Hero position at the end of this minute (X:59)"
+    )
+
+    # Ordered camp sequence - shows farming route
+    camp_sequence: List[CampClear] = Field(
+        default_factory=list,
+        description="Ordered sequence of neutral camps cleared during this minute"
+    )
+
+    # Summary counts
     lane_creeps_killed: int = Field(
         default=0, description="Lane creeps killed during this minute"
     )
-    neutral_creeps_killed: int = Field(
-        default=0, description="Neutral creeps killed during this minute"
+    camps_cleared: int = Field(
+        default=0, description="Number of neutral camps cleared during this minute"
     )
-    neutral_camps_detail: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Breakdown of neutral kills by camp type (e.g., {'satyr': 3, 'centaur': 2})"
-    )
-    position_x: Optional[float] = Field(
-        default=None, description="Hero X position at minute mark"
-    )
-    position_y: Optional[float] = Field(
-        default=None, description="Hero Y position at minute mark"
-    )
-    map_area: Optional[str] = Field(
-        default=None, description="Map area at minute mark (e.g., 'dire_safelane', 'radiant_jungle')"
-    )
-    gold: int = Field(default=0, description="Net worth at minute mark")
-    last_hits: int = Field(default=0, description="Total last hits at minute mark")
-    denies: int = Field(default=0, description="Total denies at minute mark")
-    level: int = Field(default=1, description="Hero level at minute mark")
+
+    # Stats at end of minute
+    gold: int = Field(default=0, description="Net worth at end of minute")
+    last_hits: int = Field(default=0, description="Total last hits at end of minute")
+    level: int = Field(default=1, description="Hero level at end of minute")
+
+
+class LevelTiming(BaseModel):
+    """Timing for when a hero reached a specific level."""
+
+    level: int = Field(description="Hero level reached")
+    time: float = Field(description="Game time in seconds")
+    time_str: str = Field(description="Game time formatted as M:SS")
+
+
+class ItemTiming(BaseModel):
+    """Timing for when an item was purchased."""
+
+    item: str = Field(description="Item name")
+    time: float = Field(description="Game time in seconds when purchased")
+    time_str: str = Field(description="Game time formatted as M:SS")
 
 
 class FarmingTransitions(BaseModel):
@@ -94,6 +155,9 @@ class FarmingSummary(BaseModel):
         default_factory=dict,
         description="Total neutral kills by camp type"
     )
+    multi_camp_clears: int = Field(
+        default=0, description="Number of times hero farmed 2+ camps simultaneously"
+    )
 
 
 class FarmingPatternResponse(BaseModel):
@@ -104,10 +168,23 @@ class FarmingPatternResponse(BaseModel):
     hero: str = Field(description="Hero name analyzed")
     start_minute: int = Field(description="Start of analysis range")
     end_minute: int = Field(description="End of analysis range")
+
+    # Power spike tracking
+    level_timings: List[LevelTiming] = Field(
+        default_factory=list,
+        description="When hero reached each level (for power spike analysis)"
+    )
+    item_timings: List[ItemTiming] = Field(
+        default_factory=list,
+        description="When items were purchased (for power spike analysis)"
+    )
+
+    # Per-minute farming data with routes
     minutes: List[MinuteFarmingData] = Field(
         default_factory=list,
-        description="Minute-by-minute farming breakdown"
+        description="Minute-by-minute farming breakdown with camp sequences"
     )
+
     transitions: FarmingTransitions = Field(
         default_factory=FarmingTransitions,
         description="Key transition points in farming pattern"
@@ -119,5 +196,9 @@ class FarmingPatternResponse(BaseModel):
     creep_kills: List[CreepKill] = Field(
         default_factory=list,
         description="All creep kills in chronological order"
+    )
+    multi_camp_clears: List[MultiCampClear] = Field(
+        default_factory=list,
+        description="Events where hero farmed 2+ camps simultaneously (stacked/adjacent)"
     )
     error: Optional[str] = Field(default=None)

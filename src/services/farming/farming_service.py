@@ -11,7 +11,7 @@ import logging
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
-from python_manta import CombatLogType
+from python_manta import CombatLogType, NeutralCampType
 
 from ...utils.position_tracker import classify_map_position
 from ..models.farming_data import (
@@ -24,6 +24,7 @@ from ..models.farming_data import (
     LevelTiming,
     MapPositionSnapshot,
     MinuteFarmingData,
+    MultiCampClear,
 )
 from ..models.replay_data import ParsedReplayData
 
@@ -83,6 +84,14 @@ CAMP_TIERS = {
     "large": ["large_satyr", "large_centaur", "large_troll", "large_golem", "large_hellbear", "large_wildwing"],
     "medium": ["medium_wolf", "medium_ogre", "medium_furbolg", "medium_centaur", "medium_warpine", "medium_harpy"],
     "small": ["small_kobold", "small_troll", "small_ghost", "small_vhoul", "small_gnoll"],
+}
+
+# NeutralCampType enum to string tier mapping
+NEUTRAL_CAMP_TYPE_TO_TIER = {
+    NeutralCampType.SMALL.value: "small",
+    NeutralCampType.MEDIUM.value: "medium",
+    NeutralCampType.HARD.value: "large",  # HARD = large camps
+    NeutralCampType.ANCIENT.value: "ancient",
 }
 
 
@@ -196,6 +205,11 @@ class FarmingService:
             if creep_type == "other":
                 continue  # Skip summons, wards, etc.
 
+            # Get camp tier from python-manta's neutral_camp_type (more reliable)
+            camp_tier = None
+            if hasattr(entry, 'neutral_camp_type') and entry.neutral_camp_type is not None:
+                camp_tier = NEUTRAL_CAMP_TYPE_TO_TIER.get(entry.neutral_camp_type)
+
             # Get hero position at kill time
             x, y, map_area = self._get_position_at_time(data, hero, entry.game_time)
 
@@ -205,6 +219,7 @@ class FarmingService:
                 creep_name=entry.target_name,
                 creep_type=creep_type,
                 neutral_camp=neutral_camp,
+                camp_tier=camp_tier,
                 position_x=round(x, 1) if x else None,
                 position_y=round(y, 1) if y else None,
                 map_area=map_area,
@@ -325,6 +340,66 @@ class FarmingService:
                     break
 
         return transitions
+
+    def _detect_multi_camp_clears(
+        self,
+        creep_kills: List[CreepKill],
+        time_window: float = 3.0,
+    ) -> List[MultiCampClear]:
+        """
+        Detect when hero farms multiple camps simultaneously.
+
+        Args:
+            creep_kills: All creep kills (already filtered to one hero)
+            time_window: Max seconds between kills to be considered simultaneous
+
+        Returns:
+            List of MultiCampClear events
+        """
+        multi_clears: List[MultiCampClear] = []
+
+        # Filter to only neutral kills
+        neutral_kills = [k for k in creep_kills if k.creep_type == "neutral" and k.neutral_camp]
+
+        if len(neutral_kills) < 2:
+            return multi_clears
+
+        # Group consecutive kills within time_window
+        i = 0
+        while i < len(neutral_kills):
+            group_start = neutral_kills[i]
+            group = [group_start]
+            camp_types = {group_start.neutral_camp}
+
+            # Extend group while kills are within time_window
+            j = i + 1
+            while j < len(neutral_kills):
+                time_diff = neutral_kills[j].game_time - group_start.game_time
+                if time_diff <= time_window:
+                    group.append(neutral_kills[j])
+                    camp_types.add(neutral_kills[j].neutral_camp)
+                    j += 1
+                else:
+                    break
+
+            # Multi-camp if 2+ different camp types in the group
+            if len(camp_types) >= 2:
+                duration = group[-1].game_time - group[0].game_time
+                area = group[0].map_area or "unknown"
+
+                multi_clears.append(MultiCampClear(
+                    time_str=group[0].game_time_str,
+                    camps=sorted(camp_types),
+                    duration_seconds=round(duration, 1),
+                    creeps_killed=len(group),
+                    area=area,
+                ))
+                # Skip past this group
+                i = j
+            else:
+                i += 1
+
+        return multi_clears
 
     def _get_level_timings(
         self,
@@ -488,6 +563,9 @@ class FarmingService:
         start_cs = minute_data[0].last_hits if minute_data else 0
         cs_per_min = round((end_cs - start_cs) / duration_minutes, 1) if duration_minutes > 0 else 0
 
+        # Detect multi-camp clears (stacked/adjacent farming)
+        multi_camp_clears = self._detect_multi_camp_clears(creep_kills)
+
         summary = FarmingSummary(
             total_lane_creeps=total_lane,
             total_neutral_creeps=total_camps,
@@ -495,6 +573,7 @@ class FarmingService:
             gpm=gpm,
             cs_per_min=cs_per_min,
             camps_cleared=dict(all_camps),
+            multi_camp_clears=len(multi_camp_clears),
         )
 
         # Detect transitions
@@ -512,4 +591,5 @@ class FarmingService:
             transitions=transitions,
             summary=summary,
             creep_kills=creep_kills,
+            multi_camp_clears=multi_camp_clears,
         )

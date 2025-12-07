@@ -121,9 +121,50 @@ get_combat_log(
     match_id=8461956309,
     start_time=280,      # optional: filter by time range
     end_time=300,
-    hero_filter="earthshaker"  # optional: only events involving this hero
+    hero_filter="earthshaker",  # optional: only events involving this hero
+    significant_only=False      # optional: filter to story-telling events only
 )
 ```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `match_id` | int | Required. The match ID |
+| `start_time` | float | Optional. Filter events after this game time (seconds) |
+| `end_time` | float | Optional. Filter events before this game time (seconds) |
+| `hero_filter` | string | Optional. Only events involving this hero (e.g., "earthshaker") |
+| `significant_only` | bool | Optional. If `true`, returns only story-telling events. Default: `false` |
+
+**significant_only Mode:**
+
+When `significant_only=true`, returns only high-level events useful for narrative analysis:
+
+| Included | Event Type | Description |
+|----------|------------|-------------|
+| ✅ | `ABILITY` | Ability casts |
+| ✅ | `DEATH` | Hero deaths |
+| ✅ | `ITEM` | Active item usage |
+| ✅ | `PURCHASE` | Item purchases |
+| ✅ | `BUYBACK` | Buybacks |
+
+| Excluded | Event Type | Reason |
+|----------|------------|--------|
+| ❌ | `DAMAGE` | Every damage tick creates noise |
+| ❌ | `MODIFIER_ADD` | Buff/debuff spam |
+| ❌ | `MODIFIER_REMOVE` | Buff/debuff spam |
+
+**When to use `significant_only=true`:**
+
+- Analyzing rotations over longer time windows (60-90+ seconds)
+- Getting an overview of what happened in a fight
+- Avoiding overwhelming the LLM with thousands of events
+
+**When to use default (all events):**
+
+- Detailed damage breakdown analysis
+- Tracking specific buff/debuff durations
+- Short time windows where full detail is useful
 
 **Returns:**
 ```json
@@ -144,7 +185,7 @@ get_combat_log(
 }
 ```
 
-Event types: `DAMAGE`, `MODIFIER_ADD`, `MODIFIER_REMOVE`, `ABILITY`, `ITEM`, `DEATH`, `HEAL`
+Event types: `DAMAGE`, `MODIFIER_ADD`, `MODIFIER_REMOVE`, `ABILITY`, `ITEM`, `DEATH`, `HEAL`, `PURCHASE`, `BUYBACK`
 
 ---
 
@@ -970,35 +1011,65 @@ get_farming_pattern(
   "minutes": [
     {
       "minute": 5,
-      "lane_creeps": 28,
-      "neutral_creeps": 2,
-      "position": {"x": -5200, "y": -4100},
+      "lane_creeps_killed": 28,
+      "camps_cleared": 2,
+      "camp_sequence": [
+        {"time_str": "5:12", "camp": "large_centaur", "tier": "large", "area": "radiant_jungle"},
+        {"time_str": "5:45", "camp": "medium_wolf", "tier": "medium", "area": "radiant_jungle"}
+      ],
+      "position_at_start": {"x": -5200, "y": -4100, "area": "radiant_safelane"},
       "gold": 2100,
       "level": 6
-    },
+    }
+  ],
+  "creep_kills": [
     {
-      "minute": 10,
-      "lane_creeps": 52,
-      "neutral_creeps": 18,
-      "position": {"x": -4800, "y": -3200},
-      "gold": 5200,
-      "level": 11
+      "game_time": 312.5,
+      "game_time_str": "5:12",
+      "creep_name": "npc_dota_neutral_centaur_khan",
+      "creep_type": "neutral",
+      "neutral_camp": "large_centaur",
+      "camp_tier": "large",
+      "map_area": "radiant_jungle"
+    }
+  ],
+  "multi_camp_clears": [
+    {
+      "time_str": "14:05",
+      "camps": ["large_centaur", "medium_wolf"],
+      "duration_seconds": 1.1,
+      "creeps_killed": 4,
+      "area": "dire_jungle"
     }
   ],
   "transitions": {
-    "first_jungle_kill": "4:23",
-    "first_large_camp": "5:12",
-    "left_lane": "6:45"
+    "first_jungle_kill_str": "4:23",
+    "first_large_camp_str": "5:12",
+    "left_lane_str": "6:45"
   },
   "summary": {
     "total_lane_creeps": 85,
     "total_neutral_creeps": 42,
     "jungle_percentage": 33.1,
-    "gpm": 520,
-    "cs_per_min": 8.5
+    "gpm": 520.0,
+    "cs_per_min": 8.5,
+    "multi_camp_clears": 3
   }
 }
 ```
+
+**Key Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `camp_sequence` | Ordered list of camps cleared each minute |
+| `creep_kills[].camp_tier` | Tier from replay parser: `small`, `medium`, `large`, `ancient` |
+| `multi_camp_clears` | Detects when hero farms 2+ camps simultaneously (stacked/adjacent camps) |
+| `summary.multi_camp_clears` | Total count of multi-camp clear events |
+
+**Multi-Camp Detection:**
+
+Detects heroes like Medusa or Luna farming stacked or adjacent camps with AoE abilities. A multi-camp clear is recorded when creeps from 2+ different camp types are killed within 3 seconds.
 
 **Example Questions This Tool Answers:**
 
@@ -1006,6 +1077,7 @@ get_farming_pattern(
 - "When did Anti-Mage start jungling?"
 - "Which camps did Luna clear between minutes 5-15?"
 - "How did the carry move across the map while farming?"
+- "Did Medusa farm stacked camps? How efficiently?"
 
 ---
 

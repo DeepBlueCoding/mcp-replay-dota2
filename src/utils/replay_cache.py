@@ -36,6 +36,8 @@ class CombatLogEntry:
     game_time: float
     attacker_team: int
     target_team: int
+    neutral_camp_type: Optional[int] = None  # NeutralCampType: 0=SMALL, 1=MEDIUM, 2=HARD, 3=ANCIENT
+    neutral_camp_team: Optional[int] = None  # Team that owns the camp
 
 
 @dataclass
@@ -181,6 +183,8 @@ class ReplayCache:
                     game_time=getattr(e, 'game_time', 0.0),
                     attacker_team=getattr(e, 'attacker_team', 0),
                     target_team=getattr(e, 'target_team', 0),
+                    neutral_camp_type=getattr(e, 'neutral_camp_type', None),
+                    neutral_camp_team=getattr(e, 'neutral_camp_team', None),
                 ))
         return entries
 
@@ -286,6 +290,8 @@ class ReplayCache:
                     "game_time": e.game_time,
                     "attacker_team": e.attacker_team,
                     "target_team": e.target_team,
+                    "neutral_camp_type": e.neutral_camp_type,
+                    "neutral_camp_team": e.neutral_camp_team,
                 }
                 for e in data.combat_log
             ],
