@@ -5,8 +5,9 @@ Combines CombatService and FightDetector for convenient fight queries.
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Set
 
+from ..analyzers.fight_analyzer import FightAnalyzer
 from ..analyzers.fight_detector import FightDetector
 from ..models.combat_data import Fight, FightResult, HeroDeath
 from ..models.replay_data import ParsedReplayData
@@ -30,9 +31,11 @@ class FightService:
         self,
         combat_service: Optional[CombatService] = None,
         fight_detector: Optional[FightDetector] = None,
+        fight_analyzer: Optional[FightAnalyzer] = None,
     ):
         self._combat = combat_service or CombatService()
         self._detector = fight_detector or FightDetector()
+        self._analyzer = fight_analyzer or FightAnalyzer()
 
     def get_all_fights(self, data: ParsedReplayData) -> FightResult:
         """
@@ -178,6 +181,33 @@ class FightService:
             if any(hero_lower in p.lower() for p in f.participants)
         ]
 
+    def _get_team_heroes(self, data: ParsedReplayData) -> tuple:
+        """
+        Extract radiant and dire hero sets from entity snapshots.
+
+        Returns:
+            Tuple of (radiant_heroes: Set[str], dire_heroes: Set[str])
+        """
+        radiant_heroes: Set[str] = set()
+        dire_heroes: Set[str] = set()
+
+        # Get heroes from first entity snapshot
+        if data.entity_snapshots:
+            snapshot = data.entity_snapshots[0]
+            if hasattr(snapshot, 'heroes') and snapshot.heroes:
+                for hero_snap in snapshot.heroes:
+                    hero_name = hero_snap.hero_name
+                    if hero_name and hero_name.startswith("npc_dota_hero_"):
+                        clean_name = hero_name[14:]
+                        # player_id 0-4 = radiant, 5-9 = dire
+                        if hasattr(hero_snap, 'player_id'):
+                            if hero_snap.player_id < 5:
+                                radiant_heroes.add(clean_name)
+                            else:
+                                dire_heroes.add(clean_name)
+
+        return radiant_heroes, dire_heroes
+
     def get_fight_combat_log(
         self,
         data: ParsedReplayData,
@@ -185,7 +215,7 @@ class FightService:
         hero: Optional[str] = None,
     ) -> Optional[dict]:
         """
-        Get fight boundaries and combat log for a fight at a given time.
+        Get fight boundaries, combat log, and highlights for a fight at a given time.
 
         Args:
             data: ParsedReplayData from ReplayService
@@ -193,7 +223,7 @@ class FightService:
             hero: Optional hero name to anchor fight detection
 
         Returns:
-            Dictionary with fight info and combat events, or None if no fight found
+            Dictionary with fight info, combat events, and highlights, or None if no fight found
         """
         fight = self.get_fight_at_time(data, reference_time, hero)
         if not fight:
@@ -203,11 +233,31 @@ class FightService:
         start_time = fight.start_time - 2.0
         end_time = fight.end_time + 1.0
 
-        events = self._combat.get_combat_log(
+        # Get significant events for the response
+        significant_events = self._combat.get_combat_log(
             data,
             start_time=start_time,
             end_time=end_time,
             significant_only=True,
+        )
+
+        # Get ALL events including MODIFIER_ADD for highlight detection
+        all_events = self._combat.get_combat_log(
+            data,
+            start_time=start_time,
+            end_time=end_time,
+            significant_only=False,
+        )
+
+        # Get team rosters for ace detection
+        radiant_heroes, dire_heroes = self._get_team_heroes(data)
+
+        # Analyze fight for highlights
+        highlights = self._analyzer.analyze_fight(
+            events=all_events,
+            deaths=fight.deaths,
+            radiant_heroes=radiant_heroes,
+            dire_heroes=dire_heroes,
         )
 
         return {
@@ -218,6 +268,7 @@ class FightService:
             "fight_end_str": fight.end_time_str,
             "duration": fight.duration,
             "participants": fight.participants,
-            "total_events": len(events),
-            "events": events,
+            "total_events": len(significant_events),
+            "events": significant_events,
+            "highlights": highlights,
         }

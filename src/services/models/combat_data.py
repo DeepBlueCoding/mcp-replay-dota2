@@ -140,3 +140,50 @@ class CombatLogEvent:
     ability: Optional[str] = None
     value: Optional[int] = None
     hit: Optional[bool] = None
+
+
+@dataclass
+class MultiHeroAbility:
+    """A big ability that hit multiple heroes."""
+
+    game_time: float
+    game_time_str: str
+    ability: str
+    ability_display: str
+    caster: str
+    targets: List[str] = field(default_factory=list)
+    hero_count: int = 0
+
+
+@dataclass
+class KillStreak:
+    """A kill streak (double kill, rampage, etc.)."""
+
+    game_time: float
+    game_time_str: str
+    hero: str
+    streak_type: str  # "double_kill", "triple_kill", "ultra_kill", "rampage"
+    kills: int = 0
+    victims: List[str] = field(default_factory=list)
+
+
+@dataclass
+class TeamWipe:
+    """An ace / team wipe."""
+
+    game_time: float
+    game_time_str: str
+    team_wiped: str  # "radiant" or "dire"
+    duration: float  # seconds to wipe all 5
+    killer_team: str
+
+
+@dataclass
+class FightHighlights:
+    """Key moments extracted from a fight."""
+
+    multi_hero_abilities: List[MultiHeroAbility] = field(default_factory=list)
+    kill_streaks: List[KillStreak] = field(default_factory=list)
+    team_wipes: List[TeamWipe] = field(default_factory=list)
+    fight_initiator: Optional[str] = None  # hero who started the fight
+    initiation_ability: Optional[str] = None  # ability used to initiate

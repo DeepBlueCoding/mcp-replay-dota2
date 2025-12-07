@@ -87,6 +87,64 @@ class CombatLogResponse(BaseModel):
     error: Optional[str] = Field(default=None)
 
 
+class MultiHeroAbility(BaseModel):
+    """A big ability that hit multiple heroes."""
+
+    game_time: float = Field(description="Game time when ability was cast")
+    game_time_str: str = Field(description="Game time formatted as M:SS")
+    ability: str = Field(description="Internal ability name")
+    ability_display: str = Field(description="Human-readable ability name (e.g., 'Chronosphere')")
+    caster: str = Field(description="Hero who cast the ability")
+    targets: List[str] = Field(default_factory=list, description="Heroes hit by the ability")
+    hero_count: int = Field(description="Number of heroes hit")
+
+
+class KillStreak(BaseModel):
+    """A kill streak (double kill, rampage, etc.)."""
+
+    game_time: float = Field(description="Game time of final kill in streak")
+    game_time_str: str = Field(description="Game time formatted as M:SS")
+    hero: str = Field(description="Hero who achieved the streak")
+    streak_type: str = Field(description="Type: double_kill, triple_kill, ultra_kill, rampage")
+    kills: int = Field(description="Number of kills in the streak")
+    victims: List[str] = Field(default_factory=list, description="Heroes killed in the streak")
+
+
+class TeamWipe(BaseModel):
+    """An ace / team wipe."""
+
+    game_time: float = Field(description="Game time when wipe was completed")
+    game_time_str: str = Field(description="Game time formatted as M:SS")
+    team_wiped: str = Field(description="Team that was wiped (radiant/dire)")
+    duration: float = Field(description="Seconds from first to last death")
+    killer_team: str = Field(description="Team that achieved the wipe")
+
+
+class FightHighlights(BaseModel):
+    """Key moments extracted from a fight."""
+
+    multi_hero_abilities: List[MultiHeroAbility] = Field(
+        default_factory=list,
+        description="Big abilities that hit multiple heroes (Chronosphere, Black Hole, etc.)"
+    )
+    kill_streaks: List[KillStreak] = Field(
+        default_factory=list,
+        description="Kill streaks achieved during the fight (double kill, rampage, etc.)"
+    )
+    team_wipes: List[TeamWipe] = Field(
+        default_factory=list,
+        description="Team wipes (all 5 heroes of one team killed)"
+    )
+    fight_initiator: Optional[str] = Field(
+        default=None,
+        description="Hero who initiated the fight with a big ability"
+    )
+    initiation_ability: Optional[str] = Field(
+        default=None,
+        description="Ability used to initiate the fight"
+    )
+
+
 class FightCombatLogResponse(BaseModel):
     """Response for get_fight_combat_log tool."""
 
@@ -101,6 +159,10 @@ class FightCombatLogResponse(BaseModel):
     participants: List[str] = Field(default_factory=list)
     total_events: int = Field(default=0)
     events: List[CombatLogEvent] = Field(default_factory=list)
+    highlights: Optional[FightHighlights] = Field(
+        default=None,
+        description="Key moments: multi-hero abilities, kill streaks, team wipes"
+    )
     error: Optional[str] = Field(default=None)
 
 

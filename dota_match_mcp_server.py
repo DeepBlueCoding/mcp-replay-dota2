@@ -675,6 +675,12 @@ async def get_fight_combat_log(
     connectivity. Separate skirmishes happening simultaneously in different lanes are
     correctly identified as distinct fights.
 
+    **NEW: Includes fight highlights** - key moments that determined the fight outcome:
+    - Multi-hero abilities: "4-man Chronosphere", "3-man Black Hole", etc.
+    - Kill streaks: Double Kill, Triple Kill, Ultra Kill, Rampage
+    - Team wipes: When all 5 heroes of one team die
+    - Fight initiation: Who started the fight and with what ability
+
     Use this after get_hero_deaths to get the full combat narrative for a kill,
     or use it to get all combat events around a specific game time (e.g., team fight at minute 11).
 
@@ -685,9 +691,23 @@ async def get_fight_combat_log(
               If omitted, finds the fight closest to reference_time.
 
     Returns:
-        FightCombatLogResponse with fight boundaries, participants, and combat events
+        FightCombatLogResponse with fight boundaries, participants, combat events, and highlights
     """
-    from src.models.combat_log import CombatLogEvent as CombatLogEventModel
+    from src.models.combat_log import (
+        CombatLogEvent as CombatLogEventModel,
+    )
+    from src.models.combat_log import (
+        FightHighlights as FightHighlightsModel,
+    )
+    from src.models.combat_log import (
+        KillStreak as KillStreakModel,
+    )
+    from src.models.combat_log import (
+        MultiHeroAbility as MultiHeroAbilityModel,
+    )
+    from src.models.combat_log import (
+        TeamWipe as TeamWipeModel,
+    )
 
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -721,6 +741,48 @@ async def get_fight_combat_log(
             for e in result["events"]
         ]
 
+        # Convert highlights to API model
+        highlights_data = result.get("highlights")
+        highlights = None
+        if highlights_data:
+            highlights = FightHighlightsModel(
+                multi_hero_abilities=[
+                    MultiHeroAbilityModel(
+                        game_time=mha.game_time,
+                        game_time_str=mha.game_time_str,
+                        ability=mha.ability,
+                        ability_display=mha.ability_display,
+                        caster=mha.caster,
+                        targets=mha.targets,
+                        hero_count=mha.hero_count,
+                    )
+                    for mha in highlights_data.multi_hero_abilities
+                ],
+                kill_streaks=[
+                    KillStreakModel(
+                        game_time=ks.game_time,
+                        game_time_str=ks.game_time_str,
+                        hero=ks.hero,
+                        streak_type=ks.streak_type,
+                        kills=ks.kills,
+                        victims=ks.victims,
+                    )
+                    for ks in highlights_data.kill_streaks
+                ],
+                team_wipes=[
+                    TeamWipeModel(
+                        game_time=tw.game_time,
+                        game_time_str=tw.game_time_str,
+                        team_wiped=tw.team_wiped,
+                        duration=tw.duration,
+                        killer_team=tw.killer_team,
+                    )
+                    for tw in highlights_data.team_wipes
+                ],
+                fight_initiator=highlights_data.fight_initiator,
+                initiation_ability=highlights_data.initiation_ability,
+            )
+
         return FightCombatLogResponse(
             success=True,
             match_id=match_id,
@@ -733,6 +795,7 @@ async def get_fight_combat_log(
             participants=result["participants"],
             total_events=len(events),
             events=events,
+            highlights=highlights,
         )
     except ValueError as e:
         return FightCombatLogResponse(
