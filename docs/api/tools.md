@@ -2,7 +2,7 @@
 
 ??? info "🤖 AI Summary"
 
-    **Match Analysis Tools** (require `match_id`): `download_replay` (call first), `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, `get_rune_pickups`, `get_match_draft`, `get_match_info`.
+    **Match Analysis Tools** (require `match_id`): `download_replay` (call first), `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, `get_rune_pickups`, `get_match_draft`, `get_match_info`, `get_match_heroes`, `get_match_players`.
 
     **Game State Tools**: `list_fights`, `get_teamfights`, `get_fight`, `get_camp_stacks`, `get_jungle_summary`, `get_lane_summary`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_position_timeline`, `get_fight_replay`.
 
@@ -439,6 +439,72 @@ get_match_info(match_id=8461956309)
     {"player_name": "Ame", "hero_name": "juggernaut", "hero_localized": "Juggernaut", "team": "radiant", "steam_id": 123456}
   ],
   "radiant_players": [...],
+  "dire_players": [...]
+}
+```
+
+---
+
+## get_match_heroes
+
+Get the 10 heroes in a match with detailed stats.
+
+```python
+get_match_heroes(match_id=8461956309)
+```
+
+**Returns:**
+```json
+{
+  "radiant_heroes": [
+    {
+      "hero_id": 1,
+      "hero_name": "antimage",
+      "localized_name": "Anti-Mage",
+      "team": "radiant",
+      "lane": "safe_lane",
+      "role": "core",
+      "kills": 8,
+      "deaths": 2,
+      "assists": 5,
+      "last_hits": 420,
+      "gpm": 650,
+      "xpm": 580,
+      "net_worth": 28500,
+      "hero_damage": 15200,
+      "items": ["item_manta", "item_bfury", "item_abyssal_blade"],
+      "player_name": "PlayerOne",
+      "pro_name": "Yatoro"
+    }
+  ],
+  "dire_heroes": [...]
+}
+```
+
+---
+
+## get_match_players
+
+Get the 10 players in a match with their hero assignments.
+
+```python
+get_match_players(match_id=8461956309)
+```
+
+**Returns:**
+```json
+{
+  "radiant_players": [
+    {
+      "player_name": "PlayerOne",
+      "pro_name": "Yatoro",
+      "account_id": 311360822,
+      "team": "radiant",
+      "hero_id": 1,
+      "hero_name": "antimage",
+      "localized_name": "Anti-Mage"
+    }
+  ],
   "dire_players": [...]
 }
 ```
