@@ -594,13 +594,18 @@ async def get_combat_log(
 
     Args:
         match_id: The Dota 2 match ID
-        start_time: Filter events after this game time in seconds (optional)
+        start_time: Filter events after this game time in seconds. **NOTE**: Pre-game purchases
+                   (wards, tangos, etc.) happen at NEGATIVE times (~-80s during strategy phase).
+                   Use start_time=-90 to include pre-game, or omit entirely to get all events.
+                   start_time=0 excludes pre-game purchases. (optional)
         end_time: Filter events before this game time in seconds (optional)
         hero_filter: Only include events involving this hero, e.g. "earthshaker" (optional)
-        significant_only: If True, returns only story-telling events (abilities, deaths, items,
-                         purchases, buybacks) - skips damage ticks and modifier spam.
-                         RECOMMENDED for rotation/movement analysis over longer time windows.
-                         Default: False (returns all events)
+        significant_only: **IMPORTANT**: Controls event filtering. True = only story-telling events
+                         (abilities, deaths, items, purchases, buybacks). False = ALL events including
+                         every damage tick and modifier application.
+                         **WARNING**: False with time ranges >5 minutes produces 50,000+ events and
+                         WILL FAIL with "result too large". Always use True for ranges >300 seconds.
+                         Default: False (use True for any broad analysis)
 
     Returns:
         CombatLogResponse with list of combat log events

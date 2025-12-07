@@ -67,12 +67,22 @@ get_hero_deaths(match_id=8461956309)
 Raw combat events with optional filters.
 
 ```python
+# Short time window (20 seconds) - can use significant_only=False
 get_combat_log(
     match_id=8461956309,
-    start_time=280,      # optional: filter by time range
+    start_time=280,
     end_time=300,
-    hero_filter="earthshaker",  # optional: only events involving this hero
-    significant_only=False      # optional: filter to story-telling events only
+    hero_filter="earthshaker",
+    significant_only=False
+)
+
+# Include pre-game purchases (strategy phase)
+get_combat_log(
+    match_id=8461956309,
+    start_time=-90,  # negative time captures pre-horn purchases
+    end_time=600,
+    hero_filter="jakiro",
+    significant_only=True  # REQUIRED for >5 min ranges
 )
 ```
 
@@ -81,10 +91,10 @@ get_combat_log(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `match_id` | int | Required. The match ID |
-| `start_time` | float | Optional. Filter events after this game time (seconds) |
+| `start_time` | float | Optional. Filter events after this game time (seconds). **Note:** Pre-game purchases happen at negative times (~-80s). Use `-90` to include strategy phase, or omit entirely. `start_time=0` excludes pre-game. |
 | `end_time` | float | Optional. Filter events before this game time (seconds) |
 | `hero_filter` | string | Optional. Only events involving this hero (e.g., "earthshaker") |
-| `significant_only` | bool | Optional. If `true`, returns only story-telling events. Default: `false` |
+| `significant_only` | bool | Optional. If `true`, returns only story-telling events. Default: `false`. **⚠️ WARNING:** `false` with time ranges >5 minutes produces 50,000+ events and will fail. Always use `true` for ranges >300 seconds. |
 
 **significant_only Mode:**
 

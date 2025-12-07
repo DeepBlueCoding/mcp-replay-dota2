@@ -151,6 +151,16 @@ def _ensure_parsed():
     _cache["combat_log_280_290_significant"] = combat.get_combat_log(
         data, start_time=280, end_time=290, significant_only=True
     )
+    # Pre-game time filter tests (purchases happen at negative times)
+    _cache["combat_log_start_time_0"] = combat.get_combat_log(
+        data, start_time=0, end_time=120, significant_only=True
+    )
+    _cache["combat_log_start_time_neg90"] = combat.get_combat_log(
+        data, start_time=-90, end_time=120, significant_only=True
+    )
+    _cache["combat_log_start_time_none"] = combat.get_combat_log(
+        data, start_time=None, end_time=120, significant_only=True
+    )
 
     # Fight detections using FightService
     _cache["fights"] = fight.get_all_fights(data)
@@ -335,6 +345,30 @@ def combat_log_trigger_only():
     _require_replay()
     _ensure_parsed()
     return _cache.get("combat_log_trigger_only", [])
+
+
+@pytest.fixture(scope="session")
+def combat_log_start_time_0():
+    """Combat log with start_time=0 (excludes pre-game)."""
+    _require_replay()
+    _ensure_parsed()
+    return _cache.get("combat_log_start_time_0", [])
+
+
+@pytest.fixture(scope="session")
+def combat_log_start_time_neg90():
+    """Combat log with start_time=-90 (includes pre-game)."""
+    _require_replay()
+    _ensure_parsed()
+    return _cache.get("combat_log_start_time_neg90", [])
+
+
+@pytest.fixture(scope="session")
+def combat_log_start_time_none():
+    """Combat log with start_time=None (includes all events)."""
+    _require_replay()
+    _ensure_parsed()
+    return _cache.get("combat_log_start_time_none", [])
 
 
 # =============================================================================

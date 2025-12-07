@@ -295,6 +295,39 @@ class TestAbilityTrigger:
         assert isinstance(combat_log_360_370, list)
 
 
+class TestStartTimeNegativeFilter:
+    """Tests for start_time parameter with negative (pre-game) times."""
+
+    def test_start_time_0_excludes_negative_game_times(self, combat_log_start_time_0):
+        """start_time=0 should exclude all events with negative game_time."""
+        for event in combat_log_start_time_0:
+            assert event.game_time >= 0, f"Event at {event.game_time} should be excluded with start_time=0"
+
+    def test_start_time_neg90_includes_pregame_events(self, combat_log_start_time_neg90):
+        """start_time=-90 should include pre-game events (purchases, etc.)."""
+        negative_time_events = [e for e in combat_log_start_time_neg90 if e.game_time < 0]
+        assert len(negative_time_events) > 0, "Pre-game events should be included with start_time=-90"
+
+    def test_start_time_none_includes_pregame_events(self, combat_log_start_time_none):
+        """start_time=None should include all events including pre-game."""
+        negative_time_events = [e for e in combat_log_start_time_none if e.game_time < 0]
+        assert len(negative_time_events) > 0, "Pre-game events should be included with start_time=None"
+
+    def test_pregame_purchases_captured_with_negative_start_time(self, combat_log_start_time_neg90):
+        """Pre-game item purchases should be captured with negative start_time."""
+        purchase_events = [e for e in combat_log_start_time_neg90 if e.type == "PURCHASE" and e.game_time < 0]
+        assert len(purchase_events) > 0, "Pre-game purchases should be included (wards, tangos, etc.)"
+
+    def test_start_time_0_excludes_pregame_purchases(self, combat_log_start_time_0):
+        """start_time=0 should NOT include pre-game purchases."""
+        purchase_events = [e for e in combat_log_start_time_0 if e.type == "PURCHASE" and e.game_time < 0]
+        assert len(purchase_events) == 0, "Pre-game purchases should be excluded with start_time=0"
+
+    def test_neg90_has_more_events_than_0(self, combat_log_start_time_0, combat_log_start_time_neg90):
+        """start_time=-90 should have more events than start_time=0 (pre-game included)."""
+        assert len(combat_log_start_time_neg90) > len(combat_log_start_time_0)
+
+
 class TestSignificantOnlyFilterIntegration:
     """Integration tests for significant_only filter."""
 
