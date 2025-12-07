@@ -1713,9 +1713,123 @@
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">match_id</span><span class="o">=</span><span class="mi">8461956309</span><span class="p">,</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">start_time</span><span class="o">=</span><span class="mi">280</span><span class="p">,</span>      <span class="c1"># optional: filter by time range</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">end_time</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">hero_filter</span><span class="o">=</span><span class="s2">&quot;earthshaker&quot;</span>  <span class="c1"># optional: only events involving this hero</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">hero_filter</span><span class="o">=</span><span class="s2">&quot;earthshaker&quot;</span><span class="p">,</span>  <span class="c1"># optional: only events involving this hero</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">significant_only</span><span class="o">=</span><span class="kc">False</span>      <span class="c1"># optional: filter to story-telling events only</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">)</span>
 </code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>match_id</code></td>
+<td>int</td>
+<td>Required. The match ID</td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>float</td>
+<td>Optional. Filter events after this game time (seconds)</td>
+</tr>
+<tr>
+<td><code>end_time</code></td>
+<td>float</td>
+<td>Optional. Filter events before this game time (seconds)</td>
+</tr>
+<tr>
+<td><code>hero_filter</code></td>
+<td>string</td>
+<td>Optional. Only events involving this hero (e.g., "earthshaker")</td>
+</tr>
+<tr>
+<td><code>significant_only</code></td>
+<td>bool</td>
+<td>Optional. If <code>true</code>, returns only story-telling events. Default: <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>significant_only Mode:</strong></p>
+<p>When <code>significant_only=true</code>, returns only high-level events useful for narrative analysis:</p>
+<table>
+<thead>
+<tr>
+<th>Included</th>
+<th>Event Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>✅</td>
+<td><code>ABILITY</code></td>
+<td>Ability casts</td>
+</tr>
+<tr>
+<td>✅</td>
+<td><code>DEATH</code></td>
+<td>Hero deaths</td>
+</tr>
+<tr>
+<td>✅</td>
+<td><code>ITEM</code></td>
+<td>Active item usage</td>
+</tr>
+<tr>
+<td>✅</td>
+<td><code>PURCHASE</code></td>
+<td>Item purchases</td>
+</tr>
+<tr>
+<td>✅</td>
+<td><code>BUYBACK</code></td>
+<td>Buybacks</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Excluded</th>
+<th>Event Type</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>❌</td>
+<td><code>DAMAGE</code></td>
+<td>Every damage tick creates noise</td>
+</tr>
+<tr>
+<td>❌</td>
+<td><code>MODIFIER_ADD</code></td>
+<td>Buff/debuff spam</td>
+</tr>
+<tr>
+<td>❌</td>
+<td><code>MODIFIER_REMOVE</code></td>
+<td>Buff/debuff spam</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When to use <code>significant_only=true</code>:</strong></p>
+<ul>
+<li>Analyzing rotations over longer time windows (60-90+ seconds)</li>
+<li>Getting an overview of what happened in a fight</li>
+<li>Avoiding overwhelming the LLM with thousands of events</li>
+</ul>
+<p><strong>When to use default (all events):</strong></p>
+<ul>
+<li>Detailed damage breakdown analysis</li>
+<li>Tracking specific buff/debuff durations</li>
+<li>Short time windows where full detail is useful</li>
+</ul>
 <p><strong>Returns:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
@@ -1733,7 +1847,7 @@
 <a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">  </span><span class="p">]</span>
 <a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="p">}</span>
 </code></pre></div></p>
-<p>Event types: <code>DAMAGE</code>, <code>MODIFIER_ADD</code>, <code>MODIFIER_REMOVE</code>, <code>ABILITY</code>, <code>ITEM</code>, <code>DEATH</code>, <code>HEAL</code></p>
+<p>Event types: <code>DAMAGE</code>, <code>MODIFIER_ADD</code>, <code>MODIFIER_REMOVE</code>, <code>ABILITY</code>, <code>ITEM</code>, <code>DEATH</code>, <code>HEAL</code>, <code>PURCHASE</code>, <code>BUYBACK</code></p>
 <hr />
 <h2 id="get_fight_combat_log">get_fight_combat_log<a class="headerlink" href="#get_fight_combat_log" title="Permanent link">&para;</a></h2>
 <p>Auto-detects fight boundaries around a reference time. Use this to analyze what happened leading up to a death.</p>
@@ -2369,41 +2483,88 @@
 <a id="__codelineno-67-7" name="__codelineno-67-7" href="#__codelineno-67-7"></a><span class="w">  </span><span class="nt">&quot;minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <a id="__codelineno-67-8" name="__codelineno-67-8" href="#__codelineno-67-8"></a><span class="w">    </span><span class="p">{</span>
 <a id="__codelineno-67-9" name="__codelineno-67-9" href="#__codelineno-67-9"></a><span class="w">      </span><span class="nt">&quot;minute&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
-<a id="__codelineno-67-10" name="__codelineno-67-10" href="#__codelineno-67-10"></a><span class="w">      </span><span class="nt">&quot;lane_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">28</span><span class="p">,</span>
-<a id="__codelineno-67-11" name="__codelineno-67-11" href="#__codelineno-67-11"></a><span class="w">      </span><span class="nt">&quot;neutral_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<a id="__codelineno-67-12" name="__codelineno-67-12" href="#__codelineno-67-12"></a><span class="w">      </span><span class="nt">&quot;position&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;x&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-5200</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;y&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-4100</span><span class="p">},</span>
-<a id="__codelineno-67-13" name="__codelineno-67-13" href="#__codelineno-67-13"></a><span class="w">      </span><span class="nt">&quot;gold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2100</span><span class="p">,</span>
-<a id="__codelineno-67-14" name="__codelineno-67-14" href="#__codelineno-67-14"></a><span class="w">      </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span>
-<a id="__codelineno-67-15" name="__codelineno-67-15" href="#__codelineno-67-15"></a><span class="w">    </span><span class="p">},</span>
-<a id="__codelineno-67-16" name="__codelineno-67-16" href="#__codelineno-67-16"></a><span class="w">    </span><span class="p">{</span>
-<a id="__codelineno-67-17" name="__codelineno-67-17" href="#__codelineno-67-17"></a><span class="w">      </span><span class="nt">&quot;minute&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
-<a id="__codelineno-67-18" name="__codelineno-67-18" href="#__codelineno-67-18"></a><span class="w">      </span><span class="nt">&quot;lane_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">52</span><span class="p">,</span>
-<a id="__codelineno-67-19" name="__codelineno-67-19" href="#__codelineno-67-19"></a><span class="w">      </span><span class="nt">&quot;neutral_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span>
-<a id="__codelineno-67-20" name="__codelineno-67-20" href="#__codelineno-67-20"></a><span class="w">      </span><span class="nt">&quot;position&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;x&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-4800</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;y&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-3200</span><span class="p">},</span>
-<a id="__codelineno-67-21" name="__codelineno-67-21" href="#__codelineno-67-21"></a><span class="w">      </span><span class="nt">&quot;gold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5200</span><span class="p">,</span>
-<a id="__codelineno-67-22" name="__codelineno-67-22" href="#__codelineno-67-22"></a><span class="w">      </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">11</span>
-<a id="__codelineno-67-23" name="__codelineno-67-23" href="#__codelineno-67-23"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-67-24" name="__codelineno-67-24" href="#__codelineno-67-24"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-67-25" name="__codelineno-67-25" href="#__codelineno-67-25"></a><span class="w">  </span><span class="nt">&quot;transitions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-67-26" name="__codelineno-67-26" href="#__codelineno-67-26"></a><span class="w">    </span><span class="nt">&quot;first_jungle_kill&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4:23&quot;</span><span class="p">,</span>
-<a id="__codelineno-67-27" name="__codelineno-67-27" href="#__codelineno-67-27"></a><span class="w">    </span><span class="nt">&quot;first_large_camp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5:12&quot;</span><span class="p">,</span>
-<a id="__codelineno-67-28" name="__codelineno-67-28" href="#__codelineno-67-28"></a><span class="w">    </span><span class="nt">&quot;left_lane&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6:45&quot;</span>
-<a id="__codelineno-67-29" name="__codelineno-67-29" href="#__codelineno-67-29"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-67-30" name="__codelineno-67-30" href="#__codelineno-67-30"></a><span class="w">  </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-67-31" name="__codelineno-67-31" href="#__codelineno-67-31"></a><span class="w">    </span><span class="nt">&quot;total_lane_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">85</span><span class="p">,</span>
-<a id="__codelineno-67-32" name="__codelineno-67-32" href="#__codelineno-67-32"></a><span class="w">    </span><span class="nt">&quot;total_neutral_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
-<a id="__codelineno-67-33" name="__codelineno-67-33" href="#__codelineno-67-33"></a><span class="w">    </span><span class="nt">&quot;jungle_percentage&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">33.1</span><span class="p">,</span>
-<a id="__codelineno-67-34" name="__codelineno-67-34" href="#__codelineno-67-34"></a><span class="w">    </span><span class="nt">&quot;gpm&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">520</span><span class="p">,</span>
-<a id="__codelineno-67-35" name="__codelineno-67-35" href="#__codelineno-67-35"></a><span class="w">    </span><span class="nt">&quot;cs_per_min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">8.5</span>
-<a id="__codelineno-67-36" name="__codelineno-67-36" href="#__codelineno-67-36"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-67-37" name="__codelineno-67-37" href="#__codelineno-67-37"></a><span class="p">}</span>
+<a id="__codelineno-67-10" name="__codelineno-67-10" href="#__codelineno-67-10"></a><span class="w">      </span><span class="nt">&quot;lane_creeps_killed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">28</span><span class="p">,</span>
+<a id="__codelineno-67-11" name="__codelineno-67-11" href="#__codelineno-67-11"></a><span class="w">      </span><span class="nt">&quot;camps_cleared&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-67-12" name="__codelineno-67-12" href="#__codelineno-67-12"></a><span class="w">      </span><span class="nt">&quot;camp_sequence&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-67-13" name="__codelineno-67-13" href="#__codelineno-67-13"></a><span class="w">        </span><span class="p">{</span><span class="nt">&quot;time_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5:12&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;camp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;large_centaur&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;tier&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;large&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;area&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;radiant_jungle&quot;</span><span class="p">},</span>
+<a id="__codelineno-67-14" name="__codelineno-67-14" href="#__codelineno-67-14"></a><span class="w">        </span><span class="p">{</span><span class="nt">&quot;time_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5:45&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;camp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;medium_wolf&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;tier&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;medium&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;area&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;radiant_jungle&quot;</span><span class="p">}</span>
+<a id="__codelineno-67-15" name="__codelineno-67-15" href="#__codelineno-67-15"></a><span class="w">      </span><span class="p">],</span>
+<a id="__codelineno-67-16" name="__codelineno-67-16" href="#__codelineno-67-16"></a><span class="w">      </span><span class="nt">&quot;position_at_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;x&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-5200</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;y&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-4100</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;area&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;radiant_safelane&quot;</span><span class="p">},</span>
+<a id="__codelineno-67-17" name="__codelineno-67-17" href="#__codelineno-67-17"></a><span class="w">      </span><span class="nt">&quot;gold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2100</span><span class="p">,</span>
+<a id="__codelineno-67-18" name="__codelineno-67-18" href="#__codelineno-67-18"></a><span class="w">      </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span>
+<a id="__codelineno-67-19" name="__codelineno-67-19" href="#__codelineno-67-19"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-67-20" name="__codelineno-67-20" href="#__codelineno-67-20"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-67-21" name="__codelineno-67-21" href="#__codelineno-67-21"></a><span class="w">  </span><span class="nt">&quot;creep_kills&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-67-22" name="__codelineno-67-22" href="#__codelineno-67-22"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-67-23" name="__codelineno-67-23" href="#__codelineno-67-23"></a><span class="w">      </span><span class="nt">&quot;game_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">312.5</span><span class="p">,</span>
+<a id="__codelineno-67-24" name="__codelineno-67-24" href="#__codelineno-67-24"></a><span class="w">      </span><span class="nt">&quot;game_time_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5:12&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-25" name="__codelineno-67-25" href="#__codelineno-67-25"></a><span class="w">      </span><span class="nt">&quot;creep_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;npc_dota_neutral_centaur_khan&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-26" name="__codelineno-67-26" href="#__codelineno-67-26"></a><span class="w">      </span><span class="nt">&quot;creep_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;neutral&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-27" name="__codelineno-67-27" href="#__codelineno-67-27"></a><span class="w">      </span><span class="nt">&quot;neutral_camp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;large_centaur&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-28" name="__codelineno-67-28" href="#__codelineno-67-28"></a><span class="w">      </span><span class="nt">&quot;camp_tier&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;large&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-29" name="__codelineno-67-29" href="#__codelineno-67-29"></a><span class="w">      </span><span class="nt">&quot;map_area&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;radiant_jungle&quot;</span>
+<a id="__codelineno-67-30" name="__codelineno-67-30" href="#__codelineno-67-30"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-67-31" name="__codelineno-67-31" href="#__codelineno-67-31"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-67-32" name="__codelineno-67-32" href="#__codelineno-67-32"></a><span class="w">  </span><span class="nt">&quot;multi_camp_clears&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-67-33" name="__codelineno-67-33" href="#__codelineno-67-33"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-67-34" name="__codelineno-67-34" href="#__codelineno-67-34"></a><span class="w">      </span><span class="nt">&quot;time_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;14:05&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-35" name="__codelineno-67-35" href="#__codelineno-67-35"></a><span class="w">      </span><span class="nt">&quot;camps&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;large_centaur&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;medium_wolf&quot;</span><span class="p">],</span>
+<a id="__codelineno-67-36" name="__codelineno-67-36" href="#__codelineno-67-36"></a><span class="w">      </span><span class="nt">&quot;duration_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.1</span><span class="p">,</span>
+<a id="__codelineno-67-37" name="__codelineno-67-37" href="#__codelineno-67-37"></a><span class="w">      </span><span class="nt">&quot;creeps_killed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-67-38" name="__codelineno-67-38" href="#__codelineno-67-38"></a><span class="w">      </span><span class="nt">&quot;area&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;dire_jungle&quot;</span>
+<a id="__codelineno-67-39" name="__codelineno-67-39" href="#__codelineno-67-39"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-67-40" name="__codelineno-67-40" href="#__codelineno-67-40"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-67-41" name="__codelineno-67-41" href="#__codelineno-67-41"></a><span class="w">  </span><span class="nt">&quot;transitions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-67-42" name="__codelineno-67-42" href="#__codelineno-67-42"></a><span class="w">    </span><span class="nt">&quot;first_jungle_kill_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4:23&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-43" name="__codelineno-67-43" href="#__codelineno-67-43"></a><span class="w">    </span><span class="nt">&quot;first_large_camp_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5:12&quot;</span><span class="p">,</span>
+<a id="__codelineno-67-44" name="__codelineno-67-44" href="#__codelineno-67-44"></a><span class="w">    </span><span class="nt">&quot;left_lane_str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6:45&quot;</span>
+<a id="__codelineno-67-45" name="__codelineno-67-45" href="#__codelineno-67-45"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-67-46" name="__codelineno-67-46" href="#__codelineno-67-46"></a><span class="w">  </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-67-47" name="__codelineno-67-47" href="#__codelineno-67-47"></a><span class="w">    </span><span class="nt">&quot;total_lane_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">85</span><span class="p">,</span>
+<a id="__codelineno-67-48" name="__codelineno-67-48" href="#__codelineno-67-48"></a><span class="w">    </span><span class="nt">&quot;total_neutral_creeps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<a id="__codelineno-67-49" name="__codelineno-67-49" href="#__codelineno-67-49"></a><span class="w">    </span><span class="nt">&quot;jungle_percentage&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">33.1</span><span class="p">,</span>
+<a id="__codelineno-67-50" name="__codelineno-67-50" href="#__codelineno-67-50"></a><span class="w">    </span><span class="nt">&quot;gpm&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">520.0</span><span class="p">,</span>
+<a id="__codelineno-67-51" name="__codelineno-67-51" href="#__codelineno-67-51"></a><span class="w">    </span><span class="nt">&quot;cs_per_min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">8.5</span><span class="p">,</span>
+<a id="__codelineno-67-52" name="__codelineno-67-52" href="#__codelineno-67-52"></a><span class="w">    </span><span class="nt">&quot;multi_camp_clears&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<a id="__codelineno-67-53" name="__codelineno-67-53" href="#__codelineno-67-53"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-67-54" name="__codelineno-67-54" href="#__codelineno-67-54"></a><span class="p">}</span>
 </code></pre></div></p>
+<p><strong>Key Fields:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>camp_sequence</code></td>
+<td>Ordered list of camps cleared each minute</td>
+</tr>
+<tr>
+<td><code>creep_kills[].camp_tier</code></td>
+<td>Tier from replay parser: <code>small</code>, <code>medium</code>, <code>large</code>, <code>ancient</code></td>
+</tr>
+<tr>
+<td><code>multi_camp_clears</code></td>
+<td>Detects when hero farms 2+ camps simultaneously (stacked/adjacent camps)</td>
+</tr>
+<tr>
+<td><code>summary.multi_camp_clears</code></td>
+<td>Total count of multi-camp clear events</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Multi-Camp Detection:</strong></p>
+<p>Detects heroes like Medusa or Luna farming stacked or adjacent camps with AoE abilities. A multi-camp clear is recorded when creeps from 2+ different camp types are killed within 3 seconds.</p>
 <p><strong>Example Questions This Tool Answers:</strong></p>
 <ul>
 <li>"What was Terrorblade's farming pattern in the first 10 minutes?"</li>
 <li>"When did Anti-Mage start jungling?"</li>
 <li>"Which camps did Luna clear between minutes 5-15?"</li>
 <li>"How did the carry move across the map while farming?"</li>
+<li>"Did Medusa farm stacked camps? How efficiently?"</li>
 </ul>
 <hr />
 <h2 id="get_rotation_analysis">get_rotation_analysis<a class="headerlink" href="#get_rotation_analysis" title="Permanent link">&para;</a></h2>
