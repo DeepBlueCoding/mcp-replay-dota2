@@ -3,6 +3,8 @@ Match info parser for extracting match metadata and draft from Dota 2 replays.
 
 Uses Parser.parse(game_info=True) to extract pro match data including
 teams, players, draft order, and match outcome.
+
+Uses replay_cache for duration calculation to avoid duplicate parsing.
 """
 
 import logging
@@ -20,6 +22,7 @@ from src.models.match_info import (
 )
 from src.utils.constants_fetcher import constants_fetcher
 from src.utils.pro_scene_fetcher import pro_scene_fetcher
+from src.utils.replay_cache import replay_cache
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +154,8 @@ class MatchInfoParser:
         """
         Get match information from a replay using v2 API.
 
+        Uses replay_cache for duration to avoid duplicate parsing.
+
         Args:
             replay_path: Path to the .dem replay file
 
@@ -159,8 +164,8 @@ class MatchInfoParser:
         """
         try:
             parser = Parser(str(replay_path))
-            # Parse with combat_log to get actual game duration (not playback time)
-            result = parser.parse(game_info=True, combat_log={})
+            # Only parse game_info (fast), use cache for duration
+            result = parser.parse(game_info=True)
 
             if not result.success:
                 logger.error(f"Failed to parse game info: {result.error}")
@@ -231,10 +236,13 @@ class MatchInfoParser:
 
             is_pro = game_info.radiant_team_id > 0 or game_info.dire_team_id > 0 or game_info.league_id > 0
 
-            # Get actual game duration from combat log (playback_time includes draft/pregame)
+            # Get actual game duration from cached combat log (avoids re-parsing)
             duration_seconds = game_info.playback_time
-            if result.combat_log and result.combat_log.entries:
-                duration_seconds = max(e.game_time for e in result.combat_log.entries)
+            cached_data = replay_cache.get_parsed_data(replay_path)
+            if cached_data.combat_log:
+                max_game_time = max((e.game_time for e in cached_data.combat_log), default=0.0)
+                if max_game_time > 0:
+                    duration_seconds = max_game_time
 
             return MatchInfoResult(
                 match_id=game_info.match_id,

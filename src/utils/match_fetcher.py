@@ -11,12 +11,23 @@ logger = logging.getLogger(__name__)
 
 OPENDOTA_API_URL = "https://api.opendota.com/api"
 
-LANE_NAMES = {
-    1: "safe_lane",
-    2: "mid_lane",
-    3: "off_lane",
-    4: "jungle",
-}
+def get_lane_name(lane: int, is_radiant: bool) -> Optional[str]:
+    """
+    Convert absolute lane number to team-relative lane name.
+
+    OpenDota lane values: 1=bottom, 2=mid, 3=top, 4=jungle
+    Radiant: bottom=safe, top=off
+    Dire: top=safe, bottom=off
+    """
+    if lane == 2:
+        return "mid_lane"
+    if lane == 4:
+        return "jungle"
+    if lane == 1:
+        return "safe_lane" if is_radiant else "off_lane"
+    if lane == 3:
+        return "off_lane" if is_radiant else "safe_lane"
+    return None
 
 
 def assign_roles(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -113,6 +124,42 @@ class MatchFetcher:
             "players": players,
         }
 
+    async def get_player_item_timings(
+        self, match_id: int, hero_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Get item purchase timings for a specific hero by hero_id.
+
+        Args:
+            match_id: The match ID
+            hero_id: Hero ID to search for
+
+        Returns:
+            List of item purchases with time and item name, sorted by time
+        """
+        match = await self.get_match(match_id)
+        if not match:
+            return []
+
+        for player in match.get("players", []):
+            if player.get("hero_id") == hero_id:
+                purchase_log = player.get("purchase_log")
+                if not purchase_log:
+                    return []
+
+                return sorted(
+                    [
+                        {
+                            "item": item.get("key", "unknown"),
+                            "time": item.get("time", 0),
+                        }
+                        for item in purchase_log
+                    ],
+                    key=lambda x: x["time"],
+                )
+
+        return []
+
     def _build_player(self, player: Dict[str, Any]) -> Dict[str, Any]:
         """Build player dict with relevant fields."""
         player_slot = player.get("player_slot", 0)
@@ -128,7 +175,7 @@ class MatchFetcher:
             "team": "radiant" if is_radiant else "dire",
 
             "lane": lane,
-            "lane_name": LANE_NAMES.get(lane),
+            "lane_name": get_lane_name(lane, is_radiant) if lane else None,
             "is_roaming": player.get("is_roaming"),
             "role": player.get("role"),
 

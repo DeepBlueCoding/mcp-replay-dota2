@@ -108,3 +108,35 @@ class ObjectiveKill:
     killer: Optional[str] = None
     team: Optional[str] = None
     extra_info: Optional[dict] = None
+
+
+@dataclass
+class CourierKill:
+    """A courier kill event."""
+
+    game_time: float
+    game_time_str: str
+    tick: int
+    killer: str
+    killer_is_hero: bool
+    owner: str
+    team: str
+    position_x: Optional[float] = None
+    position_y: Optional[float] = None
+
+
+@dataclass
+class CombatLogEvent:
+    """A combat log event for the get_combat_log tool."""
+
+    type: str
+    game_time: float
+    game_time_str: str
+    tick: int
+    attacker: str
+    attacker_is_hero: bool
+    target: str
+    target_is_hero: bool
+    ability: Optional[str] = None
+    value: Optional[int] = None
+    hit: Optional[bool] = None

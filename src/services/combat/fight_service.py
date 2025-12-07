@@ -177,3 +177,47 @@ class FightService:
             f for f in result.fights
             if any(hero_lower in p.lower() for p in f.participants)
         ]
+
+    def get_fight_combat_log(
+        self,
+        data: ParsedReplayData,
+        reference_time: float,
+        hero: Optional[str] = None,
+    ) -> Optional[dict]:
+        """
+        Get fight boundaries and combat log for a fight at a given time.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            reference_time: Game time to anchor the fight search
+            hero: Optional hero name to anchor fight detection
+
+        Returns:
+            Dictionary with fight info and combat events, or None if no fight found
+        """
+        fight = self.get_fight_at_time(data, reference_time, hero)
+        if not fight:
+            return None
+
+        # Get combat log events within fight boundaries (with 2s buffer)
+        start_time = fight.start_time - 2.0
+        end_time = fight.end_time + 1.0
+
+        events = self._combat.get_combat_log(
+            data,
+            start_time=start_time,
+            end_time=end_time,
+            significant_only=False,
+        )
+
+        return {
+            "fight_id": fight.fight_id,
+            "fight_start": fight.start_time,
+            "fight_start_str": fight.start_time_str,
+            "fight_end": fight.end_time,
+            "fight_end_str": fight.end_time_str,
+            "duration": fight.duration,
+            "participants": fight.participants,
+            "total_events": len(events),
+            "events": events,
+        }

@@ -16,7 +16,6 @@ from src.services.models.rotation_data import (
     RotationOutcome,
     RotationSummary,
     RuneCorrelation,
-    RuneRotations,
     WisdomRuneEvent,
 )
 from src.services.rotation.rotation_service import (
@@ -30,7 +29,6 @@ from src.services.rotation.rotation_service import (
     WISDOM_RUNE_INTERVAL,
     RotationService,
 )
-
 
 # Mark all tests in this module as fast (no replay parsing needed)
 pytestmark = pytest.mark.fast

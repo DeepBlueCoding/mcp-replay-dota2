@@ -98,15 +98,15 @@ This separation allows the services to be reused in other systems (CLI tools, we
 │                         SERVICES LAYER                                  │
 │                        src/services/                                    │
 │                                                                         │
-│   replay/                         opendota/                             │
-│   ├── replay_service.py           ├── match_service.py                 │
-│   ├── combat_service.py           ├── player_service.py                │
-│   ├── fight_service.py            └── hero_service.py                  │
-│   ├── lane_service.py                                                  │
-│   ├── jungle_service.py           cache/                               │
-│   ├── objective_service.py        ├── replay_cache.py                  │
-│   ├── vision_service.py           └── api_cache.py                     │
-│   └── timeline_service.py                                              │
+│   combat/                         src/utils/                           │
+│   ├── combat_service.py           ├── replay_cache.py  (disk cache)    │
+│   └── fight_service.py            ├── match_fetcher.py                 │
+│                                   └── ...                              │
+│   replay/                                                              │
+│   └── replay_service.py           (uses replay_cache singleton)        │
+│                                                                        │
+│   farming/                        rotation/                            │
+│   └── farming_service.py          └── rotation_service.py              │
 │                                                                         │
 │   analyzers/                      models/                               │
 │   ├── fight_detector.py           ├── replay_data.py                   │
@@ -147,7 +147,7 @@ Main entry point for replay data. Handles caching and orchestrates parsing.
 # src/services/replay/replay_service.py
 
 from python_manta import Parser
-from ..cache.replay_cache import ReplayCache
+from src.utils.replay_cache import replay_cache
 from ..models.replay_data import ParsedReplayData
 from .analyzers import FightDetector, LaneAnalyzer, JungleAnalyzer
 
@@ -1063,11 +1063,11 @@ class ParsedReplayData:
 ## Cache Strategy
 
 ```python
-# src/services/cache/replay_cache.py
+# src/utils/replay_cache.py
 
 from pathlib import Path
 from diskcache import Cache
-from ..models.replay_data import ParsedReplayData
+from dataclasses import dataclass
 
 class ReplayCache:
     """
@@ -1128,6 +1128,13 @@ src/
 │       ├── heroes_resource.py        # Hero data resources
 │       └── map_resource.py           # Map data resources
 │
+├── utils/                            # Utilities (caching, helpers)
+│   ├── replay_cache.py               # Disk-based replay data cache (singleton)
+│   ├── match_fetcher.py              # OpenDota API fetcher
+│   ├── timeline_parser.py            # Timeline extraction (uses cache)
+│   ├── match_info_parser.py          # Match info extraction (uses cache)
+│   └── ...
+│
 ├── services/                         # Services Layer (business logic)
 │   ├── __init__.py
 │   │
@@ -1155,11 +1162,6 @@ src/
 │   │   ├── jungle_analyzer.py        # Pulls, stacks
 │   │   ├── objective_analyzer.py     # Roshan, towers
 │   │   └── vision_analyzer.py        # Wards, smokes
-│   │
-│   ├── cache/                        # Caching
-│   │   ├── __init__.py
-│   │   ├── replay_cache.py           # Replay data cache
-│   │   └── api_cache.py              # OpenDota API cache
 │   │
 │   └── models/                       # Data models (Pydantic)
 │       ├── __init__.py

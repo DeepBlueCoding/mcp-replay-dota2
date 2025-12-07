@@ -216,6 +216,15 @@ class CombatLogParser:
 
         return hit_index
 
+    # Event types for significant_only mode (story-telling events, not every tick)
+    SIGNIFICANT_EVENT_TYPES = [
+        5,   # ABILITY - ability casts
+        4,   # DEATH - hero deaths
+        6,   # ITEM - active item usage
+        11,  # PURCHASE - item purchases
+        12,  # BUYBACK
+    ]
+
     def get_combat_log(
         self,
         replay_path: Path,
@@ -223,6 +232,7 @@ class CombatLogParser:
         end_time: Optional[float] = None,
         types: Optional[List[int]] = None,
         hero_filter: Optional[str] = None,
+        significant_only: bool = False,
     ) -> List[CombatLogEvent]:
         """
         Get combat log events from a replay with optional filters.
@@ -233,6 +243,8 @@ class CombatLogParser:
             end_time: Filter events before this game time (seconds)
             types: List of event type IDs to include (default: DAMAGE, MODIFIER_ADD, ABILITY, DEATH)
             hero_filter: Only include events involving this hero (cleaned name, e.g. "earthshaker")
+            significant_only: If True, only return story-telling events (abilities, deaths, items)
+                             skipping damage ticks and modifier spam. Good for rotation analysis.
 
         Returns:
             List of CombatLogEvent models. ABILITY events include 'hit' field indicating
@@ -240,7 +252,9 @@ class CombatLogParser:
         """
         data = replay_cache.get_parsed_data(replay_path)
 
-        if types is None:
+        if significant_only:
+            types = self.SIGNIFICANT_EVENT_TYPES
+        elif types is None:
             types = [
                 CombatLogType.DAMAGE.value,
                 CombatLogType.MODIFIER_ADD.value,

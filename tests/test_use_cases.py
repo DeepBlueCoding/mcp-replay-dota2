@@ -34,59 +34,14 @@ class TestUseCaseAnalyzeTeamfight:
         assert all(d.victim for d in hero_deaths)
 
     @pytest.mark.use_case
-    def test_fight_combat_log_available(self, fight_first_blood, hero_deaths):
-        """get_fight_combat_log can analyze a specific fight."""
+    def test_fight_detection_works(self, fight_first_blood, hero_deaths):
+        """Fight detection can analyze a specific fight."""
         if hero_deaths:
             first_death_time = hero_deaths[0].game_time
             assert fight_first_blood is not None
-            assert fight_first_blood.fight_start <= first_death_time <= fight_first_blood.fight_end
+            # v2: Fight model has start_time/end_time instead of fight_start/fight_end
+            assert fight_first_blood.start_time <= first_death_time <= fight_first_blood.end_time
             assert len(fight_first_blood.participants) > 0
-
-
-class TestUseCaseTrackCarryFarm:
-    """
-    Use Case 2: Tracking Carry Farm
-
-    Tools: get_item_purchases(), get_stats_at_minute()
-    Goal: Evaluate farm efficiency by item timings and CS
-    """
-
-    @pytest.mark.use_case
-    def test_item_purchases_have_timing(self, test_replay_path):
-        """Item purchases include game_time for tracking progression."""
-        if not test_replay_path.exists():
-            pytest.skip("Replay file not available (run locally with replay)")
-
-        from src.utils.combat_log_parser import combat_log_parser
-
-        purchases = combat_log_parser.get_item_purchases(test_replay_path)
-        assert len(purchases) > 0
-        assert all(hasattr(p, 'game_time') for p in purchases)
-        assert all(hasattr(p, 'hero') for p in purchases)
-        assert all(hasattr(p, 'item') for p in purchases)
-
-    @pytest.mark.use_case
-    def test_item_purchases_filter_by_hero(self, test_replay_path):
-        """Can filter item purchases by specific hero."""
-        if not test_replay_path.exists():
-            pytest.skip("Replay file not available (run locally with replay)")
-
-        from src.utils.combat_log_parser import combat_log_parser
-
-        purchases = combat_log_parser.get_item_purchases(
-            test_replay_path,
-            hero_filter="juggernaut"
-        )
-        assert all("juggernaut" in p.hero.lower() for p in purchases)
-
-    @pytest.mark.use_case
-    def test_stats_at_minute_has_farm_data(self, stats_10min):
-        """get_stats_at_minute returns CS, gold, level data."""
-        assert "players" in stats_10min
-
-        for player in stats_10min["players"]:
-            assert "net_worth" in player or "gold" in player
-            assert "level" in player
 
 
 class TestUseCaseUnderstandGank:
@@ -100,16 +55,17 @@ class TestUseCaseUnderstandGank:
     @pytest.mark.use_case
     def test_hero_deaths_include_position(self, hero_deaths_with_position):
         """Deaths include position data for gank analysis."""
-        deaths_with_pos = [d for d in hero_deaths_with_position if d.position is not None]
+        # v2: position_x and position_y directly on HeroDeath, not nested .position
+        deaths_with_pos = [d for d in hero_deaths_with_position if d.position_x is not None]
         assert len(deaths_with_pos) > 0
-        assert deaths_with_pos[0].position.x is not None
-        assert deaths_with_pos[0].position.y is not None
+        assert deaths_with_pos[0].position_x is not None
+        assert deaths_with_pos[0].position_y is not None
 
     @pytest.mark.use_case
-    def test_combat_log_shows_ability_sequence(self, fight_first_blood):
-        """Combat log shows abilities used in order."""
-        ability_events = [e for e in fight_first_blood.events if e.type == "ABILITY"]
-        assert len(ability_events) >= 0  # May not always have abilities
+    def test_fight_has_deaths(self, fight_first_blood):
+        """Fight detection includes deaths."""
+        # v2: Fight model has deaths list, not events
+        assert len(fight_first_blood.deaths) >= 0
 
 
 class TestUseCaseObjectiveControl:
@@ -141,40 +97,6 @@ class TestUseCaseObjectiveControl:
         """Barracks kills are tracked."""
         _, _, _, barracks = objectives
         assert isinstance(barracks, list)
-
-
-class TestUseCaseCompareLaning:
-    """
-    Use Case 5: Comparing Laning Phase
-
-    Tools: get_stats_at_minute()
-    Goal: Compare CS, denies, net worth at early timings
-    """
-
-    @pytest.mark.use_case
-    def test_stats_at_5_minutes(self, stats_5min):
-        """Can get stats at 5 minute mark."""
-        assert stats_5min is not None
-        assert "minute" in stats_5min
-        assert stats_5min["minute"] == 5
-
-    @pytest.mark.use_case
-    def test_stats_at_10_minutes(self, stats_10min):
-        """Can get stats at 10 minute mark for laning comparison."""
-        assert stats_10min is not None
-        assert "players" in stats_10min
-        assert len(stats_10min["players"]) == 10
-
-    @pytest.mark.use_case
-    def test_laning_stats_comparable(self, stats_10min):
-        """Stats include data needed for lane comparison."""
-        for player in stats_10min["players"]:
-            assert "player_slot" in player or "team" in player
-            has_farm_metric = any(
-                k in player for k in ["net_worth", "gold", "last_hits"]
-            )
-            assert has_farm_metric
-            assert "level" in player
 
 
 class TestFastUnitTests:

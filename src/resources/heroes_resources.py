@@ -5,6 +5,7 @@ from python_manta import Hero
 
 from src.utils.constants_fetcher import constants_fetcher
 from src.utils.match_fetcher import MatchFetcher
+from src.utils.pro_scene_fetcher import pro_scene_fetcher
 from src.utils.replay_downloader import ReplayDownloader
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,7 @@ class HeroesResource:
             return []
 
         heroes_constants = self.get_heroes_constants_raw()
+        manual_pro_names = pro_scene_fetcher.get_manual_pro_names()
 
         result = []
         for player in players:
@@ -201,6 +203,14 @@ class HeroesResource:
                 "attack_type": hero_data.get("attack_type"),
                 "roles": hero_data.get("roles", []),
             }
+
+            # Enrich with manual pro names if OpenDota doesn't have pro_name
+            account_id = player.get("account_id")
+            if account_id and not merged.get("pro_name"):
+                manual_name = manual_pro_names.get(str(account_id))
+                if manual_name:
+                    merged["pro_name"] = manual_name
+                    merged["player_name"] = manual_name
 
             result.append(merged)
 

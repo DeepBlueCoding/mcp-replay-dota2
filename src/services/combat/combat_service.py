@@ -10,6 +10,8 @@ from typing import List, Optional
 from python_manta import CombatLogType, Team
 
 from ..models.combat_data import (
+    CombatLogEvent,
+    CourierKill,
     DamageEvent,
     HeroDeath,
     ItemPurchase,
@@ -290,6 +292,38 @@ class CombatService:
 
         return kills
 
+    def get_tormentor_kills(self, data: ParsedReplayData) -> List[ObjectiveKill]:
+        """Get Tormentor kill events."""
+        kills = []
+
+        for entry in data.combat_log_entries:
+            entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
+            if entry_type != CombatLogType.DEATH.value:
+                continue
+
+            target = entry.target_name.lower()
+            if "tormentor" not in target:
+                continue
+
+            # Determine which side's tormentor was killed (radiant or dire side)
+            tormentor_side = "dire" if "badguys" in target else "radiant"
+            killer = self._clean_hero_name(entry.attacker_name)
+            team = "radiant" if entry.attacker_team == Team.RADIANT.value else "dire"
+
+            kill = ObjectiveKill(
+                game_time=entry.game_time,
+                game_time_str=self._format_time(entry.game_time),
+                tick=entry.tick,
+                objective_type="tormentor",
+                objective_name=f"Tormentor ({tormentor_side} side)",
+                killer=killer if entry.is_attacker_hero else None,
+                team=team,
+                extra_info={"side": tormentor_side},
+            )
+            kills.append(kill)
+
+        return kills
+
     def get_tower_kills(self, data: ParsedReplayData) -> List[ObjectiveKill]:
         """Get tower destruction events."""
         kills = []
@@ -351,3 +385,147 @@ class CombatService:
             kills.append(kill)
 
         return kills
+
+    def get_courier_kills(self, data: ParsedReplayData) -> List[CourierKill]:
+        """Get courier kill events."""
+        kills = []
+
+        for entry in data.combat_log_entries:
+            entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
+            if entry_type != CombatLogType.DEATH.value:
+                continue
+
+            target = entry.target_name.lower()
+            if "courier" not in target:
+                continue
+
+            # Determine courier owner team
+            courier_team = "dire" if "badguys" in target else "radiant"
+
+            # Extract owner from target name (e.g., npc_dota_courier_2 -> player 2)
+            owner = "unknown"
+            if "_courier_" in target:
+                try:
+                    parts = target.split("_courier_")
+                    if len(parts) > 1 and parts[1].isdigit():
+                        owner = f"player_{parts[1]}"
+                except (IndexError, ValueError):
+                    pass
+
+            killer = self._clean_hero_name(entry.attacker_name)
+
+            kill = CourierKill(
+                game_time=entry.game_time,
+                game_time_str=self._format_time(entry.game_time),
+                tick=entry.tick,
+                killer=killer,
+                killer_is_hero=entry.is_attacker_hero,
+                owner=owner,
+                team=courier_team,
+                position_x=entry.location_x if hasattr(entry, 'location_x') else None,
+                position_y=entry.location_y if hasattr(entry, 'location_y') else None,
+            )
+            kills.append(kill)
+
+        return kills
+
+    def _get_event_type_name(self, entry_type: int) -> str:
+        """Get human-readable event type name."""
+        type_map = {
+            CombatLogType.DAMAGE.value: "DAMAGE",
+            CombatLogType.HEAL.value: "HEAL",
+            CombatLogType.MODIFIER_ADD.value: "MODIFIER_ADD",
+            CombatLogType.MODIFIER_REMOVE.value: "MODIFIER_REMOVE",
+            CombatLogType.DEATH.value: "DEATH",
+            CombatLogType.ABILITY.value: "ABILITY",
+            CombatLogType.ITEM.value: "ITEM",
+            CombatLogType.PURCHASE.value: "PURCHASE",
+            CombatLogType.BUYBACK.value: "BUYBACK",
+        }
+        return type_map.get(entry_type, f"UNKNOWN_{entry_type}")
+
+    def _is_significant_event(self, entry_type: int) -> bool:
+        """Check if event is 'significant' (ability, death, item, purchase, buyback)."""
+        significant_types = {
+            CombatLogType.DEATH.value,
+            CombatLogType.ABILITY.value,
+            CombatLogType.ITEM.value,
+            CombatLogType.PURCHASE.value,
+            CombatLogType.BUYBACK.value,
+        }
+        return entry_type in significant_types
+
+    def get_combat_log(
+        self,
+        data: ParsedReplayData,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        hero_filter: Optional[str] = None,
+        significant_only: bool = False,
+        types: Optional[List[int]] = None,
+    ) -> List[CombatLogEvent]:
+        """
+        Get filtered combat log events.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            start_time: Filter events after this game time
+            end_time: Filter events before this game time
+            hero_filter: Only include events involving this hero
+            significant_only: Only include significant events (abilities, deaths, items)
+            types: List of CombatLogType values to include (e.g., [5] for ABILITY)
+
+        Returns:
+            List of CombatLogEvent sorted by game time
+        """
+        events = []
+
+        for entry in data.combat_log_entries:
+            entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
+
+            # Type filter
+            if types is not None and entry_type not in types:
+                continue
+
+            # Time filter
+            game_time = entry.game_time
+            if start_time is not None and game_time < start_time:
+                continue
+            if end_time is not None and game_time > end_time:
+                continue
+
+            # Significant only filter
+            if significant_only and not self._is_significant_event(entry_type):
+                continue
+
+            attacker = self._clean_hero_name(entry.attacker_name)
+            target = self._clean_hero_name(entry.target_name)
+
+            # Hero filter
+            if hero_filter:
+                hero_lower = hero_filter.lower()
+                if hero_lower not in attacker.lower() and hero_lower not in target.lower():
+                    continue
+
+            # Determine if ability "hit" (for ABILITY events)
+            hit = None
+            if entry_type == CombatLogType.ABILITY.value:
+                hit = entry.is_target_hero if hasattr(entry, 'is_target_hero') else None
+
+            event = CombatLogEvent(
+                type=self._get_event_type_name(entry_type),
+                game_time=game_time,
+                game_time_str=self._format_time(game_time),
+                tick=entry.tick,
+                attacker=attacker,
+                attacker_is_hero=entry.is_attacker_hero,
+                target=target,
+                target_is_hero=entry.is_target_hero,
+                ability=entry.inflictor_name if entry.inflictor_name else None,
+                value=entry.value if hasattr(entry, 'value') else None,
+                hit=hit,
+            )
+            events.append(event)
+
+        events.sort(key=lambda e: e.game_time)
+        return events

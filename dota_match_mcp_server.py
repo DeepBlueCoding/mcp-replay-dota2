@@ -10,7 +10,7 @@ All tools require a match_id and work with actual match data.
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -143,11 +143,8 @@ from src.resources.map_resources import get_cached_map_data
 from src.resources.pro_scene_resources import pro_scene_resource
 from src.services.cache.replay_cache import ReplayCache as ReplayCacheV2
 from src.services.replay.replay_service import ReplayService
-from src.utils.combat_log_parser import combat_log_parser
 from src.utils.match_fetcher import match_fetcher
-from src.utils.match_info_parser import match_info_parser
 from src.utils.pro_scene_fetcher import pro_scene_fetcher
-from src.utils.replay_downloader import ReplayDownloader
 
 # Initialize services
 _replay_cache = ReplayCacheV2()
@@ -186,8 +183,6 @@ _rotation_service = RotationService(
     combat_service=_combat_service,
     fight_service=_fight_service,
 )
-
-from src.utils.timeline_parser import timeline_parser
 
 
 # Define MCP Resources
@@ -372,7 +367,10 @@ async def download_replay(match_id: int, ctx: Context) -> DownloadReplayResponse
 
 
 @mcp.tool
-async def get_match_timeline(match_id: int) -> Dict[str, Any]:
+async def get_match_timeline(
+    match_id: int,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """
     Get time-series data for a Dota 2 match.
 
@@ -391,14 +389,19 @@ async def get_match_timeline(match_id: int) -> Dict[str, Any]:
     Returns:
         Dictionary with timeline data for all players and teams
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.utils.timeline_parser import timeline_parser
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        replay_path = await _replay_service.download_only(match_id, progress=progress_callback)
+    except ValueError as e:
         return {
             "success": False,
             "match_id": match_id,
-            "error": "Could not download replay for this match"
+            "error": str(e)
         }
 
     timeline = timeline_parser.parse_timeline(replay_path)
@@ -416,7 +419,11 @@ async def get_match_timeline(match_id: int) -> Dict[str, Any]:
 
 
 @mcp.tool
-async def get_stats_at_minute(match_id: int, minute: int) -> Dict[str, Any]:
+async def get_stats_at_minute(
+    match_id: int,
+    minute: int,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """
     Get player stats at a specific minute in a Dota 2 match.
 
@@ -436,14 +443,19 @@ async def get_stats_at_minute(match_id: int, minute: int) -> Dict[str, Any]:
     Returns:
         Dictionary with per-player stats at the specified minute
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.utils.timeline_parser import timeline_parser
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        replay_path = await _replay_service.download_only(match_id, progress=progress_callback)
+    except ValueError as e:
         return {
             "success": False,
             "match_id": match_id,
-            "error": "Could not download replay for this match"
+            "error": str(e)
         }
 
     timeline = timeline_parser.parse_timeline(replay_path)
@@ -463,7 +475,7 @@ async def get_stats_at_minute(match_id: int, minute: int) -> Dict[str, Any]:
 
 
 @mcp.tool
-async def get_hero_deaths(match_id: int) -> HeroDeathsResponse:
+async def get_hero_deaths(match_id: int, ctx: Optional[Context] = None) -> HeroDeathsResponse:
     """
     Get all hero deaths in a Dota 2 match.
 
@@ -481,24 +493,40 @@ async def get_hero_deaths(match_id: int) -> HeroDeathsResponse:
     Returns:
         HeroDeathsResponse with list of hero death events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import HeroDeath as HeroDeathModel
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+        service_deaths = _combat_service.get_hero_deaths(data)
+
+        deaths = [
+            HeroDeathModel(
+                game_time=d.game_time,
+                game_time_str=d.game_time_str,
+                killer=d.killer,
+                victim=d.victim,
+                killer_is_hero=d.killer_is_hero,
+                ability=d.ability,
+            )
+            for d in service_deaths
+        ]
+
+        return HeroDeathsResponse(
+            success=True,
+            match_id=match_id,
+            total_deaths=len(deaths),
+            deaths=deaths,
+        )
+    except ValueError as e:
         return HeroDeathsResponse(
             success=False,
             match_id=match_id,
-            error="Could not download replay for this match"
+            error=str(e),
         )
-
-    deaths = combat_log_parser.get_hero_deaths(replay_path)
-
-    return HeroDeathsResponse(
-        success=True,
-        match_id=match_id,
-        total_deaths=len(deaths),
-        deaths=deaths,
-    )
 
 
 @mcp.tool
@@ -507,6 +535,8 @@ async def get_combat_log(
     start_time: Optional[float] = None,
     end_time: Optional[float] = None,
     hero_filter: Optional[str] = None,
+    significant_only: bool = False,
+    ctx: Optional[Context] = None,
 ) -> CombatLogResponse:
     """
     Get combat log events from a Dota 2 match with optional filters.
@@ -514,7 +544,7 @@ async def get_combat_log(
     Returns combat events including damage, abilities, modifiers (buffs/debuffs), and deaths.
 
     Each event contains:
-    - type: DAMAGE, MODIFIER_ADD, ABILITY, DEATH, etc.
+    - type: DAMAGE, MODIFIER_ADD, ABILITY, DEATH, ITEM, PURCHASE, BUYBACK, etc.
     - game_time: Seconds since game start
     - game_time_str: Formatted as M:SS
     - attacker: Source of the event (hero name without prefix)
@@ -529,38 +559,63 @@ async def get_combat_log(
         start_time: Filter events after this game time in seconds (optional)
         end_time: Filter events before this game time in seconds (optional)
         hero_filter: Only include events involving this hero, e.g. "earthshaker" (optional)
+        significant_only: If True, returns only story-telling events (abilities, deaths, items,
+                         purchases, buybacks) - skips damage ticks and modifier spam.
+                         RECOMMENDED for rotation/movement analysis over longer time windows.
+                         Default: False (returns all events)
 
     Returns:
         CombatLogResponse with list of combat log events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import CombatLogEvent as CombatLogEventModel
 
-    if not replay_path:
-        return CombatLogResponse(
-            success=False,
-            match_id=match_id,
-            error="Could not download replay for this match"
-        )
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
 
-    events = combat_log_parser.get_combat_log(
-        replay_path,
-        start_time=start_time,
-        end_time=end_time,
-        hero_filter=hero_filter,
-    )
-
-    return CombatLogResponse(
-        success=True,
-        match_id=match_id,
-        total_events=len(events),
-        filters=CombatLogFilters(
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+        service_events = _combat_service.get_combat_log(
+            data,
             start_time=start_time,
             end_time=end_time,
             hero_filter=hero_filter,
-        ),
-        events=events,
-    )
+            significant_only=significant_only,
+        )
+
+        events = [
+            CombatLogEventModel(
+                type=e.type,
+                game_time=e.game_time,
+                game_time_str=e.game_time_str,
+                attacker=e.attacker,
+                attacker_is_hero=e.attacker_is_hero,
+                target=e.target,
+                target_is_hero=e.target_is_hero,
+                ability=e.ability,
+                value=e.value,
+                hit=e.hit,
+            )
+            for e in service_events
+        ]
+
+        return CombatLogResponse(
+            success=True,
+            match_id=match_id,
+            total_events=len(events),
+            filters=CombatLogFilters(
+                start_time=start_time,
+                end_time=end_time,
+                hero_filter=hero_filter,
+            ),
+            events=events,
+        )
+    except ValueError as e:
+        return CombatLogResponse(
+            success=False,
+            match_id=match_id,
+            error=str(e),
+        )
 
 
 @mcp.tool
@@ -568,6 +623,7 @@ async def get_fight_combat_log(
     match_id: int,
     reference_time: float,
     hero: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> FightCombatLogResponse:
     """
     Get combat log for a fight leading up to a specific moment (e.g., a death).
@@ -588,41 +644,66 @@ async def get_fight_combat_log(
     Returns:
         FightCombatLogResponse with fight boundaries, participants, and combat events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import CombatLogEvent as CombatLogEventModel
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+        result = _fight_service.get_fight_combat_log(data, reference_time, hero)
+
+        if not result:
+            return FightCombatLogResponse(
+                success=False,
+                match_id=match_id,
+                error=f"No fight found at time {reference_time}",
+            )
+
+        # Convert service CombatLogEvent to API model
+        events = [
+            CombatLogEventModel(
+                type=e.type,
+                game_time=e.game_time,
+                game_time_str=e.game_time_str,
+                attacker=e.attacker,
+                attacker_is_hero=e.attacker_is_hero,
+                target=e.target,
+                target_is_hero=e.target_is_hero,
+                ability=e.ability,
+                value=e.value,
+                hit=e.hit,
+            )
+            for e in result["events"]
+        ]
+
+        return FightCombatLogResponse(
+            success=True,
+            match_id=match_id,
+            hero=hero,
+            fight_start=result["fight_start"],
+            fight_start_str=result["fight_start_str"],
+            fight_end=result["fight_end"],
+            fight_end_str=result["fight_end_str"],
+            duration=result["duration"],
+            participants=result["participants"],
+            total_events=len(events),
+            events=events,
+        )
+    except ValueError as e:
         return FightCombatLogResponse(
             success=False,
             match_id=match_id,
-            error="Could not download replay for this match"
+            error=str(e),
         )
-
-    result = combat_log_parser.get_combat_timespan(
-        replay_path,
-        reference_time=reference_time,
-        hero=hero,
-    )
-
-    return FightCombatLogResponse(
-        success=True,
-        match_id=match_id,
-        hero=hero,
-        fight_start=result.fight_start,
-        fight_start_str=result.fight_start_str,
-        fight_end=result.fight_end,
-        fight_end_str=result.fight_end_str,
-        duration=result.duration,
-        participants=result.participants,
-        total_events=result.total_events,
-        events=result.events,
-    )
 
 
 @mcp.tool
 async def get_item_purchases(
     match_id: int,
     hero_filter: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> ItemPurchasesResponse:
     """
     Get item purchase timings for heroes in a Dota 2 match.
@@ -645,32 +726,46 @@ async def get_item_purchases(
     Returns:
         ItemPurchasesResponse with list of item purchase events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import ItemPurchase as ItemPurchaseModel
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+        service_purchases = _combat_service.get_item_purchases(data, hero_filter=hero_filter)
+
+        purchases = [
+            ItemPurchaseModel(
+                game_time=p.game_time,
+                game_time_str=p.game_time_str,
+                hero=p.hero,
+                item=p.item,
+            )
+            for p in service_purchases
+        ]
+
+        return ItemPurchasesResponse(
+            success=True,
+            match_id=match_id,
+            hero_filter=hero_filter,
+            total_purchases=len(purchases),
+            purchases=purchases,
+        )
+    except ValueError as e:
         return ItemPurchasesResponse(
             success=False,
             match_id=match_id,
-            error="Could not download replay for this match"
+            error=str(e),
         )
-
-    purchases = combat_log_parser.get_item_purchases(
-        replay_path,
-        hero_filter=hero_filter,
-    )
-
-    return ItemPurchasesResponse(
-        success=True,
-        match_id=match_id,
-        hero_filter=hero_filter,
-        total_purchases=len(purchases),
-        purchases=purchases,
-    )
 
 
 @mcp.tool
-async def get_courier_kills(match_id: int) -> CourierKillsResponse:
+async def get_courier_kills(
+    match_id: int,
+    ctx: Optional[Context] = None,
+) -> CourierKillsResponse:
     """
     Get all courier kills in a Dota 2 match.
 
@@ -687,28 +782,47 @@ async def get_courier_kills(match_id: int) -> CourierKillsResponse:
     Returns:
         CourierKillsResponse with list of courier kill events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import CourierKill as CourierKillModel
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+        service_kills = _combat_service.get_courier_kills(data)
+
+        kills = [
+            CourierKillModel(
+                game_time=k.game_time,
+                game_time_str=k.game_time_str,
+                killer=k.killer,
+                killer_is_hero=k.killer_is_hero,
+                owner=k.owner,
+                team=k.team,
+            )
+            for k in service_kills
+        ]
+
+        return CourierKillsResponse(
+            success=True,
+            match_id=match_id,
+            total_kills=len(kills),
+            kills=kills,
+        )
+    except ValueError as e:
         return CourierKillsResponse(
             success=False,
             match_id=match_id,
-            error="Could not download replay for this match"
+            error=str(e),
         )
-
-    kills = combat_log_parser.get_courier_kills(replay_path)
-
-    return CourierKillsResponse(
-        success=True,
-        match_id=match_id,
-        total_kills=len(kills),
-        kills=kills,
-    )
 
 
 @mcp.tool
-async def get_objective_kills(match_id: int) -> ObjectiveKillsResponse:
+async def get_objective_kills(
+    match_id: int,
+    ctx: Optional[Context] = None,
+) -> ObjectiveKillsResponse:
     """
     Get all major objective kills in a Dota 2 match.
 
@@ -730,30 +844,125 @@ async def get_objective_kills(match_id: int) -> ObjectiveKillsResponse:
     Returns:
         ObjectiveKillsResponse with all objective kill events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import (
+        BarracksKill,
+        RoshanKill,
+        TormentorKill,
+        TowerKill,
+    )
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    def parse_tower_info(name: str) -> tuple:
+        """Parse tower tier and lane from name."""
+        name_lower = name.lower()
+        tier = 1
+        lane = "unknown"
+        if "tower1" in name_lower or "t1" in name_lower:
+            tier = 1
+        elif "tower2" in name_lower or "t2" in name_lower:
+            tier = 2
+        elif "tower3" in name_lower or "t3" in name_lower:
+            tier = 3
+        elif "tower4" in name_lower or "t4" in name_lower:
+            tier = 4
+        if "top" in name_lower:
+            lane = "top"
+        elif "mid" in name_lower:
+            lane = "mid"
+        elif "bot" in name_lower:
+            lane = "bot"
+        elif "tower4" in name_lower or "t4" in name_lower:
+            lane = "base"
+        return tier, lane
+
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+
+        # Get objective kills from service
+        roshan_objs = _combat_service.get_roshan_kills(data)
+        tormentor_objs = _combat_service.get_tormentor_kills(data)
+        tower_objs = _combat_service.get_tower_kills(data)
+        barracks_objs = _combat_service.get_barracks_kills(data)
+
+        # Convert to API models
+        roshan_kills = [
+            RoshanKill(
+                game_time=r.game_time,
+                game_time_str=r.game_time_str,
+                killer=r.killer or "unknown",
+                team=r.team or "unknown",
+                kill_number=r.extra_info.get("kill_number", 0) if r.extra_info else 0,
+            )
+            for r in roshan_objs
+        ]
+
+        tormentor_kills = [
+            TormentorKill(
+                game_time=t.game_time,
+                game_time_str=t.game_time_str,
+                killer=t.killer or "unknown",
+                team=t.team or "unknown",
+                side=t.extra_info.get("side", "unknown") if t.extra_info else "unknown",
+            )
+            for t in tormentor_objs
+        ]
+
+        tower_kills = []
+        for t in tower_objs:
+            tier, lane = parse_tower_info(t.objective_name)
+            tower_team = t.extra_info.get("tower_team", "unknown") if t.extra_info else "unknown"
+            tower_kills.append(TowerKill(
+                game_time=t.game_time,
+                game_time_str=t.game_time_str,
+                tower=t.objective_name,
+                team=tower_team,
+                tier=tier,
+                lane=lane,
+                killer=t.killer or "unknown",
+                killer_is_hero=t.killer is not None,
+            ))
+
+        barracks_kills = []
+        for b in barracks_objs:
+            rax_team = b.extra_info.get("barracks_team", "unknown") if b.extra_info else "unknown"
+            rax_type = b.extra_info.get("barracks_type", "unknown") if b.extra_info else "unknown"
+            lane = "mid"
+            if "top" in b.objective_name.lower():
+                lane = "top"
+            elif "bot" in b.objective_name.lower():
+                lane = "bot"
+            barracks_kills.append(BarracksKill(
+                game_time=b.game_time,
+                game_time_str=b.game_time_str,
+                barracks=b.objective_name,
+                team=rax_team,
+                lane=lane,
+                type=rax_type,
+                killer=b.killer or "unknown",
+                killer_is_hero=b.killer is not None,
+            ))
+
+        return ObjectiveKillsResponse(
+            success=True,
+            match_id=match_id,
+            roshan_kills=roshan_kills,
+            tormentor_kills=tormentor_kills,
+            tower_kills=tower_kills,
+            barracks_kills=barracks_kills,
+        )
+    except ValueError as e:
         return ObjectiveKillsResponse(
             success=False,
             match_id=match_id,
-            error="Could not download replay for this match"
+            error=str(e),
         )
-
-    roshan, tormentor, towers, barracks = combat_log_parser.get_objective_kills(replay_path)
-
-    return ObjectiveKillsResponse(
-        success=True,
-        match_id=match_id,
-        roshan_kills=roshan,
-        tormentor_kills=tormentor,
-        tower_kills=towers,
-        barracks_kills=barracks,
-    )
 
 
 @mcp.tool
-async def get_rune_pickups(match_id: int) -> RunePickupsResponse:
+async def get_rune_pickups(match_id: int, ctx: Optional[Context] = None) -> RunePickupsResponse:
     """
     Get power rune pickups in a Dota 2 match.
 
@@ -777,28 +986,45 @@ async def get_rune_pickups(match_id: int) -> RunePickupsResponse:
     Returns:
         RunePickupsResponse with list of power rune pickup events
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.models.combat_log import RunePickup as RunePickupModel
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+        service_pickups = _combat_service.get_rune_pickups(data)
+
+        pickups = [
+            RunePickupModel(
+                game_time=p.game_time,
+                game_time_str=p.game_time_str,
+                hero=p.hero,
+                rune_type=p.rune_type,
+            )
+            for p in service_pickups
+        ]
+
+        return RunePickupsResponse(
+            success=True,
+            match_id=match_id,
+            total_pickups=len(pickups),
+            pickups=pickups,
+        )
+    except ValueError as e:
         return RunePickupsResponse(
             success=False,
             match_id=match_id,
-            error="Could not download replay for this match"
+            error=str(e),
         )
-
-    pickups = combat_log_parser.get_rune_pickups(replay_path)
-
-    return RunePickupsResponse(
-        success=True,
-        match_id=match_id,
-        total_pickups=len(pickups),
-        pickups=pickups,
-    )
 
 
 @mcp.tool
-async def get_match_draft(match_id: int) -> Dict[str, Any]:
+async def get_match_draft(
+    match_id: int,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """
     Get the complete draft (picks and bans) for a Dota 2 match.
 
@@ -821,14 +1047,19 @@ async def get_match_draft(match_id: int) -> Dict[str, Any]:
     Returns:
         Dictionary with draft actions and convenience lists by team
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.utils.match_info_parser import match_info_parser
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        replay_path = await _replay_service.download_only(match_id, progress=progress_callback)
+    except ValueError as e:
         return {
             "success": False,
             "match_id": match_id,
-            "error": "Could not download replay for this match"
+            "error": str(e)
         }
 
     draft = match_info_parser.get_draft(replay_path)
@@ -878,7 +1109,10 @@ async def _get_pro_names_from_opendota(match_id: int) -> Dict[int, str]:
 
 
 @mcp.tool
-async def get_match_info(match_id: int) -> Dict[str, Any]:
+async def get_match_info(
+    match_id: int,
+    ctx: Optional[Context] = None,
+) -> Dict[str, Any]:
     """
     Get match metadata and player information for a Dota 2 match.
 
@@ -897,14 +1131,19 @@ async def get_match_info(match_id: int) -> Dict[str, Any]:
     Returns:
         Dictionary with match metadata, teams, and players
     """
-    downloader = ReplayDownloader()
-    replay_path = await downloader.download_replay(match_id)
+    from src.utils.match_info_parser import match_info_parser
 
-    if not replay_path:
+    async def progress_callback(current: int, total: int, message: str) -> None:
+        if ctx:
+            await ctx.report_progress(current, total)
+
+    try:
+        replay_path = await _replay_service.download_only(match_id, progress=progress_callback)
+    except ValueError as e:
         return {
             "success": False,
             "match_id": match_id,
-            "error": "Could not download replay for this match"
+            "error": str(e)
         }
 
     match_info = match_info_parser.get_match_info(replay_path)
@@ -2065,24 +2304,28 @@ async def get_farming_pattern(
     ctx: Optional[Context] = None,
 ) -> FarmingPatternResponse:
     """
-    Analyze a hero's farming pattern - creep kills, camp rotations, and map movement.
+    Analyze a hero's farming pattern with camp sequences, power spikes, and routes.
 
     This is THE tool for questions about "farming pattern", "how did X farm",
     "when did they start jungling", "which camps did they clear", or
     "show me the farming movement minute by minute".
 
     Returns minute-by-minute breakdown including:
-    - Lane creeps killed vs neutral creeps killed each minute
-    - Which specific neutral camps were farmed (satyr, centaur, kobold, etc.)
-    - Hero position on the map at each minute
-    - Gold, CS, and level progression
+    - camp_sequence: Ordered list of camps cleared each minute (shows farming route)
+    - position_at_start/end: Where hero was at start and end of each minute
+    - level_timings: When hero reached each level (for power spike analysis)
+    - item_timings: When items were purchased (for power spike analysis)
     - Key transitions: first jungle rotation, first large camp, when they left lane
+
+    Each minute shows the actual farming ROUTE:
+    - "Min 14: started dire_jungle → large_troll (14:05) → medium_satyr (14:18) →
+      ancient_black_dragon (14:35) → large_centaur (14:52)"
 
     Example questions this tool answers:
     - "What was Terrorblade's farming pattern in the first 10 minutes?"
     - "When did Anti-Mage start jungling?"
     - "Which camps did Luna clear between minutes 5-15?"
-    - "How did the carry move across the map while farming?"
+    - "How did the carry's farming change after Battle Fury?"
 
     Args:
         match_id: The Dota 2 match ID
@@ -2091,24 +2334,62 @@ async def get_farming_pattern(
         end_minute: End of analysis range (default: 10)
 
     Returns:
-        FarmingPatternResponse with complete farming analysis:
-        - minutes: Minute-by-minute breakdown with creeps, position, gold, level
-        - transitions: Key moments (first jungle kill, first large camp, left lane)
-        - summary: Total lane vs neutral creeps, jungle %, GPM, CS/min
-        - creep_kills: All creep kills with timestamps and types
+        FarmingPatternResponse with:
+        - level_timings: When each level was reached
+        - item_timings: When items were purchased
+        - minutes: Per-minute data with camp_sequence showing farming route
+        - transitions: Key moments (first jungle kill, first large camp)
+        - summary: Total lane vs neutral, jungle %, GPM, CS/min
+        - creep_kills: All creep kills with timestamps, types, and positions
     """
+    from src.services.models.farming_data import ItemTiming
+
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
             await ctx.report_progress(current, total)
 
+    def format_time(seconds: float) -> str:
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{minutes}:{secs:02d}"
+
     try:
+        # Get replay data
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
+
+        # Get match heroes to find hero_id for item timings
+        match_heroes = await heroes_resource.get_match_heroes(match_id)
+        hero_lower = hero.lower()
+        hero_id = None
+
+        # match_heroes is a flat list of all players with hero info
+        for h in match_heroes:
+            hero_name = h.get("hero_name", "").lower()
+            localized_name = h.get("localized_name", "").lower()
+            if hero_lower in hero_name or hero_lower in localized_name:
+                hero_id = h.get("hero_id")
+                break
+
+        # Fetch item timings from OpenDota if we found the hero
+        item_timings_list: List[ItemTiming] = []
+        if hero_id:
+            raw_items = await match_fetcher.get_player_item_timings(match_id, hero_id)
+            for item in raw_items:
+                item_time = item.get("time", 0)
+                # Only include items within our time range (with some buffer)
+                if item_time <= (end_minute + 5) * 60:
+                    item_timings_list.append(ItemTiming(
+                        item=item.get("item", "unknown"),
+                        time=float(item_time),
+                        time_str=format_time(item_time),
+                    ))
 
         result = _farming_service.get_farming_pattern(
             data=data,
             hero=hero,
             start_minute=start_minute,
             end_minute=end_minute,
+            item_timings=item_timings_list,
         )
 
         return result

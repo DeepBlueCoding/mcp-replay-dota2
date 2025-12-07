@@ -23,9 +23,9 @@ classifiers = [
 
 dependencies = [
     "fastmcp>=2.12.3",
-    "python-opendota-sdk==7.39.5.1.dev4",
+    "python-opendota-sdk>=7.39.5.2",
     "requests>=2.32.5",
-    "python-manta==1.4.5.2.dev12",
+    "python-manta>=1.4.5.2",
     "aiohttp>=3.13.2",
     "diskcache>=5.6.3",
 ]
@@ -44,15 +44,6 @@ dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.3.0",
 ]
-
-[[tool.uv.index]]
-name = "testpypi"
-url = "https://test.pypi.org/simple/"
-explicit = true
-
-[tool.uv.sources]
-python-manta = { index = "testpypi" }
-python-opendota-sdk = { index = "testpypi" }
 
 [dependency-groups]
 dev = [

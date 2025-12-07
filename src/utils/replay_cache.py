@@ -38,6 +38,11 @@ class CombatLogEntry:
     target_team: int
     neutral_camp_type: Optional[int] = None  # NeutralCampType: 0=SMALL, 1=MEDIUM, 2=HARD, 3=ANCIENT
     neutral_camp_team: Optional[int] = None  # Team that owns the camp
+    # Hero detection fields (computed during extraction)
+    is_attacker_hero: bool = False
+    is_target_hero: bool = False
+    location_x: Optional[float] = None
+    location_y: Optional[float] = None
 
 
 @dataclass
@@ -59,6 +64,11 @@ class ParsedReplayData:
     tick_time_map: List[Tuple[int, float]]
     metadata: Optional[Dict[str, Any]]
     hero_positions: Dict[int, Dict[str, Tuple[float, float]]]  # tick -> hero -> (x, y)
+
+    @property
+    def combat_log_entries(self) -> List[CombatLogEntry]:
+        """Compatibility property for services that expect combat_log_entries."""
+        return self.combat_log
 
 
 class ReplayCache:
@@ -136,6 +146,8 @@ class ReplayCache:
                     CombatLogType.ABILITY.value,
                     CombatLogType.ITEM.value,
                     CombatLogType.PURCHASE.value,
+                    CombatLogType.PICKUP_RUNE.value,
+                    CombatLogType.BUYBACK.value,
                     CombatLogType.ABILITY_TRIGGER.value,
                 ],
                 "max_entries": 100000,
@@ -185,6 +197,10 @@ class ReplayCache:
                     target_team=getattr(e, 'target_team', 0),
                     neutral_camp_type=getattr(e, 'neutral_camp_type', None),
                     neutral_camp_team=getattr(e, 'neutral_camp_team', None),
+                    is_attacker_hero=getattr(e, 'is_attacker_hero', False),
+                    is_target_hero=getattr(e, 'is_target_hero', False),
+                    location_x=getattr(e, 'location_x', None),
+                    location_y=getattr(e, 'location_y', None),
                 ))
         return entries
 
@@ -292,6 +308,10 @@ class ReplayCache:
                     "target_team": e.target_team,
                     "neutral_camp_type": e.neutral_camp_type,
                     "neutral_camp_team": e.neutral_camp_team,
+                    "is_attacker_hero": e.is_attacker_hero,
+                    "is_target_hero": e.is_target_hero,
+                    "location_x": e.location_x,
+                    "location_y": e.location_y,
                 }
                 for e in data.combat_log
             ],
