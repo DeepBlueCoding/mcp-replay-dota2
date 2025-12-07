@@ -2,7 +2,7 @@
 
 ??? info "🤖 AI Summary"
 
-    Add to `claude_desktop_config.json`: `{"mcpServers": {"dota2": {"command": "uv", "args": ["run", "python", "dota_match_mcp_server.py"], "cwd": "/path/to/repo"}}}`. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".
+    Add to `claude_desktop_config.json`: `{"mcpServers": {"dota2": {"command": "uv", "args": ["run", "--frozen", "--project", "/path/to/repo", "python", "/path/to/repo/dota_match_mcp_server.py"]}}}`. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".
 
 The simplest way to use this MCP server - just configure and chat.
 
@@ -14,17 +14,47 @@ Add to your Claude Desktop config file:
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-```json
-{
-  "mcpServers": {
-    "dota2": {
-      "command": "uv",
-      "args": ["run", "python", "dota_match_mcp_server.py"],
-      "cwd": "/path/to/mcp_replay_dota2"
+=== "Linux/macOS"
+
+    ```json
+    {
+      "mcpServers": {
+        "dota2": {
+          "command": "uv",
+          "args": [
+            "run",
+            "--frozen",
+            "--project", "/home/user/projects/mcp_replay_dota2",
+            "python",
+            "/home/user/projects/mcp_replay_dota2/dota_match_mcp_server.py"
+          ]
+        }
+      }
     }
-  }
-}
-```
+    ```
+
+=== "Windows"
+
+    ```json
+    {
+      "mcpServers": {
+        "dota2": {
+          "command": "uv",
+          "args": [
+            "run",
+            "--frozen",
+            "--project", "C:\\Users\\username\\projects\\mcp_replay_dota2",
+            "python",
+            "C:\\Users\\username\\projects\\mcp_replay_dota2\\dota_match_mcp_server.py"
+          ]
+        }
+      }
+    }
+    ```
+
+!!! tip "Why `--frozen --project`?"
+    - `--frozen` ensures dependencies are locked (no unexpected updates)
+    - `--project` explicitly sets the project path (avoids working directory issues)
 
 ## Restart Claude Desktop
 
@@ -57,10 +87,16 @@ Claude will automatically:
 ## Troubleshooting
 
 **No hammer icon?**
+
 - Check the config file path is correct
 - Ensure `uv` is in your PATH
 - Check Claude Desktop logs for errors
 
 **Tools not working?**
-- Verify the `cwd` path is correct
-- Try running `uv run python dota_match_mcp_server.py` manually to check for errors
+
+- Verify the `--project` path points to the cloned repository
+- Test manually:
+
+```bash
+uv run --frozen --project /path/to/mcp_replay_dota2 python /path/to/mcp_replay_dota2/dota_match_mcp_server.py
+```

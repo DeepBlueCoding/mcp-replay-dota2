@@ -2,7 +2,7 @@
 
 ??? info "🤖 AI Summary"
 
-    Add to `.mcp.json` (project) or `~/.claude/settings.json` (global): `{"mcpServers": {"dota2": {"command": "uv", "args": ["run", "python", "/path/to/dota_match_mcp_server.py"]}}}`. Verify with `/tools`. Ask: "Analyze match 8461956309". Can also generate scripts using real match data.
+    Add to `.mcp.json` (project) or `~/.claude/settings.json` (global): `{"mcpServers": {"dota2": {"command": "uv", "args": ["run", "--frozen", "--project", "/path/to/repo", "python", "/path/to/repo/dota_match_mcp_server.py"]}}}`. Verify with `/tools`. Ask: "Analyze match 8461956309". Can also generate scripts using real match data.
 
 Use the Dota 2 MCP server within Claude Code for development workflows.
 
@@ -15,7 +15,13 @@ Add to your project's `.mcp.json`:
   "mcpServers": {
     "dota2": {
       "command": "uv",
-      "args": ["run", "python", "/absolute/path/to/mcp_replay_dota2/dota_match_mcp_server.py"]
+      "args": [
+        "run",
+        "--frozen",
+        "--project", "/absolute/path/to/mcp_replay_dota2",
+        "python",
+        "/absolute/path/to/mcp_replay_dota2/dota_match_mcp_server.py"
+      ]
     }
   }
 }
@@ -30,11 +36,21 @@ Add to `~/.claude/settings.json` to make it available in all projects:
   "mcpServers": {
     "dota2": {
       "command": "uv",
-      "args": ["run", "python", "/absolute/path/to/mcp_replay_dota2/dota_match_mcp_server.py"]
+      "args": [
+        "run",
+        "--frozen",
+        "--project", "/absolute/path/to/mcp_replay_dota2",
+        "python",
+        "/absolute/path/to/mcp_replay_dota2/dota_match_mcp_server.py"
+      ]
     }
   }
 }
 ```
+
+!!! tip "Why `--frozen --project`?"
+    - `--frozen` ensures dependencies are locked (no unexpected updates)
+    - `--project` explicitly sets the project path (avoids working directory issues)
 
 ## Verify
 
