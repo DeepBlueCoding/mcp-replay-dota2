@@ -2264,7 +2264,7 @@
 </code></pre></div></p>
 <hr />
 <h2 id="get_match_heroes">get_match_heroes<a class="headerlink" href="#get_match_heroes" title="Permanent link">&para;</a></h2>
-<p>Get the 10 heroes in a match with detailed stats.</p>
+<p>Get the 10 heroes in a match with detailed stats and <strong>counter picks data</strong> for draft analysis.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">get_match_heroes</span><span class="p">(</span><span class="n">match_id</span><span class="o">=</span><span class="mi">8461956309</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Returns:</strong>
@@ -2285,14 +2285,25 @@
 <a id="__codelineno-26-15" name="__codelineno-26-15" href="#__codelineno-26-15"></a><span class="w">      </span><span class="nt">&quot;xpm&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">580</span><span class="p">,</span>
 <a id="__codelineno-26-16" name="__codelineno-26-16" href="#__codelineno-26-16"></a><span class="w">      </span><span class="nt">&quot;net_worth&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">28500</span><span class="p">,</span>
 <a id="__codelineno-26-17" name="__codelineno-26-17" href="#__codelineno-26-17"></a><span class="w">      </span><span class="nt">&quot;hero_damage&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15200</span><span class="p">,</span>
-<a id="__codelineno-26-18" name="__codelineno-26-18" href="#__codelineno-26-18"></a><span class="w">      </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;item_manta&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;item_bfury&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;item_abyssal_blade&quot;</span><span class="p">],</span>
+<a id="__codelineno-26-18" name="__codelineno-26-18" href="#__codelineno-26-18"></a><span class="w">      </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Manta Style&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Battle Fury&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Abyssal Blade&quot;</span><span class="p">],</span>
 <a id="__codelineno-26-19" name="__codelineno-26-19" href="#__codelineno-26-19"></a><span class="w">      </span><span class="nt">&quot;player_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PlayerOne&quot;</span><span class="p">,</span>
-<a id="__codelineno-26-20" name="__codelineno-26-20" href="#__codelineno-26-20"></a><span class="w">      </span><span class="nt">&quot;pro_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Yatoro&quot;</span>
-<a id="__codelineno-26-21" name="__codelineno-26-21" href="#__codelineno-26-21"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-26-22" name="__codelineno-26-22" href="#__codelineno-26-22"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-26-23" name="__codelineno-26-23" href="#__codelineno-26-23"></a><span class="w">  </span><span class="nt">&quot;dire_heroes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
-<a id="__codelineno-26-24" name="__codelineno-26-24" href="#__codelineno-26-24"></a><span class="p">}</span>
+<a id="__codelineno-26-20" name="__codelineno-26-20" href="#__codelineno-26-20"></a><span class="w">      </span><span class="nt">&quot;pro_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Yatoro&quot;</span><span class="p">,</span>
+<a id="__codelineno-26-21" name="__codelineno-26-21" href="#__codelineno-26-21"></a><span class="w">      </span><span class="nt">&quot;counters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-26-22" name="__codelineno-26-22" href="#__codelineno-26-22"></a><span class="w">        </span><span class="p">{</span><span class="nt">&quot;hero_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;localized_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Doom&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Doom silences AM completely...&quot;</span><span class="p">}</span>
+<a id="__codelineno-26-23" name="__codelineno-26-23" href="#__codelineno-26-23"></a><span class="w">      </span><span class="p">],</span>
+<a id="__codelineno-26-24" name="__codelineno-26-24" href="#__codelineno-26-24"></a><span class="w">      </span><span class="nt">&quot;good_against&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-26-25" name="__codelineno-26-25" href="#__codelineno-26-25"></a><span class="w">        </span><span class="p">{</span><span class="nt">&quot;hero_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">94</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;localized_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Medusa&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Mana Break devastates mana shield...&quot;</span><span class="p">}</span>
+<a id="__codelineno-26-26" name="__codelineno-26-26" href="#__codelineno-26-26"></a><span class="w">      </span><span class="p">],</span>
+<a id="__codelineno-26-27" name="__codelineno-26-27" href="#__codelineno-26-27"></a><span class="w">      </span><span class="nt">&quot;when_to_pick&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Enemy has mana-dependent heroes&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Team can hold 4v5&quot;</span><span class="p">]</span>
+<a id="__codelineno-26-28" name="__codelineno-26-28" href="#__codelineno-26-28"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-26-29" name="__codelineno-26-29" href="#__codelineno-26-29"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-26-30" name="__codelineno-26-30" href="#__codelineno-26-30"></a><span class="w">  </span><span class="nt">&quot;dire_heroes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
+<a id="__codelineno-26-31" name="__codelineno-26-31" href="#__codelineno-26-31"></a><span class="p">}</span>
 </code></pre></div></p>
+<div class="admonition tip">
+<p class="admonition-title">Draft Analysis</p>
+<p>Use the <code>counters</code> and <code>good_against</code> fields to analyze draft advantages. Check which enemy heroes counter each of your picks, and identify favorable matchups.</p>
+</div>
 <hr />
 <h2 id="get_match_players">get_match_players<a class="headerlink" href="#get_match_players" title="Permanent link">&para;</a></h2>
 <p>Get the 10 players in a match with their hero assignments.</p>

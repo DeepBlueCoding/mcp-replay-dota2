@@ -2106,11 +2106,19 @@
 <p><code>HeroesResource</code> methods for counter data access:</p>
 </li>
 <li><code>get_hero_counters(hero_id)</code>: Get counter data for a specific hero</li>
-<li><code>get_all_hero_counters()</code>: Get all hero counter data</li>
+<li>
+<p><code>get_all_hero_counters()</code>: Get all hero counter data</p>
+</li>
+<li>
+<p><code>get_match_heroes</code> tool now includes counter picks for each hero:</p>
+</li>
+<li>Enables draft analysis directly from match data</li>
+<li>Each hero includes counters, good_against, when_to_pick</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>dota2://heroes/all</code> now includes counter picks data for draft analysis</li>
+<li><code>get_match_heroes</code> enriched with counter picks for draft analysis</li>
 <li>Updated documentation with counter picks examples</li>
 </ul>
 <hr />
