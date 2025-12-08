@@ -477,12 +477,19 @@ async def get_match_timeline(
     except ValueError as e:
         return MatchTimelineResponse(success=False, match_id=match_id, error=str(e))
 
+    if data.metadata is None:
+        return MatchTimelineResponse(
+            success=False,
+            match_id=match_id,
+            error="No metadata in replay. Try calling download_replay first to ensure replay is cached.",
+        )
+
     timeline = timeline_parser.parse_timeline(data)
     if not timeline:
         return MatchTimelineResponse(
             success=False,
             match_id=match_id,
-            error="Could not parse timeline from replay",
+            error="Could not parse timeline from replay metadata. Replay may be corrupted or incomplete.",
         )
 
     # Convert to typed models
@@ -562,13 +569,21 @@ async def get_stats_at_minute(
     except ValueError as e:
         return StatsAtMinuteResponse(success=False, match_id=match_id, minute=minute, error=str(e))
 
+    if data.metadata is None:
+        return StatsAtMinuteResponse(
+            success=False,
+            match_id=match_id,
+            minute=minute,
+            error="No metadata in replay. Try calling download_replay first to ensure replay is cached.",
+        )
+
     timeline = timeline_parser.parse_timeline(data)
     if not timeline:
         return StatsAtMinuteResponse(
             success=False,
             match_id=match_id,
             minute=minute,
-            error="Could not parse timeline from replay",
+            error="Could not parse timeline from replay metadata. Replay may be corrupted or incomplete.",
         )
 
     stats = timeline_parser.get_stats_at_minute(timeline, minute)
@@ -1378,13 +1393,13 @@ async def get_match_heroes(match_id: int) -> MatchHeroesResponse:
                 assists=h.get("assists", 0),
                 last_hits=h.get("last_hits", 0),
                 denies=h.get("denies", 0),
-                gpm=h.get("gpm", 0),
-                xpm=h.get("xpm", 0),
+                gpm=h.get("gold_per_min", 0),
+                xpm=h.get("xp_per_min", 0),
                 net_worth=h.get("net_worth", 0),
                 hero_damage=h.get("hero_damage", 0),
                 tower_damage=h.get("tower_damage", 0),
                 hero_healing=h.get("hero_healing", 0),
-                lane=h.get("lane"),
+                lane=h.get("lane_name"),
                 role=h.get("role"),
                 items=constants_fetcher.convert_item_ids_to_names(
                     [h.get(f"item_{i}") for i in range(6)]
@@ -1407,13 +1422,13 @@ async def get_match_heroes(match_id: int) -> MatchHeroesResponse:
                 assists=h.get("assists", 0),
                 last_hits=h.get("last_hits", 0),
                 denies=h.get("denies", 0),
-                gpm=h.get("gpm", 0),
-                xpm=h.get("xpm", 0),
+                gpm=h.get("gold_per_min", 0),
+                xpm=h.get("xp_per_min", 0),
                 net_worth=h.get("net_worth", 0),
                 hero_damage=h.get("hero_damage", 0),
                 tower_damage=h.get("tower_damage", 0),
                 hero_healing=h.get("hero_healing", 0),
-                lane=h.get("lane"),
+                lane=h.get("lane_name"),
                 role=h.get("role"),
                 items=constants_fetcher.convert_item_ids_to_names(
                     [h.get(f"item_{i}") for i in range(6)]

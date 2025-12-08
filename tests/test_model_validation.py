@@ -299,3 +299,77 @@ class TestItemConversion:
         )
 
         assert all(isinstance(item, str) for item in hero.items)
+
+
+class TestHeroStatsLaneValidation:
+    """Tests for HeroStats lane field validation."""
+
+    def test_hero_stats_accepts_string_lane(self):
+        """HeroStats should accept string lane names."""
+        hero = HeroStats(
+            hero_id=1,
+            hero_name="npc_dota_hero_antimage",
+            localized_name="Anti-Mage",
+            team="radiant",
+            kills=5,
+            deaths=2,
+            assists=10,
+            last_hits=300,
+            denies=20,
+            gpm=650,
+            xpm=700,
+            net_worth=25000,
+            hero_damage=15000,
+            tower_damage=3000,
+            hero_healing=0,
+            lane="safe_lane",
+            role="core",
+            items=[],
+        )
+        assert hero.lane == "safe_lane"
+
+    def test_hero_stats_accepts_none_lane(self):
+        """HeroStats should accept None for lane."""
+        hero = HeroStats(
+            hero_id=1,
+            hero_name="npc_dota_hero_antimage",
+            localized_name="Anti-Mage",
+            team="radiant",
+            kills=5,
+            deaths=2,
+            assists=10,
+            last_hits=300,
+            denies=20,
+            gpm=650,
+            xpm=700,
+            net_worth=25000,
+            hero_damage=15000,
+            tower_damage=3000,
+            hero_healing=0,
+            lane=None,
+            items=[],
+        )
+        assert hero.lane is None
+
+    def test_hero_stats_rejects_integer_lane(self):
+        """HeroStats should reject integer lane values - must use lane_name."""
+        with pytest.raises(ValidationError):
+            HeroStats(
+                hero_id=1,
+                hero_name="npc_dota_hero_antimage",
+                localized_name="Anti-Mage",
+                team="radiant",
+                kills=5,
+                deaths=2,
+                assists=10,
+                last_hits=300,
+                denies=20,
+                gpm=650,
+                xpm=700,
+                net_worth=25000,
+                hero_damage=15000,
+                tower_damage=3000,
+                hero_healing=0,
+                lane=1,  # Integer should fail - must be string
+                items=[],
+            )
