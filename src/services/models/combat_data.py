@@ -5,21 +5,8 @@ Data models for combat analysis.
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-
-@dataclass
-class HeroDeath:
-    """A hero death event."""
-
-    game_time: float
-    game_time_str: str
-    tick: int
-    killer: str
-    victim: str
-    killer_is_hero: bool
-    ability: Optional[str] = None
-    position_x: Optional[float] = None
-    position_y: Optional[float] = None
-    location_description: Optional[str] = None
+# Import shared models from API layer (re-export for backwards compatibility)
+from ...models.combat_log import CombatLogEvent, HeroDeath  # noqa: F401
 
 
 @dataclass
@@ -123,23 +110,6 @@ class CourierKill:
     team: str
     position_x: Optional[float] = None
     position_y: Optional[float] = None
-
-
-@dataclass
-class CombatLogEvent:
-    """A combat log event for the get_combat_log tool."""
-
-    type: str
-    game_time: float
-    game_time_str: str
-    tick: int
-    attacker: str
-    attacker_is_hero: bool
-    target: str
-    target_is_hero: bool
-    ability: Optional[str] = None
-    value: Optional[int] = None
-    hit: Optional[bool] = None
 
 
 @dataclass

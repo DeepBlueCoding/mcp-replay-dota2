@@ -9,15 +9,28 @@ from typing import List, Optional, Tuple
 
 from python_manta import CombatLogType, Team
 
+from ...models.combat_log import (
+    BarracksKill,
+    CombatLogEvent,
+    CombatLogFilters,
+    CombatLogResponse,
+    CourierKill,
+    CourierKillsResponse,
+    HeroDeath,
+    HeroDeathsResponse,
+    ItemPurchase,
+    ItemPurchasesResponse,
+    ObjectiveKillsResponse,
+    RoshanKill,
+    RunePickup,
+    RunePickupsResponse,
+    TormentorKill,
+    TowerKill,
+)
 from ...utils.position_tracker import classify_map_position
 from ..models.combat_data import (
-    CombatLogEvent,
-    CourierKill,
     DamageEvent,
-    HeroDeath,
-    ItemPurchase,
     ObjectiveKill,
-    RunePickup,
 )
 from ..models.replay_data import ParsedReplayData
 
@@ -473,6 +486,19 @@ class CombatService:
 
             killer = self._clean_hero_name(entry.attacker_name)
 
+            # Build position if available
+            position = None
+            if hasattr(entry, 'location_x') and entry.location_x is not None:
+                from ...models.combat_log import MapLocation
+                pos_info = classify_map_position(entry.location_x, entry.location_y)
+                position = MapLocation(
+                    x=entry.location_x,
+                    y=entry.location_y,
+                    region=pos_info.region,
+                    lane=pos_info.lane,
+                    location=pos_info.location,
+                )
+
             kill = CourierKill(
                 game_time=entry.game_time,
                 game_time_str=self._format_time(entry.game_time),
@@ -481,8 +507,7 @@ class CombatService:
                 killer_is_hero=entry.is_attacker_hero,
                 owner=owner,
                 team=courier_team,
-                position_x=entry.location_x if hasattr(entry, 'location_x') else None,
-                position_y=entry.location_y if hasattr(entry, 'location_y') else None,
+                position=position,
             )
             kills.append(kill)
 
@@ -593,3 +618,195 @@ class CombatService:
 
         events.sort(key=lambda e: e.game_time)
         return events
+
+    # ============ Response methods (return API Response models) ============
+
+    def get_hero_deaths_response(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+        hero_filter: Optional[str] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+    ) -> HeroDeathsResponse:
+        """Get hero deaths and return API response model."""
+        deaths = self.get_hero_deaths(data, hero_filter, start_time, end_time)
+        return HeroDeathsResponse(
+            success=True,
+            match_id=match_id,
+            total_deaths=len(deaths),
+            deaths=deaths,
+        )
+
+    def get_combat_log_response(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        hero_filter: Optional[str] = None,
+        significant_only: bool = False,
+    ) -> CombatLogResponse:
+        """Get combat log and return API response model."""
+        events = self.get_combat_log(
+            data,
+            start_time=start_time,
+            end_time=end_time,
+            hero_filter=hero_filter,
+            significant_only=significant_only,
+        )
+        return CombatLogResponse(
+            success=True,
+            match_id=match_id,
+            total_events=len(events),
+            filters=CombatLogFilters(
+                start_time=start_time,
+                end_time=end_time,
+                hero_filter=hero_filter,
+            ),
+            events=events,
+        )
+
+    def get_item_purchases_response(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+        hero_filter: Optional[str] = None,
+    ) -> ItemPurchasesResponse:
+        """Get item purchases and return API response model."""
+        purchases = self.get_item_purchases(data, hero_filter=hero_filter)
+        return ItemPurchasesResponse(
+            success=True,
+            match_id=match_id,
+            hero_filter=hero_filter,
+            total_purchases=len(purchases),
+            purchases=purchases,
+        )
+
+    def get_rune_pickups_response(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+    ) -> RunePickupsResponse:
+        """Get rune pickups and return API response model."""
+        pickups = self.get_rune_pickups(data)
+        return RunePickupsResponse(
+            success=True,
+            match_id=match_id,
+            total_pickups=len(pickups),
+            pickups=pickups,
+        )
+
+    def get_courier_kills_response(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+    ) -> CourierKillsResponse:
+        """Get courier kills and return API response model."""
+        kills = self.get_courier_kills(data)
+        return CourierKillsResponse(
+            success=True,
+            match_id=match_id,
+            total_kills=len(kills),
+            kills=kills,
+        )
+
+    def _parse_tower_info(self, name: str) -> tuple:
+        """Parse tower tier and lane from name."""
+        name_lower = name.lower()
+        tier = 1
+        lane = "unknown"
+        if "tower1" in name_lower or "t1" in name_lower:
+            tier = 1
+        elif "tower2" in name_lower or "t2" in name_lower:
+            tier = 2
+        elif "tower3" in name_lower or "t3" in name_lower:
+            tier = 3
+        elif "tower4" in name_lower or "t4" in name_lower:
+            tier = 4
+        if "top" in name_lower:
+            lane = "top"
+        elif "mid" in name_lower:
+            lane = "mid"
+        elif "bot" in name_lower:
+            lane = "bot"
+        elif "tower4" in name_lower or "t4" in name_lower:
+            lane = "base"
+        return tier, lane
+
+    def get_objective_kills_response(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+    ) -> ObjectiveKillsResponse:
+        """Get all objective kills and return API response model."""
+        roshan_objs = self.get_roshan_kills(data)
+        tormentor_objs = self.get_tormentor_kills(data)
+        tower_objs = self.get_tower_kills(data)
+        barracks_objs = self.get_barracks_kills(data)
+
+        roshan_kills = [
+            RoshanKill(
+                game_time=r.game_time,
+                game_time_str=r.game_time_str,
+                killer=r.killer or "unknown",
+                team=r.team or "unknown",
+                kill_number=r.extra_info.get("kill_number", 0) if r.extra_info else 0,
+            )
+            for r in roshan_objs
+        ]
+
+        tormentor_kills = [
+            TormentorKill(
+                game_time=t.game_time,
+                game_time_str=t.game_time_str,
+                killer=t.killer or "unknown",
+                team=t.team or "unknown",
+                side=t.extra_info.get("side", "unknown") if t.extra_info else "unknown",
+            )
+            for t in tormentor_objs
+        ]
+
+        tower_kills = []
+        for t in tower_objs:
+            tier, lane = self._parse_tower_info(t.objective_name)
+            tower_team = t.extra_info.get("tower_team", "unknown") if t.extra_info else "unknown"
+            tower_kills.append(TowerKill(
+                game_time=t.game_time,
+                game_time_str=t.game_time_str,
+                tower=t.objective_name,
+                team=tower_team,
+                tier=tier,
+                lane=lane,
+                killer=t.killer or "unknown",
+                killer_is_hero=t.killer is not None,
+            ))
+
+        barracks_kills = []
+        for b in barracks_objs:
+            rax_team = b.extra_info.get("barracks_team", "unknown") if b.extra_info else "unknown"
+            rax_type = b.extra_info.get("barracks_type", "unknown") if b.extra_info else "unknown"
+            lane = "mid"
+            if "top" in b.objective_name.lower():
+                lane = "top"
+            elif "bot" in b.objective_name.lower():
+                lane = "bot"
+            barracks_kills.append(BarracksKill(
+                game_time=b.game_time,
+                game_time_str=b.game_time_str,
+                barracks=b.objective_name,
+                team=rax_team,
+                lane=lane,
+                type=rax_type,
+                killer=b.killer or "unknown",
+                killer_is_hero=b.killer is not None,
+            ))
+
+        return ObjectiveKillsResponse(
+            success=True,
+            match_id=match_id,
+            roshan_kills=roshan_kills,
+            tormentor_kills=tormentor_kills,
+            tower_kills=tower_kills,
+            barracks_kills=barracks_kills,
+        )

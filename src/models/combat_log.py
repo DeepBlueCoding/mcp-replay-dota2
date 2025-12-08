@@ -21,6 +21,7 @@ class CombatLogEvent(BaseModel):
         default=None,
         description="For ABILITY events: whether the ability hit an enemy hero.",
     )
+    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class MapLocation(BaseModel):
@@ -42,7 +43,10 @@ class HeroDeath(BaseModel):
     victim: str = Field(description="Hero that died")
     killer_is_hero: bool = Field(description="Whether the killer was a hero")
     ability: Optional[str] = Field(default=None, description="Ability or item that dealt the killing blow")
-    position: Optional[MapLocation] = Field(default=None, description="Where the death occurred on the map")
+    position_x: Optional[float] = Field(default=None, description="World X coordinate of death")
+    position_y: Optional[float] = Field(default=None, description="World Y coordinate of death")
+    location_description: Optional[str] = Field(default=None, description="Map region description")
+    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class FightResult(BaseModel):
@@ -165,6 +169,7 @@ class ItemPurchase(BaseModel):
     game_time_str: str = Field(description="Game time formatted as M:SS")
     hero: str = Field(description="Hero that purchased the item")
     item: str = Field(description="Item name (e.g., item_bfury, item_power_treads)")
+    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class ItemPurchasesResponse(BaseModel):
@@ -188,6 +193,7 @@ class CourierKill(BaseModel):
     owner: str = Field(description="Hero who owns the courier that was killed")
     team: str = Field(description="Team whose courier was killed (radiant/dire)")
     position: Optional[MapLocation] = Field(default=None, description="Where the courier was killed")
+    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class CourierKillsResponse(BaseModel):
@@ -278,6 +284,7 @@ class RunePickup(BaseModel):
     rune_type: str = Field(
         description="Type of power rune: haste, double_damage, arcane, etc."
     )
+    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class RunePickupsResponse(BaseModel):
