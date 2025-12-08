@@ -297,43 +297,6 @@ class TestTeamWipeDetection:
         assert len(highlights.team_wipes) == 0
 
 
-class TestInitiationDetection:
-    """Tests for fight initiation detection."""
-
-    def test_detect_black_hole_initiation(self):
-        """Black Hole as first big ability should be detected as initiation."""
-        analyzer = FightAnalyzer()
-
-        events = [
-            CombatLogEvent(
-                type="ABILITY",
-                game_time=600.0,
-                game_time_str="10:00",
-                tick=18000,
-                attacker="enigma",
-                attacker_is_hero=True,
-                target="antimage",
-                target_is_hero=True,
-                ability="enigma_black_hole",
-            ),
-            CombatLogEvent(
-                type="DEATH",
-                game_time=603.0,
-                game_time_str="10:03",
-                tick=18090,
-                attacker="medusa",
-                attacker_is_hero=True,
-                target="antimage",
-                target_is_hero=True,
-            ),
-        ]
-
-        highlights = analyzer.analyze_fight(events, [])
-
-        assert highlights.fight_initiator == "enigma"
-        assert highlights.initiation_ability == "Black Hole"
-
-
 class TestHighlightsModel:
     """Tests for FightHighlights dataclass."""
 
@@ -343,8 +306,7 @@ class TestHighlightsModel:
         assert highlights.multi_hero_abilities == []
         assert highlights.kill_streaks == []
         assert highlights.team_wipes == []
-        assert highlights.fight_initiator is None
-        assert highlights.initiation_ability is None
+        assert highlights.bkb_blink_combos == []
 
     def test_new_highlight_fields_exist(self):
         """New highlight fields should exist and default to empty."""
@@ -613,8 +575,12 @@ class TestCoordinatedUltimates:
     """Tests for coordinated ultimates detection."""
 
     def test_detects_two_heroes_ulting_together(self):
-        """Should detect when 2+ heroes use big abilities together."""
+        """Should detect when 2+ heroes from SAME TEAM use big abilities together."""
         analyzer = FightAnalyzer()
+
+        # Both earthshaker and nevermore on radiant
+        radiant_heroes = {"earthshaker", "nevermore", "juggernaut", "shadow_demon", "pugna"}
+        dire_heroes = {"disruptor", "medusa", "naga_siren", "pangolier", "magnataur"}
 
         events = [
             CombatLogEvent(
@@ -641,16 +607,170 @@ class TestCoordinatedUltimates:
             ),
         ]
 
-        coordinated = analyzer._detect_coordinated_ults(events)
+        coordinated = analyzer._detect_coordinated_ults(events, radiant_heroes, dire_heroes)
 
         assert len(coordinated) == 1
         assert "earthshaker" in coordinated[0].heroes
         assert "nevermore" in coordinated[0].heroes
+        assert coordinated[0].team == "radiant"
         assert coordinated[0].window_seconds == 1.5
 
-    def test_detects_three_heroes_ulting_together(self):
-        """Should detect coordinated 3-hero ult combo."""
+    def test_coordinated_ults_has_team_field(self):
+        """Coordinated ults should include team field."""
         analyzer = FightAnalyzer()
+
+        radiant_heroes = {"earthshaker", "nevermore", "juggernaut", "shadow_demon", "pugna"}
+        dire_heroes = {"disruptor", "medusa", "naga_siren", "pangolier", "magnataur"}
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2802.0,
+                game_time_str="46:42",
+                tick=130,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="nevermore_requiem",
+            ),
+        ]
+
+        coordinated = analyzer._detect_coordinated_ults(events, radiant_heroes, dire_heroes)
+
+        assert len(coordinated) == 1
+        assert coordinated[0].team == "radiant"
+
+    def test_dire_team_coordinated_ults(self):
+        """Should correctly identify dire team coordinated ults."""
+        analyzer = FightAnalyzer()
+
+        radiant_heroes = {"earthshaker", "nevermore", "juggernaut", "shadow_demon", "pugna"}
+        dire_heroes = {"disruptor", "medusa", "naga_siren", "magnataur", "tidehunter"}
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_tidehunter",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="tidehunter_ravage",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2802.5,
+                game_time_str="46:42",
+                tick=150,
+                attacker="npc_dota_hero_magnataur",
+                attacker_is_hero=True,
+                target="npc_dota_hero_nevermore",
+                target_is_hero=True,
+                ability="magnataur_reverse_polarity",
+            ),
+        ]
+
+        coordinated = analyzer._detect_coordinated_ults(events, radiant_heroes, dire_heroes)
+
+        assert len(coordinated) == 1
+        assert coordinated[0].team == "dire"
+        assert "tidehunter" in coordinated[0].heroes
+        assert "magnataur" in coordinated[0].heroes
+
+    def test_opposite_team_ults_not_coordinated(self):
+        """Heroes from opposite teams should NOT be grouped as coordinated."""
+        analyzer = FightAnalyzer()
+
+        # ES is radiant, disruptor is dire
+        radiant_heroes = {"earthshaker", "nevermore", "juggernaut", "shadow_demon", "pugna"}
+        dire_heroes = {"disruptor", "medusa", "naga_siren", "pangolier", "magnataur"}
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_medusa",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2802.0,
+                game_time_str="46:42",
+                tick=130,
+                attacker="npc_dota_hero_disruptor",
+                attacker_is_hero=True,
+                target="npc_dota_hero_nevermore",
+                target_is_hero=True,
+                ability="disruptor_static_storm",
+            ),
+        ]
+
+        coordinated = analyzer._detect_coordinated_ults(events, radiant_heroes, dire_heroes)
+
+        # Should be empty - ES (radiant) and Disruptor (dire) are on different teams
+        assert len(coordinated) == 0
+
+    def test_no_coordinated_ults_without_team_info(self):
+        """Without team info, no coordinated ults should be detected."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2802.0,
+                game_time_str="46:42",
+                tick=130,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="nevermore_requiem",
+            ),
+        ]
+
+        # No team info provided
+        coordinated = analyzer._detect_coordinated_ults(events)
+
+        # Should return empty without team info
+        assert len(coordinated) == 0
+
+    def test_detects_three_heroes_ulting_together(self):
+        """Should detect coordinated 3-hero ult combo from SAME TEAM."""
+        analyzer = FightAnalyzer()
+
+        # All three heroes on radiant
+        radiant_heroes = {"earthshaker", "nevermore", "tidehunter", "shadow_demon", "pugna"}
+        dire_heroes = {"disruptor", "medusa", "naga_siren", "pangolier", "magnataur"}
 
         events = [
             CombatLogEvent(
@@ -669,11 +789,11 @@ class TestCoordinatedUltimates:
                 game_time=2801.5,
                 game_time_str="46:41",
                 tick=120,
-                attacker="npc_dota_hero_medusa",
+                attacker="npc_dota_hero_tidehunter",
                 attacker_is_hero=True,
-                target="npc_dota_hero_juggernaut",
+                target="npc_dota_hero_medusa",
                 target_is_hero=True,
-                ability="medusa_stone_gaze",
+                ability="tidehunter_ravage",
             ),
             CombatLogEvent(
                 type="ABILITY",
@@ -688,12 +808,13 @@ class TestCoordinatedUltimates:
             ),
         ]
 
-        coordinated = analyzer._detect_coordinated_ults(events)
+        coordinated = analyzer._detect_coordinated_ults(events, radiant_heroes, dire_heroes)
 
         assert len(coordinated) == 1
         assert len(coordinated[0].heroes) == 3
+        assert coordinated[0].team == "radiant"
         assert "earthshaker" in coordinated[0].heroes
-        assert "medusa" in coordinated[0].heroes
+        assert "tidehunter" in coordinated[0].heroes
         assert "nevermore" in coordinated[0].heroes
 
     def test_ignores_solo_ult(self):
@@ -1086,3 +1207,40 @@ class TestGenericAoEHits:
         assert aoe_hits[0].hero_count == 3
         assert aoe_hits[0].caster == "lina"
         assert aoe_hits[0].ability == "lina_light_strike_array"
+
+
+class TestGetTeamHeroesIntegration:
+    """Integration tests for FightService._get_team_heroes using real replay data."""
+
+    def test_finds_all_10_heroes(self, team_heroes):
+        """Should find all 10 heroes (5 per team)."""
+        radiant, dire = team_heroes
+        assert len(radiant) == 5
+        assert len(dire) == 5
+
+    def test_radiant_heroes_correct(self, team_heroes):
+        """Radiant team should have correct heroes for match 8461956309."""
+        radiant, _ = team_heroes
+        # Known radiant heroes from TI 2025 Grand Final Game 5
+        expected_radiant = {"earthshaker", "juggernaut", "nevermore", "shadow_demon", "pugna"}
+        assert radiant == expected_radiant
+
+    def test_dire_heroes_correct(self, team_heroes):
+        """Dire team should have correct heroes for match 8461956309."""
+        _, dire = team_heroes
+        # Known dire heroes from TI 2025 Grand Final Game 5
+        expected_dire = {"disruptor", "medusa", "naga_siren", "pangolier", "magnataur"}
+        assert dire == expected_dire
+
+    def test_no_hero_overlap(self, team_heroes):
+        """No hero should be on both teams."""
+        radiant, dire = team_heroes
+        overlap = radiant & dire
+        assert len(overlap) == 0, f"Heroes on both teams: {overlap}"
+
+    def test_hero_names_are_clean(self, team_heroes):
+        """Hero names should not have npc_dota_hero_ prefix."""
+        radiant, dire = team_heroes
+        all_heroes = radiant | dire
+        for hero in all_heroes:
+            assert not hero.startswith("npc_dota_hero_"), f"Hero {hero} still has prefix"

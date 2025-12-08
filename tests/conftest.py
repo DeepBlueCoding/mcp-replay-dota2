@@ -441,3 +441,16 @@ def fight_4640_deaths():
             if 2780 <= d.game_time <= 2820
         ]
     return _cache.get("fight_4640_deaths", [])
+
+
+@pytest.fixture(scope="session")
+def team_heroes():
+    """Team hero assignments extracted from entity snapshots."""
+    _require_replay()
+    _ensure_parsed()
+    if "team_heroes" not in _cache:
+        data = _get_parsed_data()
+        fight = _get_fight_service()
+        radiant, dire = fight._get_team_heroes(data)
+        _cache["team_heroes"] = (radiant, dire)
+    return _cache.get("team_heroes", (set(), set()))

@@ -203,8 +203,42 @@ get_fight_combat_log(
         "duration": 13.0
       }
     ],
-    "fight_initiator": "faceless_void",
-    "initiation_ability": "Chronosphere"
+    "bkb_blink_combos": [
+      {
+        "game_time": 282.0,
+        "game_time_str": "4:42",
+        "hero": "earthshaker",
+        "ability": "earthshaker_echo_slam",
+        "ability_display": "Echo Slam",
+        "bkb_time": 281.5,
+        "blink_time": 281.8,
+        "is_initiator": true
+      }
+    ],
+    "coordinated_ults": [
+      {
+        "game_time": 282.0,
+        "game_time_str": "4:42",
+        "team": "radiant",
+        "heroes": ["earthshaker", "nevermore"],
+        "abilities": ["earthshaker_echo_slam", "nevermore_requiem"],
+        "window_seconds": 1.5
+      }
+    ],
+    "clutch_saves": [
+      {
+        "game_time": 290.0,
+        "game_time_str": "4:50",
+        "saved_hero": "medusa",
+        "save_type": "self_banish",
+        "save_ability": "item_outworld_staff",
+        "saved_from": "juggernaut_omni_slash",
+        "saver": null
+      }
+    ],
+    "refresher_combos": [],
+    "buybacks": [],
+    "generic_aoe_hits": []
   }
 }
 ```
@@ -216,13 +250,18 @@ get_fight_combat_log(
 | `multi_hero_abilities` | Big ultimates/abilities hitting 2+ enemy heroes (Chronosphere, Black Hole, Ravage, Ice Path, etc.) |
 | `kill_streaks` | Double kill through Rampage (uses Dota 2's 18-second window between kills) |
 | `team_wipes` | All 5 heroes of one team killed within the fight (Ace!) |
-| `fight_initiator` | Hero who started the fight with a tracked ability |
-| `initiation_ability` | The ability used to initiate |
+| `bkb_blink_combos` | BKB + Blink into big ability (classic initiation pattern). `is_initiator=true` for first combo, `false` for follow-ups |
+| `coordinated_ults` | 2+ heroes from the **same team** using big abilities within 3 seconds. Includes `team` field (radiant/dire) |
+| `clutch_saves` | Self-saves (Outworld Staff, Euls) or ally saves (Glimmer Cape on teammates under attack) |
+| `refresher_combos` | Hero using Refresher to double-cast an ultimate (double Echo Slam, double Ravage, etc.) |
+| `buybacks` | Heroes buying back during the fight |
+| `generic_aoe_hits` | Any ability hitting 3+ heroes (catches abilities not in the big-ability list) |
 
 **Tracked Abilities (60+):**
-- **Ultimates**: Chronosphere, Black Hole, Ravage, Reverse Polarity, Echo Slam, etc.
+- **Ultimates**: Chronosphere, Black Hole, Ravage, Reverse Polarity, Echo Slam, Requiem of Souls, etc.
 - **Control**: Ice Path, Kinetic Field, Dream Coil, Static Storm, etc.
 - **Team wipe detectors**: Tracks all deaths to determine if entire team was killed
+- **Initiation**: BKB + Blink combos with is_initiator flag for the first combo
 
 ---
 

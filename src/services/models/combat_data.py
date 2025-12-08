@@ -235,6 +235,7 @@ class CoordinatedUltimates:
 
     game_time: float
     game_time_str: str
+    team: str  # radiant or dire
     heroes: List[str] = field(default_factory=list)
     abilities: List[str] = field(default_factory=list)
     window_seconds: float = 0.0  # How tight the coordination was
@@ -281,7 +282,3 @@ class FightHighlights:
 
     # Refresher double ultimates
     refresher_combos: List[RefresherCombo] = field(default_factory=list)
-
-    # Legacy initiation detection (single hero)
-    fight_initiator: Optional[str] = None
-    initiation_ability: Optional[str] = None

@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+---
+
+## [1.0.3] - 2025-12-08
+
 ### Added
 
 - **Combat-intensity based fight detection** - Major refactor of fight detection algorithm:
@@ -20,14 +24,14 @@ All notable changes to this project will be documented in this file.
 
 - Extended fight highlight detection with new patterns:
   - **BKB + Blink combos**: Detects BKB + Blink → Big Ability (either order), marks first as initiator, rest as follow-ups
-  - **Coordinated ultimates**: Detects when 2+ heroes use big teamfight abilities within 3 seconds
+  - **Coordinated ultimates**: Detects when 2+ heroes from the **same team** use big teamfight abilities within 3 seconds. Includes `team` field (radiant/dire)
   - **Refresher combos**: Detects when a hero uses Refresher to double-cast an ultimate
   - **Clutch saves**: Detects self-saves (Outworld Staff, Aeon Disk) and ally saves (Glimmer Cape, Lotus Orb, Force Staff, Shadow Demon Disruption)
   - Self-save detection includes tracking what ability the hero was saved FROM (e.g., Omnislash)
 
 - New data models in `combat_data.py`:
-  - `BKBBlinkCombo`: BKB + Blink combo with `is_initiator` flag (renamed from BKBInitiation)
-  - `CoordinatedUltimates`: Multiple heroes ulting together with window tracking
+  - `BKBBlinkCombo`: BKB + Blink combo with `is_initiator` flag
+  - `CoordinatedUltimates`: Multiple heroes ulting together with `team` field and window tracking
   - `RefresherCombo`: Refresher double ultimate with cast times
   - `ClutchSave`: Save detection with saver, save type, and ability saved from
   - `CombatWindow`: Internal dataclass for combat-intensity based fight detection
@@ -37,8 +41,8 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - `get_fight_combat_log` now uses combat-based detection by default (captures initiation)
-- Renamed `BKBInitiation` to `BKBBlinkCombo` and `initiations` field to `bkb_blink_combos`
 - Fight detection parameters tuned: 8s combat gap, 3s intensity window, 5 min events per window
+- Removed `fight_initiator` and `initiation_ability` fields (replaced by `bkb_blink_combos` with `is_initiator` flag)
 
 ### Fixed
 
@@ -48,6 +52,8 @@ All notable changes to this project will be documented in this file.
 - Hero deaths include position coordinates and location descriptions from entity snapshots
 - `significant_only` filter now excludes non-hero deaths (creep kills) from combat events
 - Autoattack kills now show `"ability": "attack"` instead of `"dota_unknown"`
+- Coordinated ultimates now only detects same-team coordination (was incorrectly grouping opposing team abilities)
+- Team hero extraction now correctly finds all 10 heroes by scanning entity snapshots after game start
 
 ---
 

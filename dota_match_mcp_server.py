@@ -861,8 +861,6 @@ async def get_fight_combat_log(
                     )
                     for tw in highlights_data.team_wipes
                 ],
-                fight_initiator=highlights_data.fight_initiator,
-                initiation_ability=highlights_data.initiation_ability,
             )
 
         return FightCombatLogResponse(

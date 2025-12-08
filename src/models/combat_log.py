@@ -135,14 +135,6 @@ class FightHighlights(BaseModel):
         default_factory=list,
         description="Team wipes (all 5 heroes of one team killed)"
     )
-    fight_initiator: Optional[str] = Field(
-        default=None,
-        description="Hero who initiated the fight with a big ability"
-    )
-    initiation_ability: Optional[str] = Field(
-        default=None,
-        description="Ability used to initiate the fight"
-    )
 
 
 class FightCombatLogResponse(BaseModel):

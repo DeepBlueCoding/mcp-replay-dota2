@@ -211,9 +211,12 @@ class FightService:
         radiant_heroes: Set[str] = set()
         dire_heroes: Set[str] = set()
 
-        # Get heroes from first entity snapshot
-        if data.entity_snapshots:
-            snapshot = data.entity_snapshots[0]
+        # Find a snapshot after laning phase starts (game_time > 60s)
+        # The first snapshot may not have all heroes spawned yet
+        for snapshot in data.entity_snapshots:
+            if snapshot.game_time < 60:
+                continue
+
             if hasattr(snapshot, 'heroes') and snapshot.heroes:
                 for hero_snap in snapshot.heroes:
                     hero_name = hero_snap.hero_name
@@ -225,6 +228,10 @@ class FightService:
                                 radiant_heroes.add(clean_name)
                             else:
                                 dire_heroes.add(clean_name)
+
+            # Stop once we have all 10 heroes
+            if len(radiant_heroes) == 5 and len(dire_heroes) == 5:
+                break
 
         return radiant_heroes, dire_heroes
 

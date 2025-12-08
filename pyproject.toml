@@ -1,6 +1,6 @@
 [project]
 name = "mcp-dota2-server"
-version = "1.0.2"
+version = "1.0.3"
 description = "Model Context Protocol server for Dota 2 match analysis using replay files"
 readme = "README.md"
 license = "MIT"

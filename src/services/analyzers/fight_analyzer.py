@@ -5,8 +5,8 @@ Detects:
 - Multi-hero abilities (Chronosphere catching 4, Black Hole on 3, etc.)
 - Kill streaks (Double Kill, Triple Kill, Ultra Kill, Rampage)
 - Team wipes (Ace)
-- Fight initiation (BKB + Blink into big ability)
-- Coordinated ultimates (2+ heroes ulting together)
+- BKB + Blink combos (first combo = initiator, rest = follow-ups)
+- Coordinated ultimates (2+ same-team heroes ulting together)
 - Refresher combos (double ultimates)
 - Clutch saves (banish, Glimmer, Lotus on ally)
 """
@@ -272,16 +272,13 @@ class FightAnalyzer:
                 deaths, radiant_heroes, dire_heroes
             )
 
-        # Detect fight initiation (legacy single hero)
-        initiator, init_ability = self._detect_initiation(events, deaths)
-        highlights.fight_initiator = initiator
-        highlights.initiation_ability = init_ability
-
         # Detect BKB + Blink combos (first is initiator, rest are follow-ups)
         highlights.bkb_blink_combos = self._detect_bkb_blink_combos(events)
 
-        # Detect coordinated ultimates
-        highlights.coordinated_ults = self._detect_coordinated_ults(events)
+        # Detect coordinated ultimates (same team only)
+        highlights.coordinated_ults = self._detect_coordinated_ults(
+            events, radiant_heroes, dire_heroes
+        )
 
         # Detect refresher combos
         highlights.refresher_combos = self._detect_refresher_combos(events)
@@ -609,48 +606,6 @@ class FightAnalyzer:
 
         return wipes
 
-    def _detect_initiation(
-        self,
-        events: List[CombatLogEvent],
-        deaths: List[HeroDeath],
-    ) -> tuple:
-        """
-        Detect who initiated the fight and with what ability.
-
-        Looks for the first big AoE disable/damage ability.
-        """
-        if not events:
-            return None, None
-
-        # Sort events by time
-        sorted_events = sorted(events, key=lambda e: e.game_time)
-
-        # Look for first big ability that hit a hero
-        for event in sorted_events:
-            if event.type not in ("ABILITY", "MODIFIER_ADD"):
-                continue
-
-            ability = self._clean_ability_name(event.ability)
-            if not ability:
-                continue
-
-            # Check if it's a tracked initiation ability
-            if ability in BIG_TEAMFIGHT_ABILITIES:
-                if event.target_is_hero:
-                    caster = self._clean_hero_name(event.attacker)
-                    display_name, _ = BIG_TEAMFIGHT_ABILITIES[ability]
-                    return caster, display_name
-
-            # Check modifier
-            if ability in ABILITY_MODIFIERS:
-                mapped_ability = ABILITY_MODIFIERS[ability]
-                if mapped_ability in BIG_TEAMFIGHT_ABILITIES and event.target_is_hero:
-                    caster = self._clean_hero_name(event.attacker)
-                    display_name, _ = BIG_TEAMFIGHT_ABILITIES[mapped_ability]
-                    return caster, display_name
-
-        return None, None
-
     def _detect_bkb_blink_combos(
         self, events: List[CombatLogEvent]
     ) -> List[BKBBlinkCombo]:
@@ -722,17 +677,33 @@ class FightAnalyzer:
         return combos
 
     def _detect_coordinated_ults(
-        self, events: List[CombatLogEvent]
+        self,
+        events: List[CombatLogEvent],
+        radiant_heroes: Optional[Set[str]] = None,
+        dire_heroes: Optional[Set[str]] = None,
     ) -> List[CoordinatedUltimates]:
         """
-        Detect when 2+ heroes use big ultimates together.
+        Detect when 2+ heroes from the SAME TEAM use big ultimates together.
 
-        Groups big ability casts within COORDINATED_ULT_WINDOW seconds.
+        Groups big ability casts within COORDINATED_ULT_WINDOW seconds,
+        but only for heroes on the same team.
         """
         coordinated: List[CoordinatedUltimates] = []
 
-        # Collect all big ability casts
-        ult_casts: List[Tuple[float, str, str]] = []  # (time, hero, ability)
+        # Need team info to detect coordination
+        if not radiant_heroes or not dire_heroes:
+            return coordinated
+
+        def get_team(hero: str) -> Optional[str]:
+            if hero in radiant_heroes:
+                return "radiant"
+            if hero in dire_heroes:
+                return "dire"
+            return None
+
+        # Collect all big ability casts with team info
+        # (time, hero, ability, team)
+        ult_casts: List[Tuple[float, str, str, str]] = []
 
         for event in events:
             if event.type not in ("ABILITY", "DAMAGE"):
@@ -743,54 +714,65 @@ class FightAnalyzer:
             ability = self._clean_ability_name(event.ability)
             if ability in BIG_TEAMFIGHT_ABILITIES:
                 hero = self._clean_hero_name(event.attacker)
-                ult_casts.append((event.game_time, hero, ability))
+                team = get_team(hero)
+                if team:
+                    ult_casts.append((event.game_time, hero, ability, team))
 
         # Dedupe by hero+ability (keep first cast only)
         seen = set()
         unique_casts = []
-        for time, hero, ability in sorted(ult_casts):
+        for time, hero, ability, team in sorted(ult_casts):
             key = (hero, ability)
             if key not in seen:
                 seen.add(key)
-                unique_casts.append((time, hero, ability))
+                unique_casts.append((time, hero, ability, team))
 
-        # Find groups within time window
+        # Find groups within time window - SAME TEAM ONLY
         if len(unique_casts) < 2:
             return coordinated
 
-        # Group casts that are close together
-        groups: List[List[Tuple[float, str, str]]] = []
-        current_group: List[Tuple[float, str, str]] = [unique_casts[0]]
+        # Group casts by team and time proximity
+        for team in ("radiant", "dire"):
+            team_casts = [(t, h, a) for t, h, a, tm in unique_casts if tm == team]
+            if len(team_casts) < 2:
+                continue
 
-        for i in range(1, len(unique_casts)):
-            time, hero, ability = unique_casts[i]
-            if time - current_group[0][0] <= COORDINATED_ULT_WINDOW:
-                current_group.append((time, hero, ability))
-            else:
-                if len(current_group) >= 2:
-                    groups.append(current_group)
-                current_group = [(time, hero, ability)]
+            # Group casts that are close together
+            groups: List[List[Tuple[float, str, str]]] = []
+            current_group: List[Tuple[float, str, str]] = [team_casts[0]]
 
-        if len(current_group) >= 2:
-            groups.append(current_group)
+            for i in range(1, len(team_casts)):
+                time, hero, ability = team_casts[i]
+                if time - current_group[0][0] <= COORDINATED_ULT_WINDOW:
+                    current_group.append((time, hero, ability))
+                else:
+                    if len(current_group) >= 2:
+                        groups.append(current_group)
+                    current_group = [(time, hero, ability)]
 
-        # Convert groups to CoordinatedUltimates
-        for group in groups:
-            heroes = [h for _, h, _ in group]
-            abilities = [a for _, _, a in group]
-            first_time = group[0][0]
-            last_time = group[-1][0]
+            if len(current_group) >= 2:
+                groups.append(current_group)
 
-            coordinated.append(
-                CoordinatedUltimates(
-                    game_time=first_time,
-                    game_time_str=self._format_time(first_time),
-                    heroes=heroes,
-                    abilities=abilities,
-                    window_seconds=last_time - first_time,
+            # Convert groups to CoordinatedUltimates
+            for group in groups:
+                heroes = [h for _, h, _ in group]
+                abilities = [a for _, _, a in group]
+                first_time = group[0][0]
+                last_time = group[-1][0]
+
+                coordinated.append(
+                    CoordinatedUltimates(
+                        game_time=first_time,
+                        game_time_str=self._format_time(first_time),
+                        team=team,
+                        heroes=heroes,
+                        abilities=abilities,
+                        window_seconds=last_time - first_time,
+                    )
                 )
-            )
 
+        # Sort by time
+        coordinated.sort(key=lambda c: c.game_time)
         return coordinated
 
     def _detect_refresher_combos(
