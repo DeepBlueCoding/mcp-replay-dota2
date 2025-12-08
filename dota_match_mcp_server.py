@@ -1388,8 +1388,10 @@ async def get_match_heroes(match_id: int) -> MatchHeroesResponse:
                 hero_healing=h.get("hero_healing", 0),
                 lane=h.get("lane"),
                 role=h.get("role"),
-                items=[h.get(f"item_{i}", "") for i in range(6)],
-                item_neutral=h.get("item_neutral"),
+                items=constants_fetcher.convert_item_ids_to_names(
+                    [h.get(f"item_{i}") for i in range(6)]
+                ),
+                item_neutral=constants_fetcher.get_item_name(h.get("item_neutral")),
             )
             for h in heroes
             if h.get("team") == "radiant"
@@ -1415,8 +1417,10 @@ async def get_match_heroes(match_id: int) -> MatchHeroesResponse:
                 hero_healing=h.get("hero_healing", 0),
                 lane=h.get("lane"),
                 role=h.get("role"),
-                items=[h.get(f"item_{i}", "") for i in range(6)],
-                item_neutral=h.get("item_neutral"),
+                items=constants_fetcher.convert_item_ids_to_names(
+                    [h.get(f"item_{i}") for i in range(6)]
+                ),
+                item_neutral=constants_fetcher.get_item_name(h.get("item_neutral")),
             )
             for h in heroes
             if h.get("team") == "dire"

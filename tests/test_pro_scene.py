@@ -523,6 +523,185 @@ class TestSeriesGrouping:
         assert match.dire_score == 22
 
 
+class TestTeamNameResolution:
+    """Tests for team name resolution in match responses."""
+
+    @pytest.fixture
+    def resource(self) -> ProSceneResource:
+        """Create a ProSceneResource instance."""
+        return ProSceneResource()
+
+    @pytest.fixture
+    def team_lookup(self) -> dict:
+        """Create a mock team lookup dictionary."""
+        return {
+            8261500: "Xtreme Gaming",
+            8599101: "Team Spirit",
+            7391077: "OG",
+            2163: "Evil Geniuses",
+            1838315: "Team Secret",
+        }
+
+    def test_resolve_team_names_fills_missing_radiant_name(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that missing radiant team name is resolved from lookup."""
+        match = ProMatchSummary(
+            match_id=8188461851,
+            radiant_team_id=8261500,
+            radiant_team_name=None,
+            dire_team_id=8599101,
+            dire_team_name="Team Spirit",
+            radiant_win=True,
+            duration=2400,
+            start_time=1733580000,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.radiant_team_name == "Xtreme Gaming"
+        assert resolved.dire_team_name == "Team Spirit"
+
+    def test_resolve_team_names_fills_missing_dire_name(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that missing dire team name is resolved from lookup."""
+        match = ProMatchSummary(
+            match_id=8188461852,
+            radiant_team_id=8599101,
+            radiant_team_name="Team Spirit",
+            dire_team_id=7391077,
+            dire_team_name=None,
+            radiant_win=False,
+            duration=2200,
+            start_time=1733580100,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.radiant_team_name == "Team Spirit"
+        assert resolved.dire_team_name == "OG"
+
+    def test_resolve_team_names_fills_both_missing_names(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that both missing team names are resolved from lookup."""
+        match = ProMatchSummary(
+            match_id=8188461853,
+            radiant_team_id=2163,
+            radiant_team_name=None,
+            dire_team_id=1838315,
+            dire_team_name=None,
+            radiant_win=True,
+            duration=2600,
+            start_time=1733580200,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.radiant_team_name == "Evil Geniuses"
+        assert resolved.dire_team_name == "Team Secret"
+
+    def test_resolve_team_names_preserves_existing_names(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that existing team names are not overwritten."""
+        match = ProMatchSummary(
+            match_id=8188461854,
+            radiant_team_id=8599101,
+            radiant_team_name="Team Spirit",
+            dire_team_id=7391077,
+            dire_team_name="OG",
+            radiant_win=True,
+            duration=2500,
+            start_time=1733580300,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.radiant_team_name == "Team Spirit"
+        assert resolved.dire_team_name == "OG"
+        assert resolved is match
+
+    def test_resolve_team_names_handles_unknown_team_id(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that unknown team IDs result in None team name."""
+        match = ProMatchSummary(
+            match_id=8188461855,
+            radiant_team_id=9999999,
+            radiant_team_name=None,
+            dire_team_id=8599101,
+            dire_team_name=None,
+            radiant_win=False,
+            duration=2300,
+            start_time=1733580400,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.radiant_team_name is None
+        assert resolved.dire_team_name == "Team Spirit"
+
+    def test_resolve_team_names_handles_none_team_id(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that None team IDs don't cause errors."""
+        match = ProMatchSummary(
+            match_id=8188461856,
+            radiant_team_id=None,
+            radiant_team_name=None,
+            dire_team_id=8599101,
+            dire_team_name=None,
+            radiant_win=True,
+            duration=2400,
+            start_time=1733580500,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.radiant_team_name is None
+        assert resolved.dire_team_name == "Team Spirit"
+
+    def test_resolve_team_names_preserves_all_match_fields(
+        self, resource: ProSceneResource, team_lookup: dict
+    ):
+        """Test that all match fields are preserved after resolution."""
+        match = ProMatchSummary(
+            match_id=8188461857,
+            radiant_team_id=8261500,
+            radiant_team_name=None,
+            dire_team_id=8599101,
+            dire_team_name=None,
+            radiant_win=True,
+            radiant_score=45,
+            dire_score=32,
+            duration=2800,
+            start_time=1733580600,
+            league_id=18324,
+            league_name="The International 2025",
+            series_id=123456,
+            series_type=1,
+            game_number=2,
+        )
+
+        resolved = resource._resolve_team_names(match, team_lookup)
+
+        assert resolved.match_id == 8188461857
+        assert resolved.radiant_team_name == "Xtreme Gaming"
+        assert resolved.dire_team_name == "Team Spirit"
+        assert resolved.radiant_win is True
+        assert resolved.radiant_score == 45
+        assert resolved.dire_score == 32
+        assert resolved.duration == 2800
+        assert resolved.start_time == 1733580600
+        assert resolved.league_id == 18324
+        assert resolved.league_name == "The International 2025"
+        assert resolved.series_id == 123456
+        assert resolved.series_type == 1
+        assert resolved.game_number == 2
+
+
 class TestSignatureHeroes:
     """Tests for signature heroes data loading."""
 

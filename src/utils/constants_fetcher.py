@@ -361,6 +361,53 @@ class ConstantsFetcher:
         """Get combat log type name from ID."""
         return self.COMBATLOG_TYPES.get(type_id, f"UNKNOWN_{type_id}")
 
+    def get_item_ids_mapping(self) -> Optional[Dict[str, str]]:
+        """Get item ID to internal name mapping."""
+        return self.load_local_constants("item_ids.json")
+
+    def get_item_name(self, item_id: int) -> Optional[str]:
+        """
+        Get human-readable item name from item ID.
+
+        Args:
+            item_id: The item ID (e.g., 1 for Blink Dagger)
+
+        Returns:
+            Human-readable item name (e.g., "Blink Dagger") or None if not found
+        """
+        if not item_id or item_id == 0:
+            return None
+
+        item_ids = self.get_item_ids_mapping()
+        if not item_ids:
+            return None
+
+        internal_name = item_ids.get(str(item_id))
+        if not internal_name:
+            return None
+
+        items = self.get_items_constants()
+        if not items:
+            return internal_name
+
+        item_data = items.get(internal_name)
+        if item_data:
+            return item_data.get("dname", internal_name)
+
+        return internal_name
+
+    def convert_item_ids_to_names(self, item_ids: List[Optional[int]]) -> List[str]:
+        """
+        Convert a list of item IDs to human-readable names.
+
+        Args:
+            item_ids: List of item IDs (can contain None or 0 for empty slots)
+
+        Returns:
+            List of item names (empty string for empty slots)
+        """
+        return [self.get_item_name(item_id) or "" for item_id in item_ids]
+
 
 # Create a singleton instance
 constants_fetcher = ConstantsFetcher()

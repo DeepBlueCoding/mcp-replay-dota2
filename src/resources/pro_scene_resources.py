@@ -342,6 +342,43 @@ class ProSceneResource:
         """Convert series_type to human-readable name."""
         return {0: "Bo1", 1: "Bo3", 2: "Bo5"}.get(series_type, f"Bo{series_type}")
 
+    async def _build_team_lookup(self) -> Dict[int, str]:
+        """Build team_id -> team_name lookup from cached teams data."""
+        teams = await pro_scene_fetcher.fetch_teams()
+        return {t["team_id"]: t.get("name") or t.get("tag") or "Unknown" for t in teams if t.get("team_id")}
+
+    def _resolve_team_names(
+        self, match: ProMatchSummary, team_lookup: Dict[int, str]
+    ) -> ProMatchSummary:
+        """Resolve missing team names from lookup table."""
+        radiant_name = match.radiant_team_name
+        dire_name = match.dire_team_name
+
+        if not radiant_name and match.radiant_team_id:
+            radiant_name = team_lookup.get(match.radiant_team_id)
+        if not dire_name and match.dire_team_id:
+            dire_name = team_lookup.get(match.dire_team_id)
+
+        if radiant_name != match.radiant_team_name or dire_name != match.dire_team_name:
+            return ProMatchSummary(
+                match_id=match.match_id,
+                radiant_team_id=match.radiant_team_id,
+                radiant_team_name=radiant_name,
+                dire_team_id=match.dire_team_id,
+                dire_team_name=dire_name,
+                radiant_win=match.radiant_win,
+                radiant_score=match.radiant_score,
+                dire_score=match.dire_score,
+                duration=match.duration,
+                start_time=match.start_time,
+                league_id=match.league_id,
+                league_name=match.league_name,
+                series_id=match.series_id,
+                series_type=match.series_type,
+                game_number=match.game_number,
+            )
+        return match
+
     def _wins_needed(self, series_type: int) -> int:
         """Calculate wins needed to win the series."""
         return {0: 1, 1: 2, 2: 3}.get(series_type, 1)
@@ -455,6 +492,8 @@ class ProSceneResource:
             async with OpenDota(format="json") as client:
                 raw_matches = await client.get_pro_matches()
 
+            team_lookup = await self._build_team_lookup()
+
             league_tiers: Dict[int, str] = {}
             if tier:
                 leagues_data = await pro_scene_fetcher.fetch_leagues()
@@ -501,24 +540,23 @@ class ProSceneResource:
                     if league_name.lower() not in match_league_name.lower():
                         continue
 
-                matches.append(
-                    ProMatchSummary(
-                        match_id=m.get("match_id"),
-                        radiant_team_id=m.get("radiant_team_id"),
-                        radiant_team_name=m.get("radiant_name"),
-                        dire_team_id=m.get("dire_team_id"),
-                        dire_team_name=m.get("dire_name"),
-                        radiant_win=m.get("radiant_win", False),
-                        radiant_score=m.get("radiant_score", 0),
-                        dire_score=m.get("dire_score", 0),
-                        duration=m.get("duration", 0),
-                        start_time=m.get("start_time", 0),
-                        league_id=m.get("leagueid"),
-                        league_name=m.get("league_name"),
-                        series_id=m.get("series_id"),
-                        series_type=m.get("series_type"),
-                    )
+                match_summary = ProMatchSummary(
+                    match_id=m.get("match_id"),
+                    radiant_team_id=m.get("radiant_team_id"),
+                    radiant_team_name=m.get("radiant_name"),
+                    dire_team_id=m.get("dire_team_id"),
+                    dire_team_name=m.get("dire_name"),
+                    radiant_win=m.get("radiant_win", False),
+                    radiant_score=m.get("radiant_score", 0),
+                    dire_score=m.get("dire_score", 0),
+                    duration=m.get("duration", 0),
+                    start_time=m.get("start_time", 0),
+                    league_id=m.get("leagueid"),
+                    league_name=m.get("league_name"),
+                    series_id=m.get("series_id"),
+                    series_type=m.get("series_type"),
                 )
+                matches.append(self._resolve_team_names(match_summary, team_lookup))
 
             all_matches, series_list = self._group_matches_into_series(matches)
 
@@ -543,30 +581,31 @@ class ProSceneResource:
                 raw_matches = await client.get(f"leagues/{league_id}/matches")
                 league_data = await client.get(f"leagues/{league_id}")
 
+            team_lookup = await self._build_team_lookup()
+
             league_name = None
             if league_data:
                 league_name = league_data.get("name")
 
             matches = []
             for m in raw_matches:
-                matches.append(
-                    ProMatchSummary(
-                        match_id=m.get("match_id"),
-                        radiant_team_id=m.get("radiant_team_id"),
-                        radiant_team_name=m.get("radiant_name"),
-                        dire_team_id=m.get("dire_team_id"),
-                        dire_team_name=m.get("dire_name"),
-                        radiant_win=m.get("radiant_win", False),
-                        radiant_score=m.get("radiant_score", 0),
-                        dire_score=m.get("dire_score", 0),
-                        duration=m.get("duration", 0),
-                        start_time=m.get("start_time", 0),
-                        league_id=league_id,
-                        league_name=league_name,
-                        series_id=m.get("series_id"),
-                        series_type=m.get("series_type"),
-                    )
+                match_summary = ProMatchSummary(
+                    match_id=m.get("match_id"),
+                    radiant_team_id=m.get("radiant_team_id"),
+                    radiant_team_name=m.get("radiant_name"),
+                    dire_team_id=m.get("dire_team_id"),
+                    dire_team_name=m.get("dire_name"),
+                    radiant_win=m.get("radiant_win", False),
+                    radiant_score=m.get("radiant_score", 0),
+                    dire_score=m.get("dire_score", 0),
+                    duration=m.get("duration", 0),
+                    start_time=m.get("start_time", 0),
+                    league_id=league_id,
+                    league_name=league_name,
+                    series_id=m.get("series_id"),
+                    series_type=m.get("series_type"),
                 )
+                matches.append(self._resolve_team_names(match_summary, team_lookup))
 
             all_matches, series_list = self._group_matches_into_series(matches)
 

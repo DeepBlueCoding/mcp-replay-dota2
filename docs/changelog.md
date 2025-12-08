@@ -12,6 +12,29 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.0.2] - 2025-12-08
+
+### Fixed
+
+- Fixed `get_pro_matches` and `get_league_matches` returning `null` team names
+  - OpenDota API doesn't always include team names in match responses
+  - Now resolves team names from cached teams data when missing
+  - Eliminates need for extra `get_team` tool calls to resolve team names
+
+- Fixed `get_match_heroes` validation error with item fields
+  - Items now return human-readable names (e.g., "Blink Dagger") instead of integer IDs
+  - Added `get_item_name()` and `convert_item_ids_to_names()` to constants_fetcher
+  - Neutral items also converted to display names
+
+### Added
+
+- Model validation tests (`tests/test_model_validation.py`)
+  - Tests for HeroStats, MatchHeroesResponse, MatchPlayerInfo validation
+  - Tests for item ID to name conversion
+  - Ensures Pydantic models reject invalid data types
+
+---
+
 ## [1.0.1] - 2025-12-08
 
 ### Fixed
