@@ -10,6 +10,30 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.0] - 2025-12-08
+
+### Changed
+
+- **Major refactor: Tools split into domain-specific modules** (92% code reduction in main entry point)
+  - `dota_match_mcp_server.py`: 2606 → 206 lines
+  - New `src/tools/` directory with modular tool registration:
+    - `replay_tools.py` - Replay download tool
+    - `combat_tools.py` - Deaths, combat log, objectives, runes, couriers
+    - `fight_tools.py` - Fight detection, teamfights, fight replay
+    - `match_tools.py` - Match info, timeline, draft, heroes, positions
+    - `pro_scene_tools.py` - Pro players, teams, leagues, matches
+    - `analysis_tools.py` - Jungle, lane, farming patterns, rotations
+  - Service injection pattern via `register_all_tools(mcp, services)` coordinator
+  - No functional changes - all 30+ tools work identically
+
+### Technical
+
+- Clean separation of concerns: each tool module handles one domain
+- Services dictionary pattern for dependency injection
+- Easier maintenance and testing of individual tool groups
+
+---
+
 ## [1.0.4] - 2025-12-08
 
 ### Added
