@@ -113,6 +113,9 @@ class ProSceneResource:
                     aliases = pro_scene_fetcher.get_player_aliases()
                     player_aliases = aliases.get(str(account_id), [])
 
+                    signature_data = pro_scene_fetcher.get_player_signature_heroes()
+                    player_sig = signature_data.get(str(account_id), {})
+
                     player_info = ProPlayerInfo(
                         account_id=p["account_id"],
                         name=p.get("name") or p.get("personaname") or "Unknown",
@@ -122,6 +125,8 @@ class ProSceneResource:
                         team_tag=p.get("team_tag"),
                         country_code=p.get("country_code"),
                         fantasy_role=p.get("fantasy_role"),
+                        role=player_sig.get("role"),
+                        signature_heroes=player_sig.get("signature_heroes", []),
                         is_active=not p.get("is_locked", False),
                         aliases=player_aliases,
                     )
@@ -163,6 +168,8 @@ class ProSceneResource:
             aliases = pro_scene_fetcher.get_team_aliases()
             team_aliases = aliases.get(str(team_id), [])
 
+            signature_data = pro_scene_fetcher.get_player_signature_heroes()
+
             team_info = TeamInfo(
                 team_id=team_id,
                 name=team_data.get("name") or "Unknown",
@@ -176,11 +183,14 @@ class ProSceneResource:
 
             roster = []
             for p in players_data:
+                player_sig = signature_data.get(str(p["account_id"]), {})
                 roster.append(
                     RosterEntry(
                         account_id=p["account_id"],
                         player_name=p.get("name") or "Unknown",
                         team_id=team_id,
+                        role=player_sig.get("role"),
+                        signature_heroes=player_sig.get("signature_heroes", []),
                         games_played=p.get("games_played") or 0,
                         wins=p.get("wins") or 0,
                         is_current=p.get("is_current_team_member") or False,

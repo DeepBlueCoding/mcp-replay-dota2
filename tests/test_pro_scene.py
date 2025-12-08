@@ -13,6 +13,7 @@ from src.models.pro_scene import (
 )
 from src.resources.pro_scene_resources import ProSceneResource
 from src.utils.player_fuzzy_search import PlayerFuzzySearch
+from src.utils.pro_scene_fetcher import pro_scene_fetcher
 from src.utils.team_fuzzy_search import TeamFuzzySearch
 
 
@@ -196,6 +197,38 @@ class TestProSceneModels:
         assert player.team_name == "Team Spirit"
         assert len(player.aliases) == 2
 
+    def test_pro_player_info_with_signature_heroes(self):
+        """Test ProPlayerInfo model with signature heroes and role."""
+        player = ProPlayerInfo(
+            account_id=311360822,
+            name="Yatoro",
+            personaname="YATORO",
+            team_id=8599101,
+            team_name="Team Spirit",
+            role=1,
+            signature_heroes=[
+                "npc_dota_hero_morphling",
+                "npc_dota_hero_slark",
+                "npc_dota_hero_faceless_void",
+            ],
+            is_active=True,
+        )
+
+        assert player.role == 1
+        assert len(player.signature_heroes) == 3
+        assert "npc_dota_hero_morphling" in player.signature_heroes
+        assert "npc_dota_hero_slark" in player.signature_heroes
+
+    def test_pro_player_info_signature_heroes_default_empty(self):
+        """Test ProPlayerInfo defaults signature_heroes to empty list."""
+        player = ProPlayerInfo(
+            account_id=123456,
+            name="Unknown Player",
+        )
+
+        assert player.signature_heroes == []
+        assert player.role is None
+
     def test_team_info_creation(self):
         """Test TeamInfo model creation."""
         team = TeamInfo(
@@ -228,6 +261,26 @@ class TestProSceneModels:
         assert entry.account_id == 311360822
         assert entry.games_played == 150
         assert entry.is_current is True
+
+    def test_roster_entry_with_signature_heroes(self):
+        """Test RosterEntry model with signature heroes and role."""
+        entry = RosterEntry(
+            account_id=311360822,
+            player_name="Yatoro",
+            team_id=8599101,
+            role=1,
+            signature_heroes=[
+                "npc_dota_hero_morphling",
+                "npc_dota_hero_faceless_void",
+            ],
+            games_played=150,
+            wins=100,
+            is_current=True,
+        )
+
+        assert entry.role == 1
+        assert len(entry.signature_heroes) == 2
+        assert "npc_dota_hero_morphling" in entry.signature_heroes
 
     def test_search_result_creation(self):
         """Test SearchResult model creation."""
@@ -468,3 +521,64 @@ class TestSeriesGrouping:
         assert match.game_number == 2
         assert match.radiant_score == 35
         assert match.dire_score == 22
+
+
+class TestSignatureHeroes:
+    """Tests for signature heroes data loading."""
+
+    def test_load_signature_heroes_data(self):
+        """Test that signature heroes data can be loaded from file."""
+        data = pro_scene_fetcher.get_player_signature_heroes()
+
+        assert isinstance(data, dict)
+        assert len(data) > 0
+
+    def test_signature_heroes_excludes_metadata(self):
+        """Test that metadata keys starting with _ are excluded."""
+        data = pro_scene_fetcher.get_player_signature_heroes()
+
+        for key in data:
+            assert not key.startswith("_")
+
+    def test_yatoro_signature_heroes(self):
+        """Test Yatoro's signature heroes are correctly loaded."""
+        data = pro_scene_fetcher.get_player_signature_heroes()
+        yatoro = data.get("311360822")
+
+        assert yatoro is not None
+        assert yatoro["name"] == "Yatoro"
+        assert yatoro["role"] == 1
+        assert "npc_dota_hero_morphling" in yatoro["signature_heroes"]
+        assert "npc_dota_hero_slark" in yatoro["signature_heroes"]
+
+    def test_collapse_signature_heroes(self):
+        """Test Collapse's signature heroes as pos 3."""
+        data = pro_scene_fetcher.get_player_signature_heroes()
+        collapse = data.get("113331514")
+
+        assert collapse is not None
+        assert collapse["name"] == "Collapse"
+        assert collapse["role"] == 3
+        assert "npc_dota_hero_mars" in collapse["signature_heroes"]
+        assert "npc_dota_hero_magnataur" in collapse["signature_heroes"]
+
+    def test_miposhka_signature_heroes(self):
+        """Test Miposhka's signature heroes as pos 5."""
+        data = pro_scene_fetcher.get_player_signature_heroes()
+        miposhka = data.get("139876032")
+
+        assert miposhka is not None
+        assert miposhka["name"] == "Miposhka"
+        assert miposhka["role"] == 5
+        assert len(miposhka["signature_heroes"]) >= 3
+
+    def test_pure_signature_heroes(self):
+        """Test Pure's signature heroes as pos 1."""
+        data = pro_scene_fetcher.get_player_signature_heroes()
+        pure = data.get("168803634")
+
+        assert pure is not None
+        assert pure["name"] == "Pure"
+        assert pure["role"] == 1
+        assert "npc_dota_hero_faceless_void" in pure["signature_heroes"]
+        assert "npc_dota_hero_terrorblade" in pure["signature_heroes"]

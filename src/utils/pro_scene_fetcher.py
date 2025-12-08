@@ -159,6 +159,16 @@ class ProSceneFetcher:
         data = self._load_from_cache("manual_pro_names.json")
         return data if data else {}
 
+    def get_player_signature_heroes(self) -> Dict[str, Dict[str, Any]]:
+        """Get curated signature heroes for pro players.
+
+        Returns dict of account_id -> {role: int, signature_heroes: List[str]}
+        """
+        data = self._load_from_cache("player_signature_heroes.json")
+        if not data:
+            return {}
+        return {k: v for k, v in data.items() if not k.startswith("_")}
+
     def add_manual_pro_name(self, account_id: int, pro_name: str) -> None:
         """Add a manual pro name mapping."""
         names = self.get_manual_pro_names()

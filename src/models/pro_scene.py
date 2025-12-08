@@ -18,6 +18,13 @@ class ProPlayerInfo(BaseModel):
     fantasy_role: Optional[int] = Field(
         default=None, description="Fantasy role (1=Core, 2=Support)"
     )
+    role: Optional[int] = Field(
+        default=None, description="Position (1=carry, 2=mid, 3=offlane, 4=soft support, 5=hard support)"
+    )
+    signature_heroes: List[str] = Field(
+        default_factory=list,
+        description="Signature heroes this player is known for (internal names like npc_dota_hero_morphling)"
+    )
     is_active: bool = Field(default=True, description="Whether player is currently active")
     aliases: List[str] = Field(default_factory=list, description="Known aliases")
 
@@ -41,6 +48,13 @@ class RosterEntry(BaseModel):
     account_id: int = Field(description="Player account ID")
     player_name: str = Field(description="Player's pro name")
     team_id: int = Field(description="Team ID")
+    role: Optional[int] = Field(
+        default=None, description="Position (1=carry, 2=mid, 3=offlane, 4=soft support, 5=hard support)"
+    )
+    signature_heroes: List[str] = Field(
+        default_factory=list,
+        description="Signature heroes this player is known for (internal names)"
+    )
     games_played: int = Field(default=0, description="Games with this team")
     wins: int = Field(default=0, description="Wins with this team")
     is_current: bool = Field(default=False, description="Currently on this team")
