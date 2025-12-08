@@ -2,6 +2,7 @@
 Fight service - high-level API for fight analysis.
 
 Combines CombatService and FightDetector for convenient fight queries.
+Uses combat-intensity based detection to catch fights without deaths.
 """
 
 import logging
@@ -39,7 +40,7 @@ class FightService:
 
     def get_all_fights(self, data: ParsedReplayData) -> FightResult:
         """
-        Get all fights in a match.
+        Get all fights in a match (legacy death-based detection).
 
         Args:
             data: ParsedReplayData from ReplayService
@@ -49,6 +50,25 @@ class FightService:
         """
         deaths = self._combat.get_hero_deaths(data)
         return self._detector.detect_fights(deaths)
+
+    def get_all_fights_from_combat(self, data: ParsedReplayData) -> FightResult:
+        """
+        Get all fights using combat-intensity based detection.
+
+        This method detects fights based on hero-to-hero combat activity,
+        not just deaths. It catches teamfights where teams disengage before
+        anyone dies, and properly captures the initiation phase.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+
+        Returns:
+            FightResult with detected fights
+        """
+        # Get all combat events (DAMAGE, ABILITY, ITEM)
+        all_events = self._combat.get_combat_log(data, significant_only=False)
+        deaths = self._combat.get_hero_deaths(data)
+        return self._detector.detect_fights_from_combat(all_events, deaths)
 
     def get_fight_by_id(
         self,
@@ -213,25 +233,42 @@ class FightService:
         data: ParsedReplayData,
         reference_time: float,
         hero: Optional[str] = None,
+        use_combat_detection: bool = True,
     ) -> Optional[dict]:
         """
         Get fight boundaries, combat log, and highlights for a fight at a given time.
+
+        Uses combat-intensity based detection by default to properly capture
+        fight start (including BKB+Blink initiation) and fights without deaths.
 
         Args:
             data: ParsedReplayData from ReplayService
             reference_time: Game time to anchor the fight search
             hero: Optional hero name to anchor fight detection
+            use_combat_detection: Use combat-based detection (default True)
 
         Returns:
             Dictionary with fight info, combat events, and highlights, or None if no fight found
         """
-        fight = self.get_fight_at_time(data, reference_time, hero)
+        # Get all combat events for detection
+        all_events = self._combat.get_combat_log(data, significant_only=False)
+        deaths = self._combat.get_hero_deaths(data)
+
+        if use_combat_detection:
+            # Use combat-intensity based detection
+            fight = self._detector.get_fight_at_time_from_combat(
+                all_events, deaths, reference_time, hero
+            )
+        else:
+            # Legacy death-based detection
+            fight = self.get_fight_at_time(data, reference_time, hero)
+
         if not fight:
             return None
 
-        # Get combat log events within fight boundaries (with 2s buffer)
+        # Get events within fight boundaries (with buffer)
         start_time = fight.start_time - 2.0
-        end_time = fight.end_time + 1.0
+        end_time = fight.end_time + 2.0
 
         # Get significant events for the response
         significant_events = self._combat.get_combat_log(
@@ -241,8 +278,8 @@ class FightService:
             significant_only=True,
         )
 
-        # Get ALL events including MODIFIER_ADD for highlight detection
-        all_events = self._combat.get_combat_log(
+        # Get ALL events for highlight detection (fight already includes initiation)
+        highlight_events = self._combat.get_combat_log(
             data,
             start_time=start_time,
             end_time=end_time,
@@ -254,7 +291,7 @@ class FightService:
 
         # Analyze fight for highlights
         highlights = self._analyzer.analyze_fight(
-            events=all_events,
+            events=highlight_events,
             deaths=fight.deaths,
             radiant_heroes=radiant_heroes,
             dire_heroes=dire_heroes,
@@ -268,6 +305,9 @@ class FightService:
             "fight_end_str": fight.end_time_str,
             "duration": fight.duration,
             "participants": fight.participants,
+            "deaths": fight.deaths,
+            "total_deaths": fight.total_deaths,
+            "is_teamfight": fight.is_teamfight,
             "total_events": len(significant_events),
             "events": significant_events,
             "highlights": highlights,

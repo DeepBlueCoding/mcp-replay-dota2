@@ -3,15 +3,13 @@
 import pytest
 from pydantic import ValidationError
 
+from src.models.pro_scene import (
+    ProMatchSummary,
+)
 from src.models.tool_responses import (
     HeroStats,
     MatchHeroesResponse,
     MatchPlayerInfo,
-    MatchPlayersResponse,
-)
-from src.models.pro_scene import (
-    ProMatchSummary,
-    SeriesSummary,
 )
 from src.utils.constants_fetcher import constants_fetcher
 

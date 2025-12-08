@@ -8,7 +8,46 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-*No unreleased changes.*
+### Added
+
+- **Combat-intensity based fight detection** - Major refactor of fight detection algorithm:
+  - Fights are now detected based on hero-to-hero combat activity, not just deaths
+  - Catches teamfights where teams disengage before anyone dies
+  - Properly captures fight initiation phase (BKB+Blink) before first death
+  - Uses intensity-based windowing to separate distinct engagements
+  - Filters out harassment/poke (brief exchanges that aren't real fights)
+  - New `detect_fights_from_combat()` and `get_fight_at_time_from_combat()` methods
+
+- Extended fight highlight detection with new patterns:
+  - **BKB + Blink combos**: Detects BKB + Blink → Big Ability (either order), marks first as initiator, rest as follow-ups
+  - **Coordinated ultimates**: Detects when 2+ heroes use big teamfight abilities within 3 seconds
+  - **Refresher combos**: Detects when a hero uses Refresher to double-cast an ultimate
+  - **Clutch saves**: Detects self-saves (Outworld Staff, Aeon Disk) and ally saves (Glimmer Cape, Lotus Orb, Force Staff, Shadow Demon Disruption)
+  - Self-save detection includes tracking what ability the hero was saved FROM (e.g., Omnislash)
+
+- New data models in `combat_data.py`:
+  - `BKBBlinkCombo`: BKB + Blink combo with `is_initiator` flag (renamed from BKBInitiation)
+  - `CoordinatedUltimates`: Multiple heroes ulting together with window tracking
+  - `RefresherCombo`: Refresher double ultimate with cast times
+  - `ClutchSave`: Save detection with saver, save type, and ability saved from
+  - `CombatWindow`: Internal dataclass for combat-intensity based fight detection
+
+- Added `nevermore_requiem` alias to BIG_TEAMFIGHT_ABILITIES (replays use old internal name)
+
+### Changed
+
+- `get_fight_combat_log` now uses combat-based detection by default (captures initiation)
+- Renamed `BKBInitiation` to `BKBBlinkCombo` and `initiations` field to `bkb_blink_combos`
+- Fight detection parameters tuned: 8s combat gap, 3s intensity window, 5 min events per window
+
+### Fixed
+
+- Generic AoE detection now properly filters self-targeting (e.g., Echo Slam damaging caster)
+- BKB+Blink detection now accepts either order (BKB→Blink or Blink→BKB)
+- Clutch saves now require target to be "in danger" (3+ hero damage hits in 2s) to filter false positives
+- Hero deaths include position coordinates and location descriptions from entity snapshots
+- `significant_only` filter now excludes non-hero deaths (creep kills) from combat events
+- Autoattack kills now show `"ability": "attack"` instead of `"dota_unknown"`
 
 ---
 

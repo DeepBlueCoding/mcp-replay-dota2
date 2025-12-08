@@ -5,10 +5,11 @@ NO MCP DEPENDENCIES - can be used from any interface.
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from python_manta import CombatLogType, Team
 
+from ...utils.position_tracker import classify_map_position
 from ..models.combat_data import (
     CombatLogEvent,
     CourierKill,
@@ -50,11 +51,63 @@ class CombatService:
         secs = int(seconds % 60)
         return f"{minutes}:{secs:02d}"
 
+    def _get_hero_position_at_time(
+        self,
+        data: ParsedReplayData,
+        hero: str,
+        target_time: float,
+    ) -> Tuple[Optional[float], Optional[float], Optional[str]]:
+        """
+        Get hero position at a specific time from entity snapshots.
+
+        Returns:
+            Tuple of (x, y, location_description) or (None, None, None)
+        """
+        hero_lower = hero.lower()
+        best_snapshot = None
+        min_diff = float('inf')
+
+        for snapshot in data.entity_snapshots:
+            diff = abs(snapshot.game_time - target_time)
+            if diff < min_diff:
+                min_diff = diff
+                best_snapshot = snapshot
+
+        if not best_snapshot or min_diff > 30.0:
+            return (None, None, None)
+
+        for hero_snap in best_snapshot.heroes:
+            hero_name = hero_snap.hero_name or ""
+            if hero_name.startswith("npc_dota_hero_"):
+                clean_name = hero_name[14:]
+            else:
+                clean_name = hero_name
+
+            if hero_lower in clean_name.lower():
+                pos = classify_map_position(hero_snap.x, hero_snap.y)
+                return (hero_snap.x, hero_snap.y, pos.region)
+
+        return (None, None, None)
+
     def _clean_hero_name(self, name: str) -> str:
         """Remove npc_dota_hero_ prefix from hero name."""
         if name.startswith("npc_dota_hero_"):
             return name[14:]
         return name
+
+    def _normalize_ability_name(
+        self, inflictor_name: Optional[str], attacker_is_hero: bool
+    ) -> Optional[str]:
+        """
+        Normalize ability name for display.
+
+        Converts "dota_unknown" to "attack" for hero autoattacks.
+        """
+        if not inflictor_name:
+            return "attack" if attacker_is_hero else None
+        if inflictor_name == "dota_unknown" and attacker_is_hero:
+            return "attack"
+        return inflictor_name
 
     def _is_hero(self, name: str) -> bool:
         """Check if a name represents a hero."""
@@ -103,6 +156,11 @@ class CombatService:
                 if hero_lower not in killer.lower() and hero_lower not in victim.lower():
                     continue
 
+            # Get victim position from entity snapshots
+            pos_x, pos_y, location_desc = self._get_hero_position_at_time(
+                data, victim, game_time
+            )
+
             death = HeroDeath(
                 game_time=game_time,
                 game_time_str=self._format_time(game_time),
@@ -110,9 +168,10 @@ class CombatService:
                 killer=killer,
                 victim=victim,
                 killer_is_hero=entry.is_attacker_hero,
-                ability=entry.inflictor_name if entry.inflictor_name else None,
-                position_x=entry.location_x if hasattr(entry, 'location_x') else None,
-                position_y=entry.location_y if hasattr(entry, 'location_y') else None,
+                ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
+                position_x=pos_x,
+                position_y=pos_y,
+                location_description=location_desc,
             )
             deaths.append(death)
 
@@ -170,7 +229,7 @@ class CombatService:
                 attacker=attacker,
                 target=target,
                 damage=entry.value,
-                ability=entry.inflictor_name if entry.inflictor_name else None,
+                ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
                 attacker_is_hero=entry.is_attacker_hero,
                 target_is_hero=entry.is_target_hero,
             )
@@ -498,6 +557,11 @@ class CombatService:
             if significant_only and not self._is_significant_event(entry_type):
                 continue
 
+            # For significant events, skip non-hero deaths (creep kills etc.)
+            if significant_only and entry_type == CombatLogType.DEATH.value:
+                if not entry.is_target_hero:
+                    continue
+
             attacker = self._clean_hero_name(entry.attacker_name)
             target = self._clean_hero_name(entry.target_name)
 
@@ -521,7 +585,7 @@ class CombatService:
                 attacker_is_hero=entry.is_attacker_hero,
                 target=target,
                 target_is_hero=entry.is_target_hero,
-                ability=entry.inflictor_name if entry.inflictor_name else None,
+                ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
                 value=entry.value if hasattr(entry, 'value') else None,
                 hit=hit,
             )

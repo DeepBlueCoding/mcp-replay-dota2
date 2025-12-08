@@ -7,7 +7,10 @@ Tests multi-hero ability detection, kill streaks, and team wipes.
 
 from src.services.analyzers.fight_analyzer import (
     BIG_TEAMFIGHT_ABILITIES,
+    BLINK_ITEMS,
     KILL_STREAK_WINDOW,
+    SELF_SAVE_ITEMS,
+    TARGET_REQUIRED_ABILITIES,
     FightAnalyzer,
 )
 from src.services.models.combat_data import (
@@ -342,3 +345,744 @@ class TestHighlightsModel:
         assert highlights.team_wipes == []
         assert highlights.fight_initiator is None
         assert highlights.initiation_ability is None
+
+    def test_new_highlight_fields_exist(self):
+        """New highlight fields should exist and default to empty."""
+        highlights = FightHighlights()
+        assert highlights.bkb_blink_combos == []
+        assert highlights.coordinated_ults == []
+        assert highlights.refresher_combos == []
+        assert highlights.clutch_saves == []
+
+
+class TestNewConstants:
+    """Tests for new fight analyzer constants."""
+
+    def test_blink_items_includes_all_variants(self):
+        """All blink variants should be tracked."""
+        assert "item_blink" in BLINK_ITEMS
+        assert "item_swift_blink" in BLINK_ITEMS
+        assert "item_arcane_blink" in BLINK_ITEMS
+        assert "item_overwhelming_blink" in BLINK_ITEMS
+
+    def test_self_save_items_includes_outworld_staff(self):
+        """Outworld Staff should be tracked as self-banish."""
+        assert "item_outworld_staff" in SELF_SAVE_ITEMS
+        assert SELF_SAVE_ITEMS["item_outworld_staff"] == "self_banish"
+
+    def test_target_required_abilities_includes_omnislash(self):
+        """Omnislash variants should be tracked."""
+        assert "juggernaut_omni_slash" in TARGET_REQUIRED_ABILITIES
+        assert "juggernaut_swiftslash" in TARGET_REQUIRED_ABILITIES
+
+    def test_requiem_alias_tracked(self):
+        """Both requiem ability names should be tracked."""
+        assert "shadow_fiend_requiem_of_souls" in BIG_TEAMFIGHT_ABILITIES
+        assert "nevermore_requiem" in BIG_TEAMFIGHT_ABILITIES
+
+
+class TestBKBBlinkCombo:
+    """Tests for BKB + Blink combo detection."""
+
+    def test_detects_bkb_blink_echo_slam(self):
+        """Should detect BKB -> Blink -> Echo Slam pattern."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_black_king_bar",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.2,
+                game_time_str="46:41",
+                tick=101,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_blink",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.5,
+                game_time_str="46:41",
+                tick=102,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+        ]
+
+        combos = analyzer._detect_bkb_blink_combos(events)
+
+        assert len(combos) == 1
+        assert combos[0].hero == "earthshaker"
+        assert combos[0].ability == "earthshaker_echo_slam"
+        assert combos[0].ability_display == "Echo Slam"
+        assert combos[0].bkb_time == 2801.0
+        assert combos[0].blink_time == 2801.2
+        assert combos[0].is_initiator is True  # First combo is initiator
+
+    def test_detects_blink_before_bkb(self):
+        """Should detect Blink -> BKB -> Ability pattern (either order is valid)."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_nevermore",
+                target_is_hero=True,
+                ability="item_blink",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.2,
+                game_time_str="46:41",
+                tick=101,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_nevermore",
+                target_is_hero=True,
+                ability="item_black_king_bar",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.5,
+                game_time_str="46:41",
+                tick=102,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="nevermore_requiem",
+            ),
+        ]
+
+        combos = analyzer._detect_bkb_blink_combos(events)
+        assert len(combos) == 1
+        assert combos[0].hero == "nevermore"
+        assert combos[0].ability_display == "Requiem of Souls"
+        assert combos[0].is_initiator is True
+
+    def test_first_combo_is_initiator_rest_followup(self):
+        """First BKB+Blink combo is initiator, subsequent ones are follow-ups."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            # ES initiates first
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_black_king_bar",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.1,
+                game_time_str="46:41",
+                tick=101,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_blink",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.3,
+                game_time_str="46:41",
+                tick=102,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            # SF follows up
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.5,
+                game_time_str="46:41",
+                tick=103,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_nevermore",
+                target_is_hero=True,
+                ability="item_blink",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.6,
+                game_time_str="46:41",
+                tick=104,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_nevermore",
+                target_is_hero=True,
+                ability="item_black_king_bar",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.8,
+                game_time_str="46:41",
+                tick=105,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="nevermore_requiem",
+            ),
+        ]
+
+        combos = analyzer._detect_bkb_blink_combos(events)
+
+        assert len(combos) == 2
+        # ES is first = initiator
+        assert combos[0].hero == "earthshaker"
+        assert combos[0].is_initiator is True
+        # SF is second = follow-up
+        assert combos[1].hero == "nevermore"
+        assert combos[1].is_initiator is False
+
+    def test_ignores_outside_time_window(self):
+        """Should not detect if ability is too far after BKB+Blink."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_black_king_bar",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2801.2,
+                game_time_str="46:41",
+                tick=101,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_blink",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2805.0,
+                game_time_str="46:45",
+                tick=202,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+        ]
+
+        combos = analyzer._detect_bkb_blink_combos(events)
+        assert len(combos) == 0
+
+
+class TestCoordinatedUltimates:
+    """Tests for coordinated ultimates detection."""
+
+    def test_detects_two_heroes_ulting_together(self):
+        """Should detect when 2+ heroes use big abilities together."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2802.5,
+                game_time_str="46:42",
+                tick=150,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="nevermore_requiem",
+            ),
+        ]
+
+        coordinated = analyzer._detect_coordinated_ults(events)
+
+        assert len(coordinated) == 1
+        assert "earthshaker" in coordinated[0].heroes
+        assert "nevermore" in coordinated[0].heroes
+        assert coordinated[0].window_seconds == 1.5
+
+    def test_detects_three_heroes_ulting_together(self):
+        """Should detect coordinated 3-hero ult combo."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.5,
+                game_time_str="46:41",
+                tick=120,
+                attacker="npc_dota_hero_medusa",
+                attacker_is_hero=True,
+                target="npc_dota_hero_juggernaut",
+                target_is_hero=True,
+                ability="medusa_stone_gaze",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2802.7,
+                game_time_str="46:42",
+                tick=160,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="nevermore_requiem",
+            ),
+        ]
+
+        coordinated = analyzer._detect_coordinated_ults(events)
+
+        assert len(coordinated) == 1
+        assert len(coordinated[0].heroes) == 3
+        assert "earthshaker" in coordinated[0].heroes
+        assert "medusa" in coordinated[0].heroes
+        assert "nevermore" in coordinated[0].heroes
+
+    def test_ignores_solo_ult(self):
+        """Should not report single hero ulting alone."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+        ]
+
+        coordinated = analyzer._detect_coordinated_ults(events)
+        assert len(coordinated) == 0
+
+
+class TestRefresherCombo:
+    """Tests for Refresher double ultimate detection."""
+
+    def test_detects_double_echo_slam(self):
+        """Should detect ES using Refresher for double Echo Slam."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2802.0,
+                game_time_str="46:42",
+                tick=120,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="item_refresher",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2803.0,
+                game_time_str="46:43",
+                tick=140,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_magnus",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+        ]
+
+        combos = analyzer._detect_refresher_combos(events)
+
+        assert len(combos) == 1
+        assert combos[0].hero == "earthshaker"
+        assert combos[0].ability == "earthshaker_echo_slam"
+        assert combos[0].ability_display == "Echo Slam"
+        assert combos[0].first_cast_time == 2801.0
+        assert combos[0].second_cast_time == 2803.0
+
+    def test_ignores_same_ability_without_refresher(self):
+        """Should not detect double cast without Refresher in between."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2803.0,
+                game_time_str="46:43",
+                tick=140,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_magnus",
+                target_is_hero=True,
+                ability="earthshaker_echo_slam",
+            ),
+        ]
+
+        combos = analyzer._detect_refresher_combos(events)
+        assert len(combos) == 0
+
+
+class TestClutchSaves:
+    """Tests for clutch save detection."""
+
+    def test_detects_outworld_staff_save_from_omnislash(self):
+        """Should detect Medusa using Outworld Staff to escape Omnislash."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2810.0,
+                game_time_str="46:50",
+                tick=500,
+                attacker="npc_dota_hero_juggernaut",
+                attacker_is_hero=True,
+                target="npc_dota_hero_medusa",
+                target_is_hero=True,
+                ability="juggernaut_omni_slash",
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2810.5,
+                game_time_str="46:50",
+                tick=520,
+                attacker="npc_dota_hero_juggernaut",
+                attacker_is_hero=True,
+                target="npc_dota_hero_medusa",
+                target_is_hero=True,
+                ability="juggernaut_omni_slash",
+                value=150,
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2811.0,
+                game_time_str="46:51",
+                tick=540,
+                attacker="npc_dota_hero_medusa",
+                attacker_is_hero=True,
+                target="npc_dota_hero_medusa",
+                target_is_hero=True,
+                ability="item_outworld_staff",
+            ),
+        ]
+
+        deaths = []
+        saves = analyzer._detect_clutch_saves(events, deaths)
+
+        assert len(saves) == 1
+        assert saves[0].saved_hero == "medusa"
+        assert saves[0].save_type == "self_banish"
+        assert saves[0].save_ability == "item_outworld_staff"
+        assert saves[0].saved_from == "juggernaut_omni_slash"
+        assert saves[0].saver is None
+
+    def test_no_save_if_target_dies(self):
+        """Should not count as save if target dies anyway."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ABILITY",
+                game_time=2810.0,
+                game_time_str="46:50",
+                tick=500,
+                attacker="npc_dota_hero_juggernaut",
+                attacker_is_hero=True,
+                target="npc_dota_hero_medusa",
+                target_is_hero=True,
+                ability="juggernaut_omni_slash",
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2811.0,
+                game_time_str="46:51",
+                tick=540,
+                attacker="npc_dota_hero_medusa",
+                attacker_is_hero=True,
+                target="npc_dota_hero_medusa",
+                target_is_hero=True,
+                ability="item_outworld_staff",
+            ),
+        ]
+
+        deaths = [
+            HeroDeath(
+                game_time=2812.0,
+                game_time_str="46:52",
+                tick=560,
+                killer="npc_dota_hero_juggernaut",
+                victim="npc_dota_hero_medusa",
+                killer_is_hero=True,
+            )
+        ]
+
+        saves = analyzer._detect_clutch_saves(events, deaths)
+        assert len(saves) == 0
+
+    def test_detects_ally_glimmer_save(self):
+        """Should detect ally using Glimmer Cape to save teammate who was under attack."""
+        analyzer = FightAnalyzer()
+
+        # Pangolier needs to be under attack (3+ hero damage hits) for save to count
+        events = [
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2808.0,
+                game_time_str="46:48",
+                tick=498,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_pangolier",
+                target_is_hero=True,
+                ability="nevermore_shadowraze1",
+                value=200,
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2809.0,
+                game_time_str="46:49",
+                tick=499,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_pangolier",
+                target_is_hero=True,
+                ability="earthshaker_fissure",
+                value=150,
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2809.5,
+                game_time_str="46:49",
+                tick=499,
+                attacker="npc_dota_hero_nevermore",
+                attacker_is_hero=True,
+                target="npc_dota_hero_pangolier",
+                target_is_hero=True,
+                ability="attack",
+                value=100,
+            ),
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2810.0,
+                game_time_str="46:50",
+                tick=500,
+                attacker="npc_dota_hero_disruptor",
+                attacker_is_hero=True,
+                target="npc_dota_hero_pangolier",
+                target_is_hero=True,
+                ability="item_glimmer_cape",
+            ),
+        ]
+
+        deaths = []
+        saves = analyzer._detect_clutch_saves(events, deaths)
+
+        assert len(saves) == 1
+        assert saves[0].saved_hero == "pangolier"
+        assert saves[0].save_type == "ally_glimmer"
+        assert saves[0].save_ability == "item_glimmer_cape"
+        assert saves[0].saver == "disruptor"
+
+    def test_ignores_self_glimmer(self):
+        """Self-Glimmer should not be tracked as ally save."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="ITEM",
+                game_time=2810.0,
+                game_time_str="46:50",
+                tick=500,
+                attacker="npc_dota_hero_disruptor",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="item_glimmer_cape",
+            ),
+        ]
+
+        deaths = []
+        saves = analyzer._detect_clutch_saves(events, deaths)
+
+        # Should not be tracked since self-Glimmer
+        assert len(saves) == 0
+
+
+class TestGenericAoEHits:
+    """Tests for generic AoE detection (any ability hitting 3+ heroes)."""
+
+    def test_filters_self_targeting(self):
+        """Should not count self-targeting in hero count."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_earthshaker",
+                target_is_hero=True,
+                ability="some_custom_ability",
+                value=300,
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="some_custom_ability",
+                value=300,
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_earthshaker",
+                attacker_is_hero=True,
+                target="npc_dota_hero_magnus",
+                target_is_hero=True,
+                ability="some_custom_ability",
+                value=300,
+            ),
+        ]
+
+        aoe_hits = analyzer._detect_generic_aoe_hits(events)
+        assert len(aoe_hits) == 0
+
+    def test_detects_unknown_ability_hitting_3_heroes(self):
+        """Should detect any ability hitting 3+ different heroes."""
+        analyzer = FightAnalyzer()
+
+        events = [
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_lina",
+                attacker_is_hero=True,
+                target="npc_dota_hero_disruptor",
+                target_is_hero=True,
+                ability="lina_light_strike_array",
+                value=200,
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_lina",
+                attacker_is_hero=True,
+                target="npc_dota_hero_magnus",
+                target_is_hero=True,
+                ability="lina_light_strike_array",
+                value=200,
+            ),
+            CombatLogEvent(
+                type="DAMAGE",
+                game_time=2801.0,
+                game_time_str="46:41",
+                tick=100,
+                attacker="npc_dota_hero_lina",
+                attacker_is_hero=True,
+                target="npc_dota_hero_juggernaut",
+                target_is_hero=True,
+                ability="lina_light_strike_array",
+                value=200,
+            ),
+        ]
+
+        aoe_hits = analyzer._detect_generic_aoe_hits(events)
+        assert len(aoe_hits) == 1
+        assert aoe_hits[0].hero_count == 3
+        assert aoe_hits[0].caster == "lina"
+        assert aoe_hits[0].ability == "lina_light_strike_array"

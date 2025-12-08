@@ -179,11 +179,109 @@ class TeamWipe:
 
 
 @dataclass
+class Buyback:
+    """A buyback event."""
+
+    game_time: float
+    game_time_str: str
+    hero: str
+    player_slot: int
+    death_time: Optional[float] = None  # When they died (for fast buyback calc)
+    buyback_delay: Optional[float] = None  # Seconds between death and buyback
+
+
+@dataclass
+class GenericAoEHit:
+    """Any ability that hit 3+ heroes (not just 'big' abilities)."""
+
+    game_time: float
+    game_time_str: str
+    ability: str
+    caster: str
+    targets: List[str] = field(default_factory=list)
+    hero_count: int = 0
+
+
+@dataclass
+class ClutchSave:
+    """A clutch save - hero survives lethal situation via item/ability."""
+
+    game_time: float
+    game_time_str: str
+    saved_hero: str
+    save_type: str  # "self_banish", "ally_glimmer", "ally_lotus", "linken_block", etc.
+    save_ability: str  # The item/ability used
+    saved_from: Optional[str] = None  # The ability they were saved from (e.g., "omnislash")
+    saver: Optional[str] = None  # Who saved them (None if self-save)
+
+
+@dataclass
+class BKBBlinkCombo:
+    """A BKB + Blink combo into big ability."""
+
+    game_time: float
+    game_time_str: str
+    hero: str
+    ability: str  # The big ability cast after BKB+Blink
+    ability_display: str
+    bkb_time: float  # When BKB was used
+    blink_time: float  # When Blink was used
+    is_initiator: bool = False  # True if first BKB+Blink combo in the fight
+
+
+@dataclass
+class CoordinatedUltimates:
+    """Multiple heroes using big ultimates together."""
+
+    game_time: float
+    game_time_str: str
+    heroes: List[str] = field(default_factory=list)
+    abilities: List[str] = field(default_factory=list)
+    window_seconds: float = 0.0  # How tight the coordination was
+
+
+@dataclass
+class RefresherCombo:
+    """A hero using Refresher to double-cast an ultimate."""
+
+    game_time: float
+    game_time_str: str
+    hero: str
+    ability: str
+    ability_display: str
+    first_cast_time: float
+    second_cast_time: float
+
+
+@dataclass
 class FightHighlights:
     """Key moments extracted from a fight."""
 
+    # Big teamfight abilities (Chrono, Black Hole, etc.) - kept for backwards compat
     multi_hero_abilities: List[MultiHeroAbility] = field(default_factory=list)
+
+    # Native Valve events
     kill_streaks: List[KillStreak] = field(default_factory=list)
     team_wipes: List[TeamWipe] = field(default_factory=list)
-    fight_initiator: Optional[str] = None  # hero who started the fight
-    initiation_ability: Optional[str] = None  # ability used to initiate
+
+    # Generic 3+ hero hits (any ability)
+    generic_aoe_hits: List[GenericAoEHit] = field(default_factory=list)
+
+    # Buybacks during fight
+    buybacks: List[Buyback] = field(default_factory=list)
+
+    # Clutch saves (self-banish, ally Glimmer, etc.)
+    clutch_saves: List[ClutchSave] = field(default_factory=list)
+
+    # BKB + Blink combos (first is initiator, rest are follow-ups)
+    bkb_blink_combos: List[BKBBlinkCombo] = field(default_factory=list)
+
+    # Coordinated ultimates (2+ heroes ulting together)
+    coordinated_ults: List[CoordinatedUltimates] = field(default_factory=list)
+
+    # Refresher double ultimates
+    refresher_combos: List[RefresherCombo] = field(default_factory=list)
+
+    # Legacy initiation detection (single hero)
+    fight_initiator: Optional[str] = None
+    initiation_ability: Optional[str] = None

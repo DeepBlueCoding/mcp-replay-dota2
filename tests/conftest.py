@@ -405,3 +405,39 @@ def all_fights():
     _require_replay()
     _ensure_parsed()
     return _cache.get("fights")
+
+
+# =============================================================================
+# Fight Analyzer fixtures (46:40 teamfight in TI grand final)
+# =============================================================================
+
+@pytest.fixture(scope="session")
+def fight_4640_combat_log():
+    """Combat log from fight at 46:40 (2780-2820s)."""
+    _require_replay()
+    _ensure_parsed()
+    if "fight_4640_combat_log" not in _cache:
+        data = _get_parsed_data()
+        combat = _get_combat_service()
+        # Get combat log for the 46:40 fight window
+        _cache["fight_4640_combat_log"] = combat.get_combat_log(
+            data, start_time=2780, end_time=2820, types=[0, 2, 4, 5]
+        )
+    return _cache.get("fight_4640_combat_log", [])
+
+
+@pytest.fixture(scope="session")
+def fight_4640_deaths():
+    """Hero deaths from fight at 46:40."""
+    _require_replay()
+    _ensure_parsed()
+    if "fight_4640_deaths" not in _cache:
+        data = _get_parsed_data()
+        combat = _get_combat_service()
+        all_deaths = combat.get_hero_deaths(data)
+        # Filter to deaths in 46:20-47:00 window
+        _cache["fight_4640_deaths"] = [
+            d for d in all_deaths
+            if 2780 <= d.game_time <= 2820
+        ]
+    return _cache.get("fight_4640_deaths", [])
