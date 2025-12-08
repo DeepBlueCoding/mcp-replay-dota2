@@ -64,11 +64,10 @@ def _get_parsed_data() -> Optional[ParsedReplayData]:
         # If we're already in an async context, create a new thread
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(asyncio.run, rs.get_parsed_data(TEST_MATCH_ID, skip_metadata=True))
+            future = executor.submit(asyncio.run, rs.get_parsed_data(TEST_MATCH_ID))
             _parsed_data = future.result()
     else:
-        # Skip metadata parsing in tests (second full file parse is too slow)
-        _parsed_data = asyncio.run(rs.get_parsed_data(TEST_MATCH_ID, skip_metadata=True))
+        _parsed_data = asyncio.run(rs.get_parsed_data(TEST_MATCH_ID))
     print(f"[conftest] Loaded {len(_parsed_data.combat_log_entries)} combat log entries")
     return _parsed_data
 

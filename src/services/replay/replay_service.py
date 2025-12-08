@@ -54,7 +54,6 @@ class ReplayService:
         self,
         match_id: int,
         progress: Optional[ProgressCallback] = None,
-        skip_metadata: bool = False,
     ) -> ParsedReplayData:
         """Get complete parsed data for a match.
 
@@ -63,7 +62,6 @@ class ReplayService:
         Args:
             match_id: The match ID
             progress: Optional callback for progress updates
-            skip_metadata: Skip metadata parsing (faster but no timeline data)
 
         Returns:
             ParsedReplayData with all extracted data
@@ -94,7 +92,7 @@ class ReplayService:
             await progress(50, 100, "Parsing replay...")
 
         try:
-            data = self._parse_replay(match_id, replay_path, progress, skip_metadata)
+            data = self._parse_replay(match_id, replay_path, progress)
         except ValueError as e:
             # Parsing failed - delete corrupt replay so it can be re-downloaded
             logger.error(f"Parsing failed for match {match_id}, deleting corrupt replay: {e}")
@@ -307,7 +305,6 @@ class ReplayService:
         match_id: int,
         replay_path: Path,
         progress: Optional[ProgressCallback] = None,
-        skip_metadata: bool = False,
     ) -> ParsedReplayData:
         """Parse replay with python-manta v2 single-pass API."""
         replay_str = str(replay_path)
@@ -346,16 +343,17 @@ class ReplayService:
             modifiers={
                 "max_modifiers": 50000,
             },
+            messages={
+                "message_types": ['CDOTAMatchMetadataFile'],
+                "max_messages": 0,  # No limit - need to find metadata at end of file
+            },
         )
 
         if not result.success:
             raise ValueError(f"Parsing failed: {result.error}")
 
-        # Parse metadata separately (CDOTAMatchMetadataFile for timeline data)
-        # This is slow as it parses the entire file again - skip in CI
-        metadata = None
-        if not skip_metadata:
-            metadata = self._parse_metadata(replay_str)
+        # Extract metadata from messages (CDOTAMatchMetadataFile for timeline data)
+        metadata = self._extract_metadata_from_result(result)
 
         logger.info(f"Parsed {len(result.combat_log.entries) if result.combat_log else 0} combat log entries")
         logger.info(f"Parsed {len(result.entities.snapshots) if result.entities else 0} entity snapshots")
@@ -368,29 +366,16 @@ class ReplayService:
             demo_index=None,  # Will be added in Phase 4
         )
 
-    def _parse_metadata(self, replay_str: str) -> Optional[dict]:
-        """Parse CDOTAMatchMetadataFile for timeline data.
-
-        This message is at the end of the replay file among millions of messages,
-        so we must parse all messages and filter for it.
-        """
+    def _extract_metadata_from_result(self, result) -> Optional[dict]:
+        """Extract CDOTAMatchMetadataFile from parse result messages."""
         try:
-            parser = Parser(replay_str)
-            # Must parse ALL messages - CDOTAMatchMetadataFile is at the very end
-            result = parser.parse(
-                messages={
-                    "message_types": ['CDOTAMatchMetadataFile'],
-                    "max_messages": 0,  # No limit - parse entire file
-                }
-            )
             if result.messages and result.messages.messages:
-                # Find the CDOTAMatchMetadataFile message
                 for msg in result.messages.messages:
                     if msg.type == 'CDOTAMatchMetadataFile':
                         logger.info("Found CDOTAMatchMetadataFile metadata")
                         return msg.data
         except Exception as e:
-            logger.warning(f"Failed to parse metadata: {e}")
+            logger.warning(f"Failed to extract metadata: {e}")
         return None
 
     def get_replay_file_size(self, match_id: int) -> Optional[float]:
