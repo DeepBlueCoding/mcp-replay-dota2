@@ -175,6 +175,45 @@ from src.models.pro_scene import (
     TeamResponse,
     TeamSearchResponse,
 )
+from src.models.tool_responses import (
+    CampStack,
+    CampStacksResponse,
+    CSAtMinuteResponse,
+    FightDeath,
+    FightDeathDetail,
+    FightDetailResponse,
+    FightListResponse,
+    FightReplayResponse,
+    FightSnapshot,
+    FightSnapshotHero,
+    FightSummary,
+    HeroCSData,
+    HeroLaneStats,
+    HeroPosition,
+    HeroPositionsResponse,
+    HeroPositionTimeline,
+    HeroSnapshot,
+    HeroStats,
+    JungleSummaryResponse,
+    KDASnapshot,
+    LaneSummaryResponse,
+    LaneWinners,
+    MatchDraftResponse,
+    MatchHeroesResponse,
+    MatchInfoResponse,
+    MatchPlayerInfo,
+    MatchPlayersResponse,
+    MatchTimelineResponse,
+    PlayerStatsAtMinute,
+    PlayerTimeline,
+    PositionPoint,
+    PositionTimelineResponse,
+    SnapshotAtTimeResponse,
+    StatsAtMinuteResponse,
+    TeamfightsResponse,
+    TeamGraphs,
+    TeamScores,
+)
 from src.resources.heroes_resources import heroes_resource
 from src.resources.map_resources import get_cached_map_data
 from src.resources.pro_scene_resources import pro_scene_resource
@@ -408,7 +447,7 @@ async def download_replay(match_id: int, ctx: Context) -> DownloadReplayResponse
 async def get_match_timeline(
     match_id: int,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> MatchTimelineResponse:
     """
     Get time-series data for a Dota 2 match.
 
@@ -425,7 +464,7 @@ async def get_match_timeline(
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with timeline data for all players and teams
+        MatchTimelineResponse with timeline data for all players and teams
     """
     from src.utils.timeline_parser import timeline_parser
 
@@ -436,24 +475,55 @@ async def get_match_timeline(
     try:
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e)
-        }
+        return MatchTimelineResponse(success=False, match_id=match_id, error=str(e))
 
     timeline = timeline_parser.parse_timeline(data)
     if not timeline:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": "Could not parse timeline from replay"
-        }
+        return MatchTimelineResponse(
+            success=False,
+            match_id=match_id,
+            error="Could not parse timeline from replay",
+        )
 
-    return {
-        "success": True,
-        **timeline
-    }
+    # Convert to typed models
+    players = []
+    for p in timeline.get("players", []):
+        kda_timeline = [
+            KDASnapshot(
+                game_time=k.get("game_time", 0),
+                kills=k.get("kills", 0),
+                deaths=k.get("deaths", 0),
+                assists=k.get("assists", 0),
+                level=k.get("level", 0),
+            )
+            for k in p.get("kda_timeline", [])
+        ]
+        players.append(
+            PlayerTimeline(
+                hero=p.get("hero", ""),
+                team=p.get("team", "radiant"),
+                net_worth=p.get("net_worth", []),
+                hero_damage=p.get("hero_damage", []),
+                kda_timeline=kda_timeline,
+            )
+        )
+
+    team_graphs_data = timeline.get("team_graphs")
+    team_graphs = None
+    if team_graphs_data:
+        team_graphs = TeamGraphs(
+            radiant_xp=team_graphs_data.get("radiant_xp", []),
+            dire_xp=team_graphs_data.get("dire_xp", []),
+            radiant_gold=team_graphs_data.get("radiant_gold", []),
+            dire_gold=team_graphs_data.get("dire_gold", []),
+        )
+
+    return MatchTimelineResponse(
+        success=True,
+        match_id=match_id,
+        players=players,
+        team_graphs=team_graphs,
+    )
 
 
 @mcp.tool
@@ -461,7 +531,7 @@ async def get_stats_at_minute(
     match_id: int,
     minute: int,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> StatsAtMinuteResponse:
     """
     Get player stats at a specific minute in a Dota 2 match.
 
@@ -479,7 +549,7 @@ async def get_stats_at_minute(
         minute: Game minute to get stats for (0-based)
 
     Returns:
-        Dictionary with per-player stats at the specified minute
+        StatsAtMinuteResponse with per-player stats at the specified minute
     """
     from src.utils.timeline_parser import timeline_parser
 
@@ -490,26 +560,38 @@ async def get_stats_at_minute(
     try:
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e)
-        }
+        return StatsAtMinuteResponse(success=False, match_id=match_id, minute=minute, error=str(e))
 
     timeline = timeline_parser.parse_timeline(data)
     if not timeline:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": "Could not parse timeline from replay"
-        }
+        return StatsAtMinuteResponse(
+            success=False,
+            match_id=match_id,
+            minute=minute,
+            error="Could not parse timeline from replay",
+        )
 
     stats = timeline_parser.get_stats_at_minute(timeline, minute)
-    return {
-        "success": True,
-        "match_id": match_id,
-        **stats
-    }
+    players = [
+        PlayerStatsAtMinute(
+            hero=p.get("hero", ""),
+            team=p.get("team", "radiant"),
+            net_worth=p.get("net_worth", 0),
+            hero_damage=p.get("hero_damage", 0),
+            kills=p.get("kills", 0),
+            deaths=p.get("deaths", 0),
+            assists=p.get("assists", 0),
+            level=p.get("level", 0),
+        )
+        for p in stats.get("players", [])
+    ]
+
+    return StatsAtMinuteResponse(
+        success=True,
+        match_id=match_id,
+        minute=minute,
+        players=players,
+    )
 
 
 @mcp.tool
@@ -1130,7 +1212,7 @@ async def get_rune_pickups(match_id: int, ctx: Optional[Context] = None) -> Rune
 async def get_match_draft(
     match_id: int,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> MatchDraftResponse:
     """
     Get the complete draft (picks and bans) for a Dota 2 match.
 
@@ -1151,7 +1233,7 @@ async def get_match_draft(
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with draft actions and convenience lists by team
+        MatchDraftResponse with draft actions and convenience lists by team
     """
     from src.utils.match_info_parser import match_info_parser
 
@@ -1162,24 +1244,17 @@ async def get_match_draft(
     try:
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e)
-        }
+        return MatchDraftResponse(success=False, match_id=match_id, error=str(e))
 
     draft = match_info_parser.get_draft(data)
     if not draft:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": "Could not parse draft from replay"
-        }
+        return MatchDraftResponse(
+            success=False,
+            match_id=match_id,
+            error="Could not parse draft from replay",
+        )
 
-    return {
-        "success": True,
-        **draft.model_dump()
-    }
+    return MatchDraftResponse(success=True, match_id=match_id, draft=draft)
 
 
 async def _get_pro_names_from_opendota(match_id: int) -> Dict[int, str]:
@@ -1218,7 +1293,7 @@ async def _get_pro_names_from_opendota(match_id: int) -> Dict[int, str]:
 async def get_match_info(
     match_id: int,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> MatchInfoResponse:
     """
     Get match metadata and player information for a Dota 2 match.
 
@@ -1235,7 +1310,7 @@ async def get_match_info(
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with match metadata, teams, and players
+        MatchInfoResponse with match metadata, teams, and players
     """
     from src.utils.match_info_parser import match_info_parser
 
@@ -1246,39 +1321,34 @@ async def get_match_info(
     try:
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e)
-        }
+        return MatchInfoResponse(success=False, match_id=match_id, error=str(e))
 
     match_info = match_info_parser.get_match_info(data)
     if not match_info:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": "Could not parse match info from replay"
-        }
-
-    result = match_info.model_dump()
+        return MatchInfoResponse(
+            success=False,
+            match_id=match_id,
+            error="Could not parse match info from replay",
+        )
 
     # Enrich player names with pro names from OpenDota
     pro_names = await _get_pro_names_from_opendota(match_id)
     if pro_names:
-        for player_list in [result["players"], result["radiant_players"], result["dire_players"]]:
-            for player in player_list:
-                steam_id = player.get("steam_id")
-                if steam_id and steam_id in pro_names:
-                    player["player_name"] = pro_names[steam_id]
+        for player in match_info.players:
+            if player.steam_id and player.steam_id in pro_names:
+                player.player_name = pro_names[player.steam_id]
+        for player in match_info.radiant_players:
+            if player.steam_id and player.steam_id in pro_names:
+                player.player_name = pro_names[player.steam_id]
+        for player in match_info.dire_players:
+            if player.steam_id and player.steam_id in pro_names:
+                player.player_name = pro_names[player.steam_id]
 
-    return {
-        "success": True,
-        **result
-    }
+    return MatchInfoResponse(success=True, match_id=match_id, info=match_info)
 
 
 @mcp.tool
-async def get_match_heroes(match_id: int) -> Dict[str, Any]:
+async def get_match_heroes(match_id: int) -> MatchHeroesResponse:
     """
     Get the 10 heroes in a Dota 2 match with detailed stats.
 
@@ -1293,27 +1363,79 @@ async def get_match_heroes(match_id: int) -> Dict[str, Any]:
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with radiant and dire team heroes
+        MatchHeroesResponse with radiant and dire team heroes
     """
     heroes = await heroes_resource.get_match_heroes(match_id)
     if heroes:
-        radiant = [h for h in heroes if h.get("team") == "radiant"]
-        dire = [h for h in heroes if h.get("team") == "dire"]
-        return {
-            "success": True,
-            "match_id": match_id,
-            "radiant": radiant,
-            "dire": dire,
-        }
-    return {
-        "success": False,
-        "match_id": match_id,
-        "error": f"Could not fetch heroes for match {match_id}"
-    }
+        radiant_heroes = [
+            HeroStats(
+                hero_id=h.get("hero_id", 0),
+                hero_name=h.get("hero_name", ""),
+                localized_name=h.get("localized_name", ""),
+                team="radiant",
+                player_name=h.get("player_name"),
+                pro_name=h.get("pro_name"),
+                kills=h.get("kills", 0),
+                deaths=h.get("deaths", 0),
+                assists=h.get("assists", 0),
+                last_hits=h.get("last_hits", 0),
+                denies=h.get("denies", 0),
+                gpm=h.get("gpm", 0),
+                xpm=h.get("xpm", 0),
+                net_worth=h.get("net_worth", 0),
+                hero_damage=h.get("hero_damage", 0),
+                tower_damage=h.get("tower_damage", 0),
+                hero_healing=h.get("hero_healing", 0),
+                lane=h.get("lane"),
+                role=h.get("role"),
+                items=[h.get(f"item_{i}", "") for i in range(6)],
+                item_neutral=h.get("item_neutral"),
+            )
+            for h in heroes
+            if h.get("team") == "radiant"
+        ]
+        dire_heroes = [
+            HeroStats(
+                hero_id=h.get("hero_id", 0),
+                hero_name=h.get("hero_name", ""),
+                localized_name=h.get("localized_name", ""),
+                team="dire",
+                player_name=h.get("player_name"),
+                pro_name=h.get("pro_name"),
+                kills=h.get("kills", 0),
+                deaths=h.get("deaths", 0),
+                assists=h.get("assists", 0),
+                last_hits=h.get("last_hits", 0),
+                denies=h.get("denies", 0),
+                gpm=h.get("gpm", 0),
+                xpm=h.get("xpm", 0),
+                net_worth=h.get("net_worth", 0),
+                hero_damage=h.get("hero_damage", 0),
+                tower_damage=h.get("tower_damage", 0),
+                hero_healing=h.get("hero_healing", 0),
+                lane=h.get("lane"),
+                role=h.get("role"),
+                items=[h.get(f"item_{i}", "") for i in range(6)],
+                item_neutral=h.get("item_neutral"),
+            )
+            for h in heroes
+            if h.get("team") == "dire"
+        ]
+        return MatchHeroesResponse(
+            success=True,
+            match_id=match_id,
+            radiant_heroes=radiant_heroes,
+            dire_heroes=dire_heroes,
+        )
+    return MatchHeroesResponse(
+        success=False,
+        match_id=match_id,
+        error=f"Could not fetch heroes for match {match_id}",
+    )
 
 
 @mcp.tool
-async def get_match_players(match_id: int) -> Dict[str, Any]:
+async def get_match_players(match_id: int) -> MatchPlayersResponse:
     """
     Get the 10 players in a Dota 2 match with their hero assignments.
 
@@ -1326,34 +1448,42 @@ async def get_match_players(match_id: int) -> Dict[str, Any]:
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with radiant and dire team players
+        MatchPlayersResponse with radiant and dire team players
     """
     heroes = await heroes_resource.get_match_heroes(match_id)
     if heroes:
-        players = []
-        for h in heroes:
-            players.append({
-                "player_name": h.get("player_name"),
-                "pro_name": h.get("pro_name"),
-                "account_id": h.get("account_id"),
-                "team": h.get("team"),
-                "hero_id": h.get("hero_id"),
-                "hero_name": h.get("hero_name"),
-                "localized_name": h.get("localized_name"),
-            })
-        radiant = [p for p in players if p.get("team") == "radiant"]
-        dire = [p for p in players if p.get("team") == "dire"]
-        return {
-            "success": True,
-            "match_id": match_id,
-            "radiant": radiant,
-            "dire": dire,
-        }
-    return {
-        "success": False,
-        "match_id": match_id,
-        "error": f"Could not fetch players for match {match_id}"
-    }
+        radiant = [
+            MatchPlayerInfo(
+                player_name=h.get("player_name", ""),
+                pro_name=h.get("pro_name"),
+                account_id=h.get("account_id"),
+                hero_id=h.get("hero_id", 0),
+                hero_name=h.get("hero_name", ""),
+                localized_name=h.get("localized_name", ""),
+            )
+            for h in heroes
+            if h.get("team") == "radiant"
+        ]
+        dire = [
+            MatchPlayerInfo(
+                player_name=h.get("player_name", ""),
+                pro_name=h.get("pro_name"),
+                account_id=h.get("account_id"),
+                hero_id=h.get("hero_id", 0),
+                hero_name=h.get("hero_name", ""),
+                localized_name=h.get("localized_name", ""),
+            )
+            for h in heroes
+            if h.get("team") == "dire"
+        ]
+        return MatchPlayersResponse(
+            success=True, match_id=match_id, radiant=radiant, dire=dire
+        )
+    return MatchPlayersResponse(
+        success=False,
+        match_id=match_id,
+        error=f"Could not fetch players for match {match_id}",
+    )
 
 
 # Pro Scene Tools
@@ -1633,7 +1763,7 @@ async def get_league_matches(
 
 # Fight Analysis Tools
 @mcp.tool
-async def list_fights(match_id: int, ctx: Context) -> Dict[str, Any]:
+async def list_fights(match_id: int, ctx: Context) -> FightListResponse:
     """
     List all fights in a Dota 2 match.
 
@@ -1653,7 +1783,7 @@ async def list_fights(match_id: int, ctx: Context) -> Dict[str, Any]:
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with fight summary and list of all fights
+        FightListResponse with fight summary and list of all fights
     """
     # Create progress callback
     async def progress_callback(current: int, total: int, message: str) -> None:
@@ -1666,24 +1796,48 @@ async def list_fights(match_id: int, ctx: Context) -> Dict[str, Any]:
         # Get fight summary
         summary = _fight_service.get_fight_summary(data)
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            **summary,
-        }
+        # Convert fights to typed models
+        fights = [
+            FightSummary(
+                fight_id=f.get("fight_id", ""),
+                start_time=f.get("start_time", 0.0),
+                start_time_str=f.get("start_time_str", "0:00"),
+                end_time=f.get("end_time", 0.0),
+                end_time_str=f.get("end_time_str", "0:00"),
+                duration_seconds=f.get("duration_seconds", 0.0),
+                total_deaths=f.get("total_deaths", 0),
+                is_teamfight=f.get("is_teamfight", False),
+                participants=f.get("participants", []),
+                deaths=[
+                    FightDeath(
+                        game_time=d.get("game_time", 0.0),
+                        game_time_str=d.get("game_time_str", "0:00"),
+                        killer=d.get("killer", ""),
+                        victim=d.get("victim", ""),
+                        ability=d.get("ability"),
+                    )
+                    for d in f.get("deaths", [])
+                ],
+            )
+            for f in summary.get("fights", [])
+        ]
+
+        return FightListResponse(
+            success=True,
+            match_id=match_id,
+            total_fights=summary.get("total_fights", 0),
+            teamfights=summary.get("teamfights", 0),
+            skirmishes=summary.get("skirmishes", 0),
+            total_deaths=summary.get("total_deaths", 0),
+            fights=fights,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return FightListResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to analyze fights: {e}",
-        }
+        return FightListResponse(
+            success=False, match_id=match_id, error=f"Failed to analyze fights: {e}"
+        )
 
 
 @mcp.tool
@@ -1691,7 +1845,7 @@ async def get_teamfights(
     match_id: int,
     min_deaths: int = 3,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> TeamfightsResponse:
     """
     Get only teamfights from a Dota 2 match.
 
@@ -1710,7 +1864,7 @@ async def get_teamfights(
         min_deaths: Minimum deaths to classify as teamfight (default: 3)
 
     Returns:
-        Dictionary with list of teamfights
+        TeamfightsResponse with list of teamfights
     """
     # Create progress callback
     async def progress_callback(current: int, total: int, message: str) -> None:
@@ -1721,45 +1875,45 @@ async def get_teamfights(
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
         teamfights = _fight_service.get_teamfights(data, min_deaths=min_deaths)
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "min_deaths_threshold": min_deaths,
-            "total_teamfights": len(teamfights),
-            "teamfights": [
-                {
-                    "fight_id": f.fight_id,
-                    "start_time": f.start_time_str,
-                    "end_time": f.end_time_str,
-                    "duration_seconds": round(f.duration, 1),
-                    "total_deaths": f.total_deaths,
-                    "participants": f.participants,
-                    "deaths": [
-                        {
-                            "game_time": d.game_time_str,
-                            "killer": d.killer,
-                            "victim": d.victim,
-                            "ability": d.ability,
-                        }
-                        for d in f.deaths
-                    ],
-                }
-                for f in teamfights
-            ],
-        }
+        fights = [
+            FightSummary(
+                fight_id=f.fight_id,
+                start_time=f.start_time,
+                start_time_str=f.start_time_str,
+                end_time=f.end_time,
+                end_time_str=f.end_time_str,
+                duration_seconds=round(f.duration, 1),
+                total_deaths=f.total_deaths,
+                is_teamfight=True,
+                participants=f.participants,
+                deaths=[
+                    FightDeath(
+                        game_time=d.game_time,
+                        game_time_str=d.game_time_str,
+                        killer=d.killer,
+                        victim=d.victim,
+                        ability=d.ability,
+                    )
+                    for d in f.deaths
+                ],
+            )
+            for f in teamfights
+        ]
+
+        return TeamfightsResponse(
+            success=True,
+            match_id=match_id,
+            min_deaths_threshold=min_deaths,
+            total_teamfights=len(teamfights),
+            teamfights=fights,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return TeamfightsResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get teamfights: {e}",
-        }
+        return TeamfightsResponse(
+            success=False, match_id=match_id, error=f"Failed to get teamfights: {e}"
+        )
 
 
 @mcp.tool
@@ -1767,7 +1921,7 @@ async def get_fight(
     match_id: int,
     fight_id: str,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> FightDetailResponse:
     """
     Get detailed information about a specific fight.
 
@@ -1787,7 +1941,7 @@ async def get_fight(
         fight_id: Fight identifier (e.g., "fight_1", "fight_5")
 
     Returns:
-        Detailed fight information
+        FightDetailResponse with detailed fight information
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -1798,45 +1952,45 @@ async def get_fight(
         fight = _fight_service.get_fight_by_id(data, fight_id)
 
         if not fight:
-            return {
-                "success": False,
-                "match_id": match_id,
-                "error": f"Fight '{fight_id}' not found. Use list_fights to see available fights.",
-            }
+            return FightDetailResponse(
+                success=False,
+                match_id=match_id,
+                error=f"Fight '{fight_id}' not found. Use list_fights to see available fights.",
+            )
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "fight_id": fight.fight_id,
-            "start_time": fight.start_time_str,
-            "start_time_seconds": fight.start_time,
-            "end_time": fight.end_time_str,
-            "end_time_seconds": fight.end_time,
-            "duration_seconds": round(fight.duration, 1),
-            "is_teamfight": fight.is_teamfight,
-            "total_deaths": fight.total_deaths,
-            "participants": fight.participants,
-            "deaths": [
-                {
-                    "game_time": d.game_time_str,
-                    "game_time_seconds": d.game_time,
-                    "killer": d.killer,
-                    "killer_is_hero": d.killer_is_hero,
-                    "victim": d.victim,
-                    "ability": d.ability,
-                    "position_x": d.position_x,
-                    "position_y": d.position_y,
-                }
-                for d in fight.deaths
-            ],
-        }
+        deaths = [
+            FightDeathDetail(
+                game_time=d.game_time,
+                game_time_str=d.game_time_str,
+                killer=d.killer,
+                killer_is_hero=d.killer_is_hero,
+                victim=d.victim,
+                ability=d.ability,
+                position_x=d.position_x,
+                position_y=d.position_y,
+            )
+            for d in fight.deaths
+        ]
+
+        return FightDetailResponse(
+            success=True,
+            match_id=match_id,
+            fight_id=fight.fight_id,
+            start_time=fight.start_time,
+            start_time_str=fight.start_time_str,
+            start_time_seconds=fight.start_time,
+            end_time=fight.end_time,
+            end_time_str=fight.end_time_str,
+            end_time_seconds=fight.end_time,
+            duration_seconds=round(fight.duration, 1),
+            is_teamfight=fight.is_teamfight,
+            total_deaths=fight.total_deaths,
+            participants=fight.participants,
+            deaths=deaths,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return FightDetailResponse(success=False, match_id=match_id, error=str(e))
 
 
 # Jungle and Lane Analysis Tools
@@ -1845,7 +1999,7 @@ async def get_camp_stacks(
     match_id: int,
     hero_filter: Optional[str] = None,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> CampStacksResponse:
     """
     Get all neutral camp stacks in a Dota 2 match.
 
@@ -1864,7 +2018,7 @@ async def get_camp_stacks(
         hero_filter: Only show stacks by this hero (optional)
 
     Returns:
-        Dictionary with camp stack events
+        CampStacksResponse with camp stack events
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -1874,39 +2028,35 @@ async def get_camp_stacks(
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
         stacks = _jungle_service.get_camp_stacks(data, hero_filter=hero_filter)
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "hero_filter": hero_filter,
-            "total_stacks": len(stacks),
-            "stacks": [
-                {
-                    "game_time": s.game_time_str,
-                    "game_time_seconds": s.game_time,
-                    "stacker": s.stacker,
-                    "camp_type": s.camp_type,
-                    "stack_count": s.stack_count,
-                }
-                for s in stacks
-            ],
-        }
+        stack_models = [
+            CampStack(
+                game_time=s.game_time,
+                game_time_str=s.game_time_str,
+                stacker=s.stacker,
+                camp_type=s.camp_type,
+                stack_count=s.stack_count,
+            )
+            for s in stacks
+        ]
+
+        return CampStacksResponse(
+            success=True,
+            match_id=match_id,
+            hero_filter=hero_filter,
+            total_stacks=len(stacks),
+            stacks=stack_models,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return CampStacksResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get camp stacks: {e}",
-        }
+        return CampStacksResponse(
+            success=False, match_id=match_id, error=f"Failed to get camp stacks: {e}"
+        )
 
 
 @mcp.tool
-async def get_jungle_summary(match_id: int, ctx: Optional[Context] = None) -> Dict[str, Any]:
+async def get_jungle_summary(match_id: int, ctx: Optional[Context] = None) -> JungleSummaryResponse:
     """
     Get jungle activity summary for a Dota 2 match.
 
@@ -1921,7 +2071,7 @@ async def get_jungle_summary(match_id: int, ctx: Optional[Context] = None) -> Di
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with jungle summary
+        JungleSummaryResponse with jungle summary
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -1932,30 +2082,24 @@ async def get_jungle_summary(match_id: int, ctx: Optional[Context] = None) -> Di
         summary = _jungle_service.get_jungle_summary(data)
         efficiency = _jungle_service.get_stack_efficiency(data)
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "total_stacks": summary.total_stacks,
-            "stacks_by_hero": summary.stacks_by_hero,
-            "stack_efficiency_per_10min": efficiency,
-        }
+        return JungleSummaryResponse(
+            success=True,
+            match_id=match_id,
+            total_stacks=summary.total_stacks,
+            stacks_by_hero=summary.stacks_by_hero,
+            stack_efficiency_per_10min=efficiency,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return JungleSummaryResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get jungle summary: {e}",
-        }
+        return JungleSummaryResponse(
+            success=False, match_id=match_id, error=f"Failed to get jungle summary: {e}"
+        )
 
 
 @mcp.tool
-async def get_lane_summary(match_id: int, ctx: Optional[Context] = None) -> Dict[str, Any]:
+async def get_lane_summary(match_id: int, ctx: Optional[Context] = None) -> LaneSummaryResponse:
     """
     Get laning phase summary for a Dota 2 match.
 
@@ -1984,7 +2128,7 @@ async def get_lane_summary(match_id: int, ctx: Optional[Context] = None) -> Dict
         match_id: The Dota 2 match ID
 
     Returns:
-        Dictionary with laning phase summary
+        LaneSummaryResponse with laning phase summary
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -2016,48 +2160,44 @@ async def get_lane_summary(match_id: int, ctx: Optional[Context] = None) -> Dict
             lane_name = od_data.get("lane_name") or s.lane
             role = od_data.get("role") or s.role
 
-            hero_stats.append({
-                "hero": s.hero,
-                "lane": lane_name,
-                "role": role,
-                "team": s.team,
-                "last_hits_5min": s.last_hits_5min,
-                "last_hits_10min": s.last_hits_10min,
-                "denies_5min": s.denies_5min,
-                "denies_10min": s.denies_10min,
-                "gold_5min": s.gold_5min,
-                "gold_10min": s.gold_10min,
-                "level_5min": s.level_5min,
-                "level_10min": s.level_10min,
-            })
+            hero_stats.append(
+                HeroLaneStats(
+                    hero=s.hero,
+                    lane=lane_name,
+                    role=role,
+                    team=s.team,
+                    last_hits_5min=s.last_hits_5min,
+                    last_hits_10min=s.last_hits_10min,
+                    denies_5min=s.denies_5min,
+                    denies_10min=s.denies_10min,
+                    gold_5min=s.gold_5min,
+                    gold_10min=s.gold_10min,
+                    level_5min=s.level_5min,
+                    level_10min=s.level_10min,
+                )
+            )
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "lane_winners": {
-                "top": summary.top_winner,
-                "mid": summary.mid_winner,
-                "bot": summary.bot_winner,
-            },
-            "team_scores": {
-                "radiant": round(summary.radiant_laning_score, 1),
-                "dire": round(summary.dire_laning_score, 1),
-            },
-            "hero_stats": hero_stats,
-        }
+        return LaneSummaryResponse(
+            success=True,
+            match_id=match_id,
+            lane_winners=LaneWinners(
+                top=summary.top_winner,
+                mid=summary.mid_winner,
+                bot=summary.bot_winner,
+            ),
+            team_scores=TeamScores(
+                radiant=round(summary.radiant_laning_score, 1),
+                dire=round(summary.dire_laning_score, 1),
+            ),
+            hero_stats=hero_stats,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return LaneSummaryResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get lane summary: {e}",
-        }
+        return LaneSummaryResponse(
+            success=False, match_id=match_id, error=f"Failed to get lane summary: {e}"
+        )
 
 
 @mcp.tool
@@ -2065,7 +2205,7 @@ async def get_cs_at_minute(
     match_id: int,
     minute: int,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> CSAtMinuteResponse:
     """
     Get last hits, denies, gold, and level for all heroes at a specific minute.
 
@@ -2079,7 +2219,7 @@ async def get_cs_at_minute(
         minute: Game minute to query (e.g., 5, 10, 15)
 
     Returns:
-        Dictionary with CS data for all heroes at the specified minute
+        CSAtMinuteResponse with CS data for all heroes at the specified minute
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -2089,25 +2229,29 @@ async def get_cs_at_minute(
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
         cs_data = _lane_service.get_cs_at_minute(data, minute)
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "minute": minute,
-            "heroes": cs_data,
-        }
+        # cs_data is Dict[hero_name, {last_hits, denies, gold, level, team}]
+        heroes = [
+            HeroCSData(
+                hero=hero_name,
+                team=stats.get("team", "radiant"),
+                last_hits=stats.get("last_hits", 0),
+                denies=stats.get("denies", 0),
+                gold=stats.get("gold", 0),
+                level=stats.get("level", 0),
+            )
+            for hero_name, stats in cs_data.items()
+        ]
+
+        return CSAtMinuteResponse(
+            success=True, match_id=match_id, minute=minute, heroes=heroes
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return CSAtMinuteResponse(success=False, match_id=match_id, minute=minute, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get CS at minute {minute}: {e}",
-        }
+        return CSAtMinuteResponse(
+            success=False, match_id=match_id, minute=minute, error=f"Failed to get CS at minute {minute}: {e}"
+        )
 
 
 @mcp.tool
@@ -2115,7 +2259,7 @@ async def get_hero_positions(
     match_id: int,
     minute: int,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> HeroPositionsResponse:
     """
     Get hero positions at a specific minute in a Dota 2 match.
 
@@ -2130,7 +2274,7 @@ async def get_hero_positions(
         minute: Game minute to query (e.g., 0, 5, 10)
 
     Returns:
-        Dictionary with hero positions at the specified minute
+        HeroPositionsResponse with hero positions at the specified minute
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -2140,34 +2284,30 @@ async def get_hero_positions(
         data = await _replay_service.get_parsed_data(match_id, progress=progress_callback)
         positions = _lane_service.get_hero_positions_at_minute(data, minute)
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "minute": minute,
-            "positions": [
-                {
-                    "hero": p.hero,
-                    "team": p.team,
-                    "x": round(p.x, 1),
-                    "y": round(p.y, 1),
-                    "game_time": p.game_time,
-                }
-                for p in positions
-            ],
-        }
+        pos_models = [
+            HeroPosition(
+                hero=p.hero,
+                team=p.team,
+                x=round(p.x, 1),
+                y=round(p.y, 1),
+                game_time=p.game_time,
+            )
+            for p in positions
+        ]
+
+        return HeroPositionsResponse(
+            success=True, match_id=match_id, minute=minute, positions=pos_models
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return HeroPositionsResponse(success=False, match_id=match_id, minute=minute, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get hero positions at minute {minute}: {e}",
-        }
+        return HeroPositionsResponse(
+            success=False,
+            match_id=match_id,
+            minute=minute,
+            error=f"Failed to get hero positions at minute {minute}: {e}",
+        )
 
 
 # Game State Tools
@@ -2176,7 +2316,7 @@ async def get_snapshot_at_time(
     match_id: int,
     game_time: float,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> SnapshotAtTimeResponse:
     """
     Get game state snapshot at a specific game time.
 
@@ -2191,7 +2331,7 @@ async def get_snapshot_at_time(
         game_time: Game time in seconds (e.g., 300.0 for 5:00)
 
     Returns:
-        Dictionary with game state at the specified time
+        SnapshotAtTimeResponse with game state at the specified time
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -2205,50 +2345,46 @@ async def get_snapshot_at_time(
         snapshot = _seek_service.get_snapshot_at_time(data.replay_path, game_time)
 
         if not snapshot:
-            return {
-                "success": False,
-                "match_id": match_id,
-                "error": f"Could not get snapshot at time {game_time}",
-            }
+            return SnapshotAtTimeResponse(
+                success=False,
+                match_id=match_id,
+                error=f"Could not get snapshot at time {game_time}",
+            )
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "tick": snapshot.tick,
-            "game_time": snapshot.game_time,
-            "game_time_str": snapshot.game_time_str,
-            "radiant_gold": snapshot.radiant_gold,
-            "dire_gold": snapshot.dire_gold,
-            "heroes": [
-                {
-                    "hero": h.hero,
-                    "team": h.team,
-                    "player_id": h.player_id,
-                    "x": round(h.x, 1),
-                    "y": round(h.y, 1),
-                    "health": h.health,
-                    "max_health": h.max_health,
-                    "mana": h.mana,
-                    "max_mana": h.max_mana,
-                    "level": h.level,
-                    "alive": h.alive,
-                }
-                for h in snapshot.heroes
-            ],
-        }
+        heroes = [
+            HeroSnapshot(
+                hero=h.hero,
+                team=h.team,
+                player_id=h.player_id,
+                x=round(h.x, 1),
+                y=round(h.y, 1),
+                health=h.health,
+                max_health=h.max_health,
+                mana=h.mana,
+                max_mana=h.max_mana,
+                level=h.level,
+                alive=h.alive,
+            )
+            for h in snapshot.heroes
+        ]
+
+        return SnapshotAtTimeResponse(
+            success=True,
+            match_id=match_id,
+            tick=snapshot.tick,
+            game_time=snapshot.game_time,
+            game_time_str=snapshot.game_time_str,
+            radiant_gold=snapshot.radiant_gold,
+            dire_gold=snapshot.dire_gold,
+            heroes=heroes,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return SnapshotAtTimeResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get snapshot: {e}",
-        }
+        return SnapshotAtTimeResponse(
+            success=False, match_id=match_id, error=f"Failed to get snapshot: {e}"
+        )
 
 
 @mcp.tool
@@ -2259,7 +2395,7 @@ async def get_position_timeline(
     hero_filter: Optional[str] = None,
     interval_seconds: float = 1.0,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> PositionTimelineResponse:
     """
     Get hero positions over a time range at regular intervals.
 
@@ -2276,7 +2412,7 @@ async def get_position_timeline(
         interval_seconds: Sampling interval in seconds (default 1.0)
 
     Returns:
-        Dictionary with position timelines for each hero
+        PositionTimelineResponse with position timelines for each hero
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -2293,43 +2429,39 @@ async def get_position_timeline(
             interval_seconds=interval_seconds,
         )
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "start_time": start_time,
-            "end_time": end_time,
-            "interval_seconds": interval_seconds,
-            "hero_filter": hero_filter,
-            "heroes": [
-                {
-                    "hero": t.hero,
-                    "team": t.team,
-                    "positions": [
-                        {
-                            "tick": p[0],
-                            "game_time": round(p[1], 1),
-                            "x": round(p[2], 1),
-                            "y": round(p[3], 1),
-                        }
-                        for p in t.positions
-                    ],
-                }
-                for t in timelines
-            ],
-        }
+        hero_timelines = [
+            HeroPositionTimeline(
+                hero=t.hero,
+                team=t.team,
+                positions=[
+                    PositionPoint(
+                        tick=p[0],
+                        game_time=round(p[1], 1),
+                        x=round(p[2], 1),
+                        y=round(p[3], 1),
+                    )
+                    for p in t.positions
+                ],
+            )
+            for t in timelines
+        ]
+
+        return PositionTimelineResponse(
+            success=True,
+            match_id=match_id,
+            start_time=start_time,
+            end_time=end_time,
+            interval_seconds=interval_seconds,
+            hero_filter=hero_filter,
+            heroes=hero_timelines,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return PositionTimelineResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get position timeline: {e}",
-        }
+        return PositionTimelineResponse(
+            success=False, match_id=match_id, error=f"Failed to get position timeline: {e}"
+        )
 
 
 @mcp.tool
@@ -2339,7 +2471,7 @@ async def get_fight_replay(
     end_time: float,
     interval_seconds: float = 0.5,
     ctx: Optional[Context] = None,
-) -> Dict[str, Any]:
+) -> FightReplayResponse:
     """
     Get high-resolution replay data for a fight.
 
@@ -2358,7 +2490,7 @@ async def get_fight_replay(
         interval_seconds: Sampling interval (default 0.5s for 2 samples/second)
 
     Returns:
-        Dictionary with fight replay data including hero states over time
+        FightReplayResponse with fight replay data including hero states over time
     """
     async def progress_callback(current: int, total: int, message: str) -> None:
         if ctx:
@@ -2374,51 +2506,47 @@ async def get_fight_replay(
             interval_seconds=interval_seconds,
         )
 
-        return {
-            "success": True,
-            "match_id": match_id,
-            "start_tick": fight_replay.start_tick,
-            "end_tick": fight_replay.end_tick,
-            "start_time": fight_replay.start_time,
-            "start_time_str": fight_replay.start_time_str,
-            "end_time": fight_replay.end_time,
-            "end_time_str": fight_replay.end_time_str,
-            "interval_seconds": interval_seconds,
-            "total_snapshots": len(fight_replay.snapshots),
-            "snapshots": [
-                {
-                    "tick": s.tick,
-                    "game_time": round(s.game_time, 1),
-                    "game_time_str": s.game_time_str,
-                    "heroes": [
-                        {
-                            "hero": h.hero,
-                            "team": h.team,
-                            "x": round(h.x, 1),
-                            "y": round(h.y, 1),
-                            "health": h.health,
-                            "max_health": h.max_health,
-                            "alive": h.alive,
-                        }
-                        for h in s.heroes
-                    ],
-                }
-                for s in fight_replay.snapshots
-            ],
-        }
+        snapshots = [
+            FightSnapshot(
+                tick=s.tick,
+                game_time=round(s.game_time, 1),
+                game_time_str=s.game_time_str,
+                heroes=[
+                    FightSnapshotHero(
+                        hero=h.hero,
+                        team=h.team,
+                        x=round(h.x, 1),
+                        y=round(h.y, 1),
+                        health=h.health,
+                        max_health=h.max_health,
+                        alive=h.alive,
+                    )
+                    for h in s.heroes
+                ],
+            )
+            for s in fight_replay.snapshots
+        ]
+
+        return FightReplayResponse(
+            success=True,
+            match_id=match_id,
+            start_tick=fight_replay.start_tick,
+            end_tick=fight_replay.end_tick,
+            start_time=fight_replay.start_time,
+            start_time_str=fight_replay.start_time_str,
+            end_time=fight_replay.end_time,
+            end_time_str=fight_replay.end_time_str,
+            interval_seconds=interval_seconds,
+            total_snapshots=len(fight_replay.snapshots),
+            snapshots=snapshots,
+        )
 
     except ValueError as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": str(e),
-        }
+        return FightReplayResponse(success=False, match_id=match_id, error=str(e))
     except Exception as e:
-        return {
-            "success": False,
-            "match_id": match_id,
-            "error": f"Failed to get fight replay: {e}",
-        }
+        return FightReplayResponse(
+            success=False, match_id=match_id, error=f"Failed to get fight replay: {e}"
+        )
 
 
 # Farming Pattern Analysis Tools
