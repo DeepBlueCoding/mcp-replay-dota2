@@ -1390,6 +1390,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1405,7 +1444,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1416,7 +1455,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1444,7 +1483,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1472,7 +1511,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1652,6 +1691,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1667,7 +1745,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1678,7 +1756,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1706,7 +1784,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1734,7 +1812,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1898,10 +1976,59 @@
 </details>
 <p>All notable changes to this project will be documented in this file.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
-<p><em>No unreleased changes.</em></p>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Combat-intensity based fight detection</strong> - Major refactor of fight detection algorithm:</li>
+<li>Fights are now detected based on hero-to-hero combat activity, not just deaths</li>
+<li>Catches teamfights where teams disengage before anyone dies</li>
+<li>Properly captures fight initiation phase (BKB+Blink) before first death</li>
+<li>Uses intensity-based windowing to separate distinct engagements</li>
+<li>Filters out harassment/poke (brief exchanges that aren't real fights)</li>
+<li>
+<p>New <code>detect_fights_from_combat()</code> and <code>get_fight_at_time_from_combat()</code> methods</p>
+</li>
+<li>
+<p>Extended fight highlight detection with new patterns:</p>
+</li>
+<li><strong>BKB + Blink combos</strong>: Detects BKB + Blink → Big Ability (either order), marks first as initiator, rest as follow-ups</li>
+<li><strong>Coordinated ultimates</strong>: Detects when 2+ heroes use big teamfight abilities within 3 seconds</li>
+<li><strong>Refresher combos</strong>: Detects when a hero uses Refresher to double-cast an ultimate</li>
+<li><strong>Clutch saves</strong>: Detects self-saves (Outworld Staff, Aeon Disk) and ally saves (Glimmer Cape, Lotus Orb, Force Staff, Shadow Demon Disruption)</li>
+<li>
+<p>Self-save detection includes tracking what ability the hero was saved FROM (e.g., Omnislash)</p>
+</li>
+<li>
+<p>New data models in <code>combat_data.py</code>:</p>
+</li>
+<li><code>BKBBlinkCombo</code>: BKB + Blink combo with <code>is_initiator</code> flag (renamed from BKBInitiation)</li>
+<li><code>CoordinatedUltimates</code>: Multiple heroes ulting together with window tracking</li>
+<li><code>RefresherCombo</code>: Refresher double ultimate with cast times</li>
+<li><code>ClutchSave</code>: Save detection with saver, save type, and ability saved from</li>
+<li>
+<p><code>CombatWindow</code>: Internal dataclass for combat-intensity based fight detection</p>
+</li>
+<li>
+<p>Added <code>nevermore_requiem</code> alias to BIG_TEAMFIGHT_ABILITIES (replays use old internal name)</p>
+</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>get_fight_combat_log</code> now uses combat-based detection by default (captures initiation)</li>
+<li>Renamed <code>BKBInitiation</code> to <code>BKBBlinkCombo</code> and <code>initiations</code> field to <code>bkb_blink_combos</code></li>
+<li>Fight detection parameters tuned: 8s combat gap, 3s intensity window, 5 min events per window</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Generic AoE detection now properly filters self-targeting (e.g., Echo Slam damaging caster)</li>
+<li>BKB+Blink detection now accepts either order (BKB→Blink or Blink→BKB)</li>
+<li>Clutch saves now require target to be "in danger" (3+ hero damage hits in 2s) to filter false positives</li>
+<li>Hero deaths include position coordinates and location descriptions from entity snapshots</li>
+<li><code>significant_only</code> filter now excludes non-hero deaths (creep kills) from combat events</li>
+<li>Autoattack kills now show <code>"ability": "attack"</code> instead of <code>"dota_unknown"</code></li>
+</ul>
 <hr />
 <h2 id="102-2025-12-08">[1.0.2] - 2025-12-08<a class="headerlink" href="#102-2025-12-08" title="Permanent link">&para;</a></h2>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fixed <code>get_pro_matches</code> and <code>get_league_matches</code> returning <code>null</code> team names</li>
 <li>OpenDota API doesn't always include team names in match responses</li>
@@ -1916,7 +2043,7 @@
 <li>Added <code>get_item_name()</code> and <code>convert_item_ids_to_names()</code> to constants_fetcher</li>
 <li>Neutral items also converted to display names</li>
 </ul>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Model validation tests (<code>tests/test_model_validation.py</code>)</li>
 <li>Tests for HeroStats, MatchHeroesResponse, MatchPlayerInfo validation</li>
@@ -1925,7 +2052,7 @@
 </ul>
 <hr />
 <h2 id="101-2025-12-08">[1.0.1] - 2025-12-08<a class="headerlink" href="#101-2025-12-08" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Updated examples documentation to match v1.0.0 Pydantic response models</li>
 <li>Added fight highlights to <code>get_fight_combat_log</code> examples (multi_hero_abilities, kill_streaks, team_wipes)</li>
@@ -1934,7 +2061,7 @@
 </ul>
 <hr />
 <h2 id="100-2025-12-08">[1.0.0] - 2025-12-08<a class="headerlink" href="#100-2025-12-08" title="Permanent link">&para;</a></h2>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <h4 id="mcp-resources">MCP Resources<a class="headerlink" href="#mcp-resources" title="Permanent link">&para;</a></h4>
 <ul>
 <li><code>dota2://heroes/all</code> - All Dota 2 heroes with stats and abilities</li>
