@@ -49,8 +49,8 @@ jobs:
         id: cache-parsed
         uses: actions/cache@v4
         with:
-          path: ~/.cache/mcp_dota2/parsed_replays
-          key: parsed-${{ env.TEST_MATCH_ID }}-v3
+          path: ~/.cache/mcp_dota2/parsed_replays_v2
+          key: parsed-${{ env.TEST_MATCH_ID }}-v4
 
       - name: Download test replay
         if: steps.cache-replay.outputs.cache-hit != 'true'
