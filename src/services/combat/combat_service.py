@@ -38,8 +38,8 @@ from ..models.combat_data import (
 )
 from ..models.replay_data import ParsedReplayData
 
-DEFAULT_MAX_EVENTS = 500
-MAX_EVENTS_CAP = 2000
+DEFAULT_MAX_EVENTS = 200
+MAX_EVENTS_CAP = 500
 
 logger = logging.getLogger(__name__)
 

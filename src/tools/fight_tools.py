@@ -59,11 +59,11 @@ def register_fight_tools(mcp, services):
         **IMPORTANT: Use detail_level to control response size and token usage.**
 
         Detail levels:
-        - **narrative** (default, ~200-500 tokens): Deaths, abilities, purchases only.
-          Best for: Understanding fight outcome and key moments.
-        - **tactical** (~500-2000 tokens): Adds hero-to-hero damage, debuffs.
-          Best for: Damage analysis, ability impact.
-        - **full** (WARNING: 5000+ tokens): All events including creeps.
+        - **narrative** (default): Deaths, abilities, purchases only.
+          Best for: "What happened?", "Who died and how?", "Key abilities used."
+        - **tactical**: Adds hero-to-hero damage, attack events, debuffs.
+          Best for: "Timeline of damage on X", "Who attacked who and when?", "What effects were applied?"
+        - **full** (WARNING: Very large): All events including creeps.
           Best for: Debugging only.
 
         **Includes fight highlights** (always detected regardless of detail_level):

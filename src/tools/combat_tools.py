@@ -57,21 +57,25 @@ def register_combat_tools(mcp, services):
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
         detail_level: Literal["narrative", "tactical", "full"] = "narrative",
-        max_events: int = 500,
+        max_events: int = 200,
         ctx: Optional[Context] = None,
     ) -> CombatLogResponse:
         """
-        Get combat log events from a Dota 2 match with optional filters.
+        Get combat log events from a Dota 2 match for a specific time window.
 
-        **IMPORTANT: Use the appropriate detail_level to control response size and token usage.**
+        **CRITICAL: Always use focused time windows (start_time AND end_time).**
+        Do NOT query large time ranges. Use 1-3 minute windows for best results.
+
+        **For hero-specific analysis, use get_hero_combat_analysis instead.**
+        That tool provides per-fight breakdowns with kills, deaths, ability usage, and damage.
 
         Detail levels (from least to most verbose):
-        - **narrative** (default, ~500-2000 tokens): Hero deaths, abilities, purchases, buybacks.
-          Best for: "What happened?" story-telling analysis.
-        - **tactical** (~2000-5000 tokens): Adds hero-to-hero damage, debuffs on heroes.
-          Best for: "How much damage did X do?" damage analysis.
-        - **full** (WARNING: 50,000+ tokens): All events including creeps, heals, modifier removes.
-          Best for: Debugging only. WILL OVERFLOW CONTEXT for time ranges >30 seconds.
+        - **narrative** (default): Hero deaths, abilities, purchases, buybacks.
+          Best for: "What happened?", "Who died and how?", "Key abilities used."
+        - **tactical**: Adds hero-to-hero damage, attack events, debuffs on heroes.
+          Best for: "Timeline of damage on X", "Who attacked who and when?", "What effects were applied?"
+        - **full** (WARNING: Very large): All events including creeps, heals.
+          Best for: Debugging only. Use time ranges <30 seconds.
 
         Each event contains:
         - type: DAMAGE, MODIFIER_ADD, ABILITY, DEATH, PURCHASE, BUYBACK
@@ -82,11 +86,11 @@ def register_combat_tools(mcp, services):
 
         Args:
             match_id: The Dota 2 match ID
-            start_time: Filter events after this time (seconds). Use -90 to include pre-game purchases.
-            end_time: Filter events before this time (seconds)
+            start_time: Filter events after this time (seconds). REQUIRED for focused queries.
+            end_time: Filter events before this time (seconds). REQUIRED for focused queries.
             hero_filter: Only events involving this hero, e.g. "earthshaker"
             detail_level: Controls verbosity. Use "narrative" for most queries.
-            max_events: Maximum events to return (default 500, max 2000). Prevents overflow.
+            max_events: Maximum events to return (default 200, max 500).
 
         Returns:
             CombatLogResponse with events. Check `truncated` field if results were capped.
