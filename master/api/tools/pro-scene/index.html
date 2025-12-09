@@ -1815,7 +1815,7 @@
 <tr>
 <td><code>team_name</code></td>
 <td>string</td>
-<td>Fuzzy match team name (e.g., "OG", "Spirit", "Navi")</td>
+<td>Fuzzy match team name (e.g., "OG", "Spirit", "Tundra")</td>
 </tr>
 <tr>
 <td><code>league_name</code></td>
@@ -1829,11 +1829,17 @@
 </tr>
 </tbody>
 </table>
+<p><strong>Data Blending:</strong> When <code>team_name</code> is provided, this tool automatically blends data from two sources:</p>
+<ol>
+<li><strong>Team-specific endpoint</strong> (<code>/teams/{id}/matches</code>) - captures matches that OpenDota's <code>/proMatches</code> often misses (e.g., major tournaments like SLAM)</li>
+<li><strong>General pro matches</strong> (<code>/proMatches</code>) - provides broader coverage</li>
+</ol>
+<p>This ensures comprehensive results when searching for specific teams.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Get top-tier tournament matches only</span>
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">tier</span><span class="o">=</span><span class="s2">&quot;premium&quot;</span><span class="p">)</span>
 <a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Find matches for a specific team</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">team_name</span><span class="o">=</span><span class="s2">&quot;OG&quot;</span><span class="p">)</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Find matches for a specific team (blends both data sources)</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">team_name</span><span class="o">=</span><span class="s2">&quot;Tundra&quot;</span><span class="p">,</span> <span class="n">days_back</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
 <a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
 <a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Find matches in a specific tournament</span>
 <a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;SLAM&quot;</span><span class="p">)</span>
