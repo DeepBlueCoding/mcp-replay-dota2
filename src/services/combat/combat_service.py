@@ -586,6 +586,7 @@ class CombatService:
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
+        ability_filter: Optional[str] = None,
         types: Optional[List[int]] = None,
         detail_level: DetailLevel = DetailLevel.FULL,
         max_events: Optional[int] = None,
@@ -598,6 +599,7 @@ class CombatService:
             start_time: Filter events after this game time
             end_time: Filter events before this game time
             hero_filter: Only include events involving this hero
+            ability_filter: Only include events involving this ability
             types: List of CombatLogType values to include (e.g., [5] for ABILITY)
             detail_level: Controls verbosity. NARRATIVE (least), TACTICAL, FULL (most).
             max_events: Maximum number of events to return. None = no limit.
@@ -606,6 +608,7 @@ class CombatService:
             List of CombatLogEvent sorted by game time
         """
         events = []
+        ability_filter_lower = ability_filter.lower() if ability_filter else None
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -637,6 +640,12 @@ class CombatService:
             if hero_filter:
                 hero_lower = hero_filter.lower()
                 if hero_lower not in attacker.lower() and hero_lower not in target.lower():
+                    continue
+
+            # Ability filter
+            if ability_filter_lower:
+                ability = entry.inflictor_name or ""
+                if ability_filter_lower not in ability.lower():
                     continue
 
             # Determine if ability "hit" (for ABILITY events)
@@ -697,6 +706,7 @@ class CombatService:
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
+        ability_filter: Optional[str] = None,
         detail_level: DetailLevel = DetailLevel.NARRATIVE,
         max_events: int = DEFAULT_MAX_EVENTS,
     ) -> CombatLogResponse:
@@ -709,6 +719,7 @@ class CombatService:
             start_time=start_time,
             end_time=end_time,
             hero_filter=hero_filter,
+            ability_filter=ability_filter,
             detail_level=detail_level,
             max_events=effective_max,
         )
@@ -879,6 +890,7 @@ class CombatService:
         match_id: int,
         hero: str,
         fights: List,
+        ability_filter: Optional[str] = None,
     ) -> HeroCombatAnalysisResponse:
         """
         Analyze a hero's combat involvement across the entire match.
@@ -888,11 +900,13 @@ class CombatService:
             match_id: Match ID for response
             hero: Hero name to analyze
             fights: List of Fight objects from FightService
+            ability_filter: Only show this ability in results
 
         Returns:
             HeroCombatAnalysisResponse with match-wide stats and per-fight breakdown
         """
         hero_lower = hero.lower()
+        ability_filter_lower = ability_filter.lower() if ability_filter else None
         hero_fights: List[FightParticipation] = []
         total_kills = 0
         total_deaths = 0
@@ -912,6 +926,9 @@ class CombatService:
             if entry_type == CombatLogType.ABILITY.value and is_our_hero_attacker:
                 ability = entry.inflictor_name
                 if ability and ability != "dota_unknown":
+                    # Apply ability filter if specified
+                    if ability_filter_lower and ability_filter_lower not in ability.lower():
+                        continue
                     match_ability_casts[ability] = match_ability_casts.get(ability, 0) + 1
                     if entry.is_target_hero:
                         match_ability_hits[ability] = match_ability_hits.get(ability, 0) + 1
@@ -973,6 +990,9 @@ class CombatService:
                 elif entry_type == CombatLogType.ABILITY.value and is_our_hero_attacker:
                     ability = entry.inflictor_name
                     if ability and ability != "dota_unknown":
+                        # Apply ability filter if specified
+                        if ability_filter_lower and ability_filter_lower not in ability.lower():
+                            continue
                         ability_casts[ability] = ability_casts.get(ability, 0) + 1
                         if entry.is_target_hero:
                             ability_hits[ability] = ability_hits.get(ability, 0) + 1

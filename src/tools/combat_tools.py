@@ -58,6 +58,7 @@ def register_combat_tools(mcp, services):
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
+        ability_filter: Optional[str] = None,
         detail_level: Literal["narrative", "tactical", "full"] = "narrative",
         max_events: int = 200,
         ctx: Optional[Context] = None,
@@ -81,6 +82,7 @@ def register_combat_tools(mcp, services):
             start_time: Start of time window (seconds). REQUIRED.
             end_time: End of time window (seconds). REQUIRED.
             hero_filter: Only events involving this hero
+            ability_filter: Only events involving this ability (e.g., "ice_path", "chronosphere")
             detail_level: "narrative" (default), "tactical", or "full"
             max_events: Maximum events (default 200)
         """
@@ -93,6 +95,7 @@ def register_combat_tools(mcp, services):
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
             return combat_service.get_combat_log_response(
                 data, match_id, start_time, end_time, hero_filter,
+                ability_filter=ability_filter,
                 detail_level=level,
                 max_events=max_events,
             )
@@ -244,6 +247,7 @@ def register_combat_tools(mcp, services):
     async def get_hero_performance(
         match_id: int,
         hero: str,
+        ability_filter: Optional[str] = None,
         ctx: Optional[Context] = None,
     ) -> HeroCombatAnalysisResponse:
         """
@@ -267,6 +271,7 @@ def register_combat_tools(mcp, services):
         Args:
             match_id: The Dota 2 match ID
             hero: Hero name (e.g., "jakiro", "mars", "faceless_void")
+            ability_filter: Only show this ability (e.g., "ice_path", "chronosphere")
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -276,7 +281,8 @@ def register_combat_tools(mcp, services):
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
             fight_result = fight_service.get_all_fights(data)
             return combat_service.get_hero_combat_analysis(
-                data, match_id, hero, fight_result.fights
+                data, match_id, hero, fight_result.fights,
+                ability_filter=ability_filter,
             )
         except ValueError as e:
             return HeroCombatAnalysisResponse(

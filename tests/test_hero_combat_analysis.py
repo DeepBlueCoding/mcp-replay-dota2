@@ -239,3 +239,129 @@ class TestModifierAddTracking:
         assert fissure is not None
         assert fissure.total_casts > 0
         assert fissure.hero_hits > 0
+
+
+class TestAbilityFilter:
+    """Tests for ability_filter parameter in get_hero_combat_analysis."""
+
+    def test_ability_filter_returns_only_filtered_ability(self, parsed_replay_data, all_fights):
+        """When ability_filter is set, only that ability should appear in results."""
+        from src.services.combat.combat_service import CombatService
+
+        combat_service = CombatService()
+        result = combat_service.get_hero_combat_analysis(
+            parsed_replay_data,
+            match_id=8461956309,
+            hero="earthshaker",
+            fights=all_fights.fights,
+            ability_filter="fissure",
+        )
+
+        assert result.success is True
+        # Only fissure should be in ability_summary
+        for ability in result.ability_summary:
+            assert "fissure" in ability.ability.lower()
+
+    def test_ability_filter_no_match_returns_empty(self, parsed_replay_data, all_fights):
+        """When ability_filter doesn't match any ability, summary should be empty."""
+        from src.services.combat.combat_service import CombatService
+
+        combat_service = CombatService()
+        result = combat_service.get_hero_combat_analysis(
+            parsed_replay_data,
+            match_id=8461956309,
+            hero="earthshaker",
+            fights=all_fights.fights,
+            ability_filter="nonexistent_ability_xyz",
+        )
+
+        assert result.success is True
+        assert len(result.ability_summary) == 0
+
+    def test_ability_filter_is_case_insensitive(self, parsed_replay_data, all_fights):
+        """Ability filter should be case-insensitive."""
+        from src.services.combat.combat_service import CombatService
+
+        combat_service = CombatService()
+        result_lower = combat_service.get_hero_combat_analysis(
+            parsed_replay_data,
+            match_id=8461956309,
+            hero="earthshaker",
+            fights=all_fights.fights,
+            ability_filter="fissure",
+        )
+        result_upper = combat_service.get_hero_combat_analysis(
+            parsed_replay_data,
+            match_id=8461956309,
+            hero="earthshaker",
+            fights=all_fights.fights,
+            ability_filter="FISSURE",
+        )
+
+        assert len(result_lower.ability_summary) == len(result_upper.ability_summary)
+
+    def test_ability_filter_partial_match(self, parsed_replay_data, all_fights):
+        """Ability filter should work with partial matches."""
+        from src.services.combat.combat_service import CombatService
+
+        combat_service = CombatService()
+        # "echo" should match "earthshaker_echo_slam"
+        result = combat_service.get_hero_combat_analysis(
+            parsed_replay_data,
+            match_id=8461956309,
+            hero="earthshaker",
+            fights=all_fights.fights,
+            ability_filter="echo",
+        )
+
+        assert result.success is True
+        for ability in result.ability_summary:
+            assert "echo" in ability.ability.lower()
+
+
+class TestCombatLogAbilityFilter:
+    """Tests for ability_filter parameter in get_combat_log."""
+
+    def test_combat_log_ability_filter(self, parsed_replay_data):
+        """When ability_filter is set, only events with that ability should appear."""
+        from src.models.combat_log import DetailLevel
+        from src.services.combat.combat_service import CombatService
+
+        combat_service = CombatService()
+        events = combat_service.get_combat_log(
+            parsed_replay_data,
+            start_time=0,
+            end_time=600,
+            ability_filter="fissure",
+            detail_level=DetailLevel.FULL,
+        )
+
+        # All returned events should involve fissure
+        for event in events:
+            if event.ability:
+                assert "fissure" in event.ability.lower()
+
+    def test_combat_log_ability_filter_with_hero_filter(self, parsed_replay_data):
+        """Ability filter should work with hero filter."""
+        from src.models.combat_log import DetailLevel
+        from src.services.combat.combat_service import CombatService
+
+        combat_service = CombatService()
+        events = combat_service.get_combat_log(
+            parsed_replay_data,
+            start_time=0,
+            end_time=600,
+            hero_filter="earthshaker",
+            ability_filter="fissure",
+            detail_level=DetailLevel.FULL,
+        )
+
+        # All events should involve earthshaker AND fissure
+        for event in events:
+            has_earthshaker = (
+                "earthshaker" in event.attacker.lower() or
+                "earthshaker" in event.target.lower()
+            )
+            assert has_earthshaker
+            if event.ability:
+                assert "fissure" in event.ability.lower()
