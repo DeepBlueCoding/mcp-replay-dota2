@@ -62,15 +62,26 @@ def register_pro_scene_tools(mcp, services):
     async def get_pro_matches(
         limit: int = 100,
         tier: Optional[str] = None,
-        team_name: Optional[str] = None,
+        team1_name: Optional[str] = None,
+        team2_name: Optional[str] = None,
         league_name: Optional[str] = None,
         days_back: Optional[int] = None,
     ) -> ProMatchesResponse:
-        """Get recent professional Dota 2 matches with series grouping."""
+        """Get recent professional Dota 2 matches with series grouping.
+
+        Args:
+            limit: Maximum matches to return (default 100)
+            tier: Filter by league tier (premium, professional, amateur)
+            team1_name: Filter by first team (fuzzy match). Alone: all matches for team.
+            team2_name: Filter by second team (fuzzy match). With team1: head-to-head matches.
+            league_name: Filter by league/tournament name (contains, case-insensitive)
+            days_back: Only return matches from last N days
+        """
         return await pro_scene_resource.get_pro_matches(
             limit=limit,
             tier=tier,
-            team_name=team_name,
+            team1_name=team1_name,
+            team2_name=team2_name,
             league_name=league_name,
             days_back=days_back,
         )

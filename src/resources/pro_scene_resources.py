@@ -473,7 +473,8 @@ class ProSceneResource:
         self,
         limit: int = 100,
         tier: Optional[str] = None,
-        team_name: Optional[str] = None,
+        team1_name: Optional[str] = None,
+        team2_name: Optional[str] = None,
         league_name: Optional[str] = None,
         days_back: Optional[int] = None,
     ) -> ProMatchesResponse:
@@ -482,7 +483,8 @@ class ProSceneResource:
         Args:
             limit: Maximum matches to return
             tier: Filter by league tier (premium, professional, amateur)
-            team_name: Filter by team name (uses team-specific endpoint for better results)
+            team1_name: Filter by first team (fuzzy match). Alone: all matches for team.
+            team2_name: Filter by second team (fuzzy match). With team1: head-to-head.
             league_name: Filter by league name (contains, case-insensitive)
             days_back: Only matches from last N days
         """
@@ -504,45 +506,60 @@ class ProSceneResource:
             if days_back:
                 cutoff_time = int(time.time()) - (days_back * 24 * 60 * 60)
 
-            # Resolve team filter first
-            team_ids_to_match: set = set()
+            # Resolve team filters
+            team1_id: Optional[int] = None
+            team2_id: Optional[int] = None
             team_specific_matches: Dict[int, ProMatchSummary] = {}
-            if team_name:
-                await self._ensure_initialized()
-                results = team_fuzzy_search.search(team_name, threshold=0.5, max_results=1)
+
+            await self._ensure_initialized()
+
+            if team1_name:
+                results = team_fuzzy_search.search(team1_name, threshold=0.5, max_results=1)
                 if results:
-                    team_id = results[0].id
-                    team_ids_to_match = {team_id}
+                    team1_id = results[0].id
 
-                    # Fetch team-specific matches (often missing from /proMatches)
-                    team_details = await pro_scene_fetcher.fetch_team_details(team_id)
-                    team_data = team_details.get("team", {})
-                    for m in team_details.get("recent_matches", []):
-                        match_time = m.get("start_time", 0)
-                        if cutoff_time and match_time < cutoff_time:
+            if team2_name:
+                results = team_fuzzy_search.search(team2_name, threshold=0.5, max_results=1)
+                if results:
+                    team2_id = results[0].id
+
+            # Fetch team-specific matches for better coverage
+            for team_id in [team1_id, team2_id]:
+                if not team_id:
+                    continue
+
+                team_details = await pro_scene_fetcher.fetch_team_details(team_id)
+                team_data = team_details.get("team", {})
+                for m in team_details.get("recent_matches", []):
+                    match_id = m["match_id"]
+                    if match_id in team_specific_matches:
+                        continue
+
+                    match_time = m.get("start_time", 0)
+                    if cutoff_time and match_time < cutoff_time:
+                        continue
+                    if tier:
+                        match_tier = league_tiers.get(m.get("leagueid"))
+                        if match_tier != tier:
                             continue
-                        if tier:
-                            match_tier = league_tiers.get(m.get("leagueid"))
-                            if match_tier != tier:
-                                continue
-                        if league_name:
-                            if league_name.lower() not in (m.get("league_name") or "").lower():
-                                continue
+                    if league_name:
+                        if league_name.lower() not in (m.get("league_name") or "").lower():
+                            continue
 
-                        is_radiant = m.get("radiant", False)
-                        match_summary = ProMatchSummary(
-                            match_id=m["match_id"],
-                            radiant_team_id=team_id if is_radiant else m.get("opposing_team_id"),
-                            radiant_team_name=team_data.get("name") if is_radiant else m.get("opposing_team_name"),
-                            dire_team_id=m.get("opposing_team_id") if is_radiant else team_id,
-                            dire_team_name=m.get("opposing_team_name") if is_radiant else team_data.get("name"),
-                            radiant_win=m.get("radiant_win") or False,
-                            duration=m.get("duration") or 0,
-                            start_time=match_time,
-                            league_id=m.get("leagueid"),
-                            league_name=m.get("league_name"),
-                        )
-                        team_specific_matches[m["match_id"]] = self._resolve_team_names(match_summary, team_lookup)
+                    is_radiant = m.get("radiant", False)
+                    match_summary = ProMatchSummary(
+                        match_id=match_id,
+                        radiant_team_id=team_id if is_radiant else m.get("opposing_team_id"),
+                        radiant_team_name=team_data.get("name") if is_radiant else m.get("opposing_team_name"),
+                        dire_team_id=m.get("opposing_team_id") if is_radiant else team_id,
+                        dire_team_name=m.get("opposing_team_name") if is_radiant else team_data.get("name"),
+                        radiant_win=m.get("radiant_win") or False,
+                        duration=m.get("duration") or 0,
+                        start_time=match_time,
+                        league_id=m.get("leagueid"),
+                        league_name=m.get("league_name"),
+                    )
+                    team_specific_matches[match_id] = self._resolve_team_names(match_summary, team_lookup)
 
             # Fetch from /proMatches endpoint
             async with OpenDota(format="json") as client:
@@ -552,7 +569,7 @@ class ProSceneResource:
             for m in raw_matches:
                 match_id = m.get("match_id")
                 if match_id in matches_by_id:
-                    continue  # Already have from team-specific endpoint
+                    continue
 
                 if tier:
                     match_tier = league_tiers.get(m.get("leagueid"))
@@ -561,12 +578,6 @@ class ProSceneResource:
 
                 if cutoff_time:
                     if m.get("start_time", 0) < cutoff_time:
-                        continue
-
-                if team_ids_to_match:
-                    radiant_id = m.get("radiant_team_id")
-                    dire_id = m.get("dire_team_id")
-                    if radiant_id not in team_ids_to_match and dire_id not in team_ids_to_match:
                         continue
 
                 if league_name:
@@ -591,8 +602,26 @@ class ProSceneResource:
                 )
                 matches_by_id[match_id] = self._resolve_team_names(match_summary, team_lookup)
 
+            # Apply team filters (after collecting all matches)
+            filtered_matches: List[ProMatchSummary] = []
+            for match in matches_by_id.values():
+                radiant_id = match.radiant_team_id
+                dire_id = match.dire_team_id
+
+                if team1_id and team2_id:
+                    # Head-to-head: both teams must be in the match (either side)
+                    match_team_ids = {radiant_id, dire_id}
+                    if team1_id not in match_team_ids or team2_id not in match_team_ids:
+                        continue
+                elif team1_id:
+                    # Single team filter: team must be on either side
+                    if radiant_id != team1_id and dire_id != team1_id:
+                        continue
+
+                filtered_matches.append(match)
+
             # Sort by start_time descending and apply limit
-            matches = sorted(matches_by_id.values(), key=lambda x: x.start_time, reverse=True)[:limit]
+            matches = sorted(filtered_matches, key=lambda x: x.start_time, reverse=True)[:limit]
 
             all_matches, series_list = self._group_matches_into_series(matches)
 

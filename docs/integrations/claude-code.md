@@ -18,9 +18,9 @@ Add to your project's `.mcp.json`:
       "args": [
         "run",
         "--frozen",
-        "--project", "/absolute/path/to/mcp_replay_dota2",
+        "--project", "/absolute/path/to/mcp-replay-dota2",
         "python",
-        "/absolute/path/to/mcp_replay_dota2/dota_match_mcp_server.py"
+        "/absolute/path/to/mcp-replay-dota2/dota_match_mcp_server.py"
       ]
     }
   }
@@ -39,9 +39,9 @@ Add to `~/.claude/settings.json` to make it available in all projects:
       "args": [
         "run",
         "--frozen",
-        "--project", "/absolute/path/to/mcp_replay_dota2",
+        "--project", "/absolute/path/to/mcp-replay-dota2",
         "python",
-        "/absolute/path/to/mcp_replay_dota2/dota_match_mcp_server.py"
+        "/absolute/path/to/mcp-replay-dota2/dota_match_mcp_server.py"
       ]
     }
   }

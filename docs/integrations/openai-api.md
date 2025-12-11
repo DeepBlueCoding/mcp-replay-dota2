@@ -107,7 +107,7 @@ class MCPToolExecutor:
                 result = await session.call_tool(tool_name, arguments=tool_args)
                 return result.content[0].text
 
-executor = MCPToolExecutor("/path/to/mcp_replay_dota2")
+executor = MCPToolExecutor("/path/to/mcp-replay-dota2")
 ```
 
 ## Agentic Loop

@@ -187,11 +187,17 @@ Get recent professional matches with series grouping. By default returns ALL mat
 |-----------|------|-------------|
 | `limit` | int | Maximum matches to return (default: 100) |
 | `tier` | string | Filter by league tier: `"premium"` (TI, Majors), `"professional"`, or `"amateur"` |
-| `team_name` | string | Fuzzy match team name (e.g., "OG", "Spirit", "Tundra") |
+| `team1_name` | string | Filter by first team (fuzzy match). Alone: returns all matches for that team |
+| `team2_name` | string | Filter by second team (fuzzy match). With team1: returns head-to-head matches |
 | `league_name` | string | Contains match on league name (e.g., "SLAM", "ESL", "DreamLeague") |
 | `days_back` | int | Only return matches from the last N days |
 
-**Data Blending:** When `team_name` is provided, this tool automatically blends data from two sources:
+**Team Filtering:**
+
+- **Single team** (`team1_name` only): Returns all matches involving that team (either radiant or dire)
+- **Head-to-head** (`team1_name` + `team2_name`): Returns only matches where both teams played against each other, regardless of which side (radiant/dire) they were on
+
+**Data Blending:** When team filters are provided, this tool automatically blends data from two sources:
 
 1. **Team-specific endpoint** (`/teams/{id}/matches`) - captures matches that OpenDota's `/proMatches` often misses (e.g., major tournaments like SLAM)
 2. **General pro matches** (`/proMatches`) - provides broader coverage
@@ -202,14 +208,20 @@ This ensures comprehensive results when searching for specific teams.
 # Get top-tier tournament matches only
 get_pro_matches(tier="premium")
 
-# Find matches for a specific team (blends both data sources)
-get_pro_matches(team_name="Tundra", days_back=7)
+# Find all matches for a specific team
+get_pro_matches(team1_name="Tundra", days_back=7)
+
+# Find head-to-head matches between two teams
+get_pro_matches(team1_name="Team Spirit", team2_name="OG")
+
+# Head-to-head at a specific tournament
+get_pro_matches(team1_name="Spirit", team2_name="OG", league_name="International")
 
 # Find matches in a specific tournament
 get_pro_matches(league_name="SLAM")
 
-# Combine filters
-get_pro_matches(tier="premium", team_name="Team Spirit", days_back=30)
+# Combine filters: team matches at premium tournaments
+get_pro_matches(tier="premium", team1_name="Team Spirit", days_back=30)
 ```
 
 **Returns:**

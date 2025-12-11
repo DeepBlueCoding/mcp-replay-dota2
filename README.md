@@ -1,7 +1,7 @@
 # MCP Dota 2 Match Analysis Server
 
-[![Build Status](https://github.com/DeepBlueCoding/mcp_replay_dota2/actions/workflows/test.yml/badge.svg)](https://github.com/DeepBlueCoding/mcp_replay_dota2/actions/workflows/test.yml)
-[![Documentation](https://img.shields.io/badge/docs-gh--pages-blue.svg)](https://deepbluecoding.github.io/mcp_replay_dota2/)
+[![Build Status](https://github.com/DeepBlueCoding/mcp-replay-dota2/actions/workflows/test.yml/badge.svg)](https://github.com/DeepBlueCoding/mcp-replay-dota2/actions/workflows/test.yml)
+[![Documentation](https://img.shields.io/badge/docs-gh--pages-blue.svg)](https://deepbluecoding.github.io/mcp-replay-dota2/)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 
 [FastMCP](https://github.com/jlowin/fastmcp) server for Dota 2 match analysis using replay files and OpenDota API.
@@ -13,8 +13,8 @@
 ### Local
 
 ```bash
-git clone https://github.com/DeepBlueCoding/mcp_replay_dota2.git
-cd mcp_replay_dota2
+git clone https://github.com/DeepBlueCoding/mcp-replay-dota2.git
+cd mcp-replay-dota2
 uv sync
 uv run python dota_match_mcp_server.py
 ```
@@ -33,7 +33,7 @@ docker run -p 8081:8081 dota2-mcp-server --transport sse
 - **Tools**: Match analysis (deaths, combat log, objectives, timelines, drafts)
 - **Instructions**: Built-in coaching guidance for meaningful LLM responses
 
-See [full documentation](https://deepbluecoding.github.io/mcp_replay_dota2/) for API reference and integration guides.
+See [full documentation](https://deepbluecoding.github.io/mcp-replay-dota2/) for API reference and integration guides.
 
 ## Development
 

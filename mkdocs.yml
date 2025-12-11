@@ -1,8 +1,8 @@
 site_name: MCP Dota 2 Server
 site_description: Give your LLM the ability to analyze Dota 2 matches
-site_url: https://deepbluecoding.github.io/mcp_replay_dota2/
-repo_name: DeepBlueCoding/mcp_replay_dota2
-repo_url: https://github.com/DeepBlueCoding/mcp_replay_dota2
+site_url: https://deepbluecoding.github.io/mcp-replay-dota2/
+repo_name: DeepBlueCoding/mcp-replay-dota2
+repo_url: https://github.com/DeepBlueCoding/mcp-replay-dota2
 
 theme:
   name: material

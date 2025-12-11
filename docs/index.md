@@ -58,8 +58,8 @@ The LLM reads the replay data and provides analysis based on actual game events,
 ### Option A: Local Install
 
 ```bash
-git clone https://github.com/DeepBlueCoding/mcp_replay_dota2.git
-cd mcp_replay_dota2
+git clone https://github.com/DeepBlueCoding/mcp-replay-dota2.git
+cd mcp-replay-dota2
 uv sync
 uv run python dota_match_mcp_server.py
 ```
@@ -140,7 +140,7 @@ The LLM will automatically call the appropriate tools and synthesize an analysis
 | `get_team` | Get team details + roster |
 | `get_team_matches` | Team match history with series grouping |
 | `get_leagues` | All leagues/tournaments |
-| `get_pro_matches` | Recent pro matches with series grouping |
+| `get_pro_matches` | Recent pro matches with series grouping (supports head-to-head filtering) |
 | `get_league_matches` | Matches from a specific league |
 
 ## Available Resources

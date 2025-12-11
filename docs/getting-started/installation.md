@@ -12,8 +12,8 @@
 ## Install
 
 ```bash
-git clone https://github.com/DeepBlueCoding/mcp_replay_dota2.git
-cd mcp_replay_dota2
+git clone https://github.com/DeepBlueCoding/mcp-replay-dota2.git
+cd mcp-replay-dota2
 uv sync
 ```
 

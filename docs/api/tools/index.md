@@ -10,7 +10,7 @@
 
     **Rotation Analysis**: `get_rotation_analysis(start_minute, end_minute)` - THE tool for "what rotations happened?" questions. Detects when heroes leave assigned lanes, correlates with rune pickups, links outcomes to fight_ids. Returns rotations, power/wisdom rune events, and per-hero statistics.
 
-    **Pro Scene Tools**: `search_pro_player(query)`, `search_team(query)`, `get_pro_player(account_id)`, `get_pro_player_by_name(name)`, `get_team(team_id)`, `get_team_by_name(name)`, `get_team_matches(team_id)`, `get_leagues(tier?)`, `get_pro_matches(limit?, tier?, team_name?, league_name?, days_back?)`, `get_league_matches(league_id)`.
+    **Pro Scene Tools**: `search_pro_player(query)`, `search_team(query)`, `get_pro_player(account_id)`, `get_pro_player_by_name(name)`, `get_team(team_id)`, `get_team_by_name(name)`, `get_team_matches(team_id)`, `get_leagues(tier?)`, `get_pro_matches(limit?, tier?, team1_name?, team2_name?, league_name?, days_back?)`, `get_league_matches(league_id)`. Head-to-head filtering: pass both `team1_name` and `team2_name` to get matches where both teams played against each other.
 
     **Parallel-safe tools**: `get_stats_at_minute`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_fight`, `get_position_timeline`, `get_fight_replay` - call multiple times with different parameters in parallel for efficiency.
 

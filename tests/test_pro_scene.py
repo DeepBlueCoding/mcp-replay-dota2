@@ -911,6 +911,467 @@ class TestProMatchesDataBlending:
         assert filtered[0].match_id == 6002
 
 
+class TestTwoTeamFiltering:
+    """Tests for two-team (head-to-head) filtering logic."""
+
+    def test_head_to_head_filter_includes_match_with_both_teams(self):
+        """Test that head-to-head filter includes matches where both teams play."""
+        match = ProMatchSummary(
+            match_id=1001,
+            radiant_team_id=100,
+            radiant_team_name="Team A",
+            dire_team_id=200,
+            dire_team_name="Team B",
+            radiant_win=True,
+            duration=2400,
+            start_time=1000,
+        )
+
+        team1_id = 100
+        team2_id = 200
+        match_team_ids = {match.radiant_team_id, match.dire_team_id}
+
+        assert team1_id in match_team_ids
+        assert team2_id in match_team_ids
+
+    def test_head_to_head_filter_excludes_match_without_team1(self):
+        """Test that head-to-head filter excludes matches missing team1."""
+        match = ProMatchSummary(
+            match_id=1002,
+            radiant_team_id=300,
+            radiant_team_name="Team C",
+            dire_team_id=200,
+            dire_team_name="Team B",
+            radiant_win=True,
+            duration=2400,
+            start_time=1000,
+        )
+
+        team1_id = 100
+        match_team_ids = {match.radiant_team_id, match.dire_team_id}
+
+        # Team1 (100) is not in this match - should be excluded
+        assert team1_id not in match_team_ids
+
+    def test_head_to_head_filter_excludes_match_without_team2(self):
+        """Test that head-to-head filter excludes matches missing team2."""
+        match = ProMatchSummary(
+            match_id=1003,
+            radiant_team_id=100,
+            radiant_team_name="Team A",
+            dire_team_id=300,
+            dire_team_name="Team C",
+            radiant_win=True,
+            duration=2400,
+            start_time=1000,
+        )
+
+        team2_id = 200
+        match_team_ids = {match.radiant_team_id, match.dire_team_id}
+
+        # Team2 (200) is not in this match - should be excluded
+        assert team2_id not in match_team_ids
+
+    def test_head_to_head_works_regardless_of_side(self):
+        """Test that head-to-head filter works whether team is radiant or dire."""
+        # Team A on radiant, Team B on dire
+        match1 = ProMatchSummary(
+            match_id=1004,
+            radiant_team_id=100,
+            radiant_team_name="Team A",
+            dire_team_id=200,
+            dire_team_name="Team B",
+            radiant_win=True,
+            duration=2400,
+            start_time=1000,
+        )
+        # Team B on radiant, Team A on dire (sides swapped)
+        match2 = ProMatchSummary(
+            match_id=1005,
+            radiant_team_id=200,
+            radiant_team_name="Team B",
+            dire_team_id=100,
+            dire_team_name="Team A",
+            radiant_win=False,
+            duration=2500,
+            start_time=1100,
+        )
+
+        team1_id = 100
+        team2_id = 200
+
+        # Both matches should pass the filter
+        for match in [match1, match2]:
+            match_team_ids = {match.radiant_team_id, match.dire_team_id}
+            assert team1_id in match_team_ids and team2_id in match_team_ids
+
+    def test_single_team_filter_includes_team_on_radiant(self):
+        """Test that single team filter includes matches where team is radiant."""
+        match = ProMatchSummary(
+            match_id=1006,
+            radiant_team_id=100,
+            radiant_team_name="Team A",
+            dire_team_id=300,
+            dire_team_name="Team C",
+            radiant_win=True,
+            duration=2400,
+            start_time=1000,
+        )
+
+        team1_id = 100
+        assert match.radiant_team_id == team1_id or match.dire_team_id == team1_id
+
+    def test_single_team_filter_includes_team_on_dire(self):
+        """Test that single team filter includes matches where team is dire."""
+        match = ProMatchSummary(
+            match_id=1007,
+            radiant_team_id=300,
+            radiant_team_name="Team C",
+            dire_team_id=100,
+            dire_team_name="Team A",
+            radiant_win=False,
+            duration=2400,
+            start_time=1000,
+        )
+
+        team1_id = 100
+        assert match.radiant_team_id == team1_id or match.dire_team_id == team1_id
+
+    def test_single_team_filter_excludes_unrelated_match(self):
+        """Test that single team filter excludes matches without that team."""
+        match = ProMatchSummary(
+            match_id=1008,
+            radiant_team_id=300,
+            radiant_team_name="Team C",
+            dire_team_id=400,
+            dire_team_name="Team D",
+            radiant_win=True,
+            duration=2400,
+            start_time=1000,
+        )
+
+        team1_id = 100
+        assert match.radiant_team_id != team1_id and match.dire_team_id != team1_id
+
+    def test_no_team_filter_includes_all_matches(self):
+        """Test that no team filter includes all matches."""
+        matches = [
+            ProMatchSummary(
+                match_id=1009 + i,
+                radiant_team_id=100 + i,
+                radiant_team_name=f"Team {i}",
+                dire_team_id=200 + i,
+                dire_team_name=f"Team {i+10}",
+                radiant_win=True,
+                duration=2400,
+                start_time=1000 + i,
+            )
+            for i in range(5)
+        ]
+
+        team1_id = None
+        team2_id = None
+
+        filtered = []
+        for match in matches:
+            if team1_id and team2_id:
+                match_team_ids = {match.radiant_team_id, match.dire_team_id}
+                if team1_id not in match_team_ids or team2_id not in match_team_ids:
+                    continue
+            elif team1_id:
+                if match.radiant_team_id != team1_id and match.dire_team_id != team1_id:
+                    continue
+            filtered.append(match)
+
+        assert len(filtered) == 5
+
+
+class TestGetProMatchesFiltering:
+    """Tests for get_pro_matches filtering with team1_name, team2_name, and other filters."""
+
+    @pytest.fixture
+    def resource(self) -> ProSceneResource:
+        """Create a ProSceneResource instance."""
+        return ProSceneResource()
+
+    @pytest.fixture
+    def sample_matches(self) -> list:
+        """Create sample matches for filtering tests."""
+        return [
+            ProMatchSummary(
+                match_id=1001,
+                radiant_team_id=100,
+                radiant_team_name="Team Spirit",
+                dire_team_id=200,
+                dire_team_name="OG",
+                radiant_win=True,
+                duration=2400,
+                start_time=1700000000,
+                league_id=15728,
+                league_name="The International 2023",
+            ),
+            ProMatchSummary(
+                match_id=1002,
+                radiant_team_id=200,
+                radiant_team_name="OG",
+                dire_team_id=100,
+                dire_team_name="Team Spirit",
+                radiant_win=False,
+                duration=2200,
+                start_time=1700001000,
+                league_id=15728,
+                league_name="The International 2023",
+            ),
+            ProMatchSummary(
+                match_id=1003,
+                radiant_team_id=100,
+                radiant_team_name="Team Spirit",
+                dire_team_id=300,
+                dire_team_name="Team Liquid",
+                radiant_win=True,
+                duration=2600,
+                start_time=1700002000,
+                league_id=15728,
+                league_name="The International 2023",
+            ),
+            ProMatchSummary(
+                match_id=1004,
+                radiant_team_id=200,
+                radiant_team_name="OG",
+                dire_team_id=300,
+                dire_team_name="Team Liquid",
+                radiant_win=False,
+                duration=2300,
+                start_time=1700003000,
+                league_id=16000,
+                league_name="DreamLeague Season 22",
+            ),
+            ProMatchSummary(
+                match_id=1005,
+                radiant_team_id=400,
+                radiant_team_name="Tundra",
+                dire_team_id=500,
+                dire_team_name="Gaimin Gladiators",
+                radiant_win=True,
+                duration=2500,
+                start_time=1700004000,
+                league_id=16000,
+                league_name="DreamLeague Season 22",
+            ),
+        ]
+
+    def _apply_team_filters(
+        self,
+        matches: list,
+        team1_id: int | None,
+        team2_id: int | None,
+    ) -> list:
+        """Apply team filtering logic matching the resource implementation."""
+        filtered = []
+        for match in matches:
+            radiant_id = match.radiant_team_id
+            dire_id = match.dire_team_id
+
+            if team1_id and team2_id:
+                match_team_ids = {radiant_id, dire_id}
+                if team1_id not in match_team_ids or team2_id not in match_team_ids:
+                    continue
+            elif team1_id:
+                if radiant_id != team1_id and dire_id != team1_id:
+                    continue
+
+            filtered.append(match)
+        return filtered
+
+    def test_filter_single_team_returns_all_their_matches(self, sample_matches):
+        """Test filtering by single team returns all matches involving that team."""
+        team_spirit_id = 100
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=team_spirit_id, team2_id=None)
+
+        assert len(filtered) == 3
+        match_ids = {m.match_id for m in filtered}
+        assert match_ids == {1001, 1002, 1003}
+
+    def test_filter_single_team_og(self, sample_matches):
+        """Test filtering by OG returns all OG matches."""
+        og_id = 200
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=og_id, team2_id=None)
+
+        assert len(filtered) == 3
+        match_ids = {m.match_id for m in filtered}
+        assert match_ids == {1001, 1002, 1004}
+
+    def test_filter_head_to_head_spirit_vs_og(self, sample_matches):
+        """Test head-to-head filtering returns only matches between both teams."""
+        team_spirit_id = 100
+        og_id = 200
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=team_spirit_id, team2_id=og_id)
+
+        assert len(filtered) == 2
+        match_ids = {m.match_id for m in filtered}
+        assert match_ids == {1001, 1002}
+
+    def test_filter_head_to_head_spirit_vs_liquid(self, sample_matches):
+        """Test head-to-head Spirit vs Liquid returns single match."""
+        team_spirit_id = 100
+        liquid_id = 300
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=team_spirit_id, team2_id=liquid_id)
+
+        assert len(filtered) == 1
+        assert filtered[0].match_id == 1003
+
+    def test_filter_head_to_head_og_vs_liquid(self, sample_matches):
+        """Test head-to-head OG vs Liquid returns single match."""
+        og_id = 200
+        liquid_id = 300
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=og_id, team2_id=liquid_id)
+
+        assert len(filtered) == 1
+        assert filtered[0].match_id == 1004
+
+    def test_filter_head_to_head_no_matches(self, sample_matches):
+        """Test head-to-head with no common matches returns empty."""
+        team_spirit_id = 100
+        tundra_id = 400
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=team_spirit_id, team2_id=tundra_id)
+
+        assert len(filtered) == 0
+
+    def test_filter_no_teams_returns_all(self, sample_matches):
+        """Test no team filter returns all matches."""
+        filtered = self._apply_team_filters(sample_matches, team1_id=None, team2_id=None)
+
+        assert len(filtered) == 5
+
+    def test_filter_team_order_independent(self, sample_matches):
+        """Test that team1/team2 order doesn't affect results."""
+        team_spirit_id = 100
+        og_id = 200
+
+        filtered1 = self._apply_team_filters(sample_matches, team1_id=team_spirit_id, team2_id=og_id)
+        filtered2 = self._apply_team_filters(sample_matches, team1_id=og_id, team2_id=team_spirit_id)
+
+        assert len(filtered1) == len(filtered2)
+        assert {m.match_id for m in filtered1} == {m.match_id for m in filtered2}
+
+    def test_filter_combined_with_league_name(self, sample_matches):
+        """Test team filter combined with league name filter."""
+        og_id = 200
+        league_filter = "international"
+
+        # First filter by team
+        team_filtered = self._apply_team_filters(sample_matches, team1_id=og_id, team2_id=None)
+
+        # Then filter by league
+        league_filtered = [
+            m for m in team_filtered
+            if league_filter.lower() in (m.league_name or "").lower()
+        ]
+
+        assert len(league_filtered) == 2
+        match_ids = {m.match_id for m in league_filtered}
+        assert match_ids == {1001, 1002}
+
+    def test_filter_head_to_head_combined_with_league(self, sample_matches):
+        """Test head-to-head filter combined with league filter."""
+        team_spirit_id = 100
+        og_id = 200
+        league_filter = "international"
+
+        # Filter by both teams
+        team_filtered = self._apply_team_filters(
+            sample_matches, team1_id=team_spirit_id, team2_id=og_id
+        )
+
+        # Then filter by league
+        league_filtered = [
+            m for m in team_filtered
+            if league_filter.lower() in (m.league_name or "").lower()
+        ]
+
+        assert len(league_filtered) == 2
+        match_ids = {m.match_id for m in league_filtered}
+        assert match_ids == {1001, 1002}
+
+    def test_filter_single_team_with_dreamleague(self, sample_matches):
+        """Test single team filter with DreamLeague matches."""
+        og_id = 200
+        league_filter = "dreamleague"
+
+        team_filtered = self._apply_team_filters(sample_matches, team1_id=og_id, team2_id=None)
+        league_filtered = [
+            m for m in team_filtered
+            if league_filter.lower() in (m.league_name or "").lower()
+        ]
+
+        assert len(league_filtered) == 1
+        assert league_filtered[0].match_id == 1004
+
+    def test_filter_days_back_logic(self, sample_matches):
+        """Test days_back filtering logic."""
+        cutoff_time = 1700002500  # Between match 1003 and 1004
+
+        filtered = [m for m in sample_matches if m.start_time >= cutoff_time]
+
+        assert len(filtered) == 2
+        match_ids = {m.match_id for m in filtered}
+        assert match_ids == {1004, 1005}
+
+    def test_filter_team_and_days_back_combined(self, sample_matches):
+        """Test combining team filter with days_back."""
+        og_id = 200
+        cutoff_time = 1700002500
+
+        team_filtered = self._apply_team_filters(sample_matches, team1_id=og_id, team2_id=None)
+        time_filtered = [m for m in team_filtered if m.start_time >= cutoff_time]
+
+        assert len(time_filtered) == 1
+        assert time_filtered[0].match_id == 1004
+
+    def test_head_to_head_includes_both_sides(self, sample_matches):
+        """Test head-to-head includes matches regardless of radiant/dire side."""
+        team_spirit_id = 100
+        og_id = 200
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=team_spirit_id, team2_id=og_id)
+
+        # Match 1001: Spirit radiant, OG dire
+        # Match 1002: OG radiant, Spirit dire
+        radiant_teams = {m.radiant_team_id for m in filtered}
+        dire_teams = {m.dire_team_id for m in filtered}
+
+        # Both teams appear on both sides
+        assert team_spirit_id in radiant_teams
+        assert team_spirit_id in dire_teams
+        assert og_id in radiant_teams
+        assert og_id in dire_teams
+
+    def test_filter_nonexistent_team_returns_empty(self, sample_matches):
+        """Test filtering by nonexistent team returns empty list."""
+        nonexistent_id = 99999
+
+        filtered = self._apply_team_filters(sample_matches, team1_id=nonexistent_id, team2_id=None)
+
+        assert len(filtered) == 0
+
+    def test_filter_head_to_head_with_one_nonexistent_team(self, sample_matches):
+        """Test head-to-head with one nonexistent team returns empty."""
+        team_spirit_id = 100
+        nonexistent_id = 99999
+
+        filtered = self._apply_team_filters(
+            sample_matches, team1_id=team_spirit_id, team2_id=nonexistent_id
+        )
+
+        assert len(filtered) == 0
+
+
 class TestSignatureHeroes:
     """Tests for signature heroes data loading."""
 

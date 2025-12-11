@@ -24,9 +24,9 @@ Add to your Claude Desktop config file:
           "args": [
             "run",
             "--frozen",
-            "--project", "/home/user/projects/mcp_replay_dota2",
+            "--project", "/home/user/projects/mcp-replay-dota2",
             "python",
-            "/home/user/projects/mcp_replay_dota2/dota_match_mcp_server.py"
+            "/home/user/projects/mcp-replay-dota2/dota_match_mcp_server.py"
           ]
         }
       }
@@ -43,9 +43,9 @@ Add to your Claude Desktop config file:
           "args": [
             "run",
             "--frozen",
-            "--project", "C:\\Users\\username\\projects\\mcp_replay_dota2",
+            "--project", "C:\\Users\\username\\projects\\mcp-replay-dota2",
             "python",
-            "C:\\Users\\username\\projects\\mcp_replay_dota2\\dota_match_mcp_server.py"
+            "C:\\Users\\username\\projects\\mcp-replay-dota2\\dota_match_mcp_server.py"
           ]
         }
       }
@@ -98,5 +98,5 @@ Claude will automatically:
 - Test manually:
 
 ```bash
-uv run --frozen --project /path/to/mcp_replay_dota2 python /path/to/mcp_replay_dota2/dota_match_mcp_server.py
+uv run --frozen --project /path/to/mcp-replay-dota2 python /path/to/mcp-replay-dota2/dota_match_mcp_server.py
 ```

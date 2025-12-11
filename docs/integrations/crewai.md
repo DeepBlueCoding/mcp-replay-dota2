@@ -24,7 +24,7 @@ from langchain_mcp_adapters import MCPToolkit
 toolkit = MCPToolkit(
     command="uv",
     args=["run", "python", "dota_match_mcp_server.py"],
-    cwd="/path/to/mcp_replay_dota2"
+    cwd="/path/to/mcp-replay-dota2"
 )
 
 # Wrap MCP tools as CrewAI tools

@@ -2,7 +2,7 @@
 Use case validation tests.
 
 Tests validate the documented use cases from:
-https://deepbluecoding.github.io/mcp_replay_dota2/latest/examples/use-cases/
+https://deepbluecoding.github.io/mcp-replay-dota2/latest/examples/use-cases/
 
 Uses pre-parsed replay data from conftest.py fixtures.
 Run with: uv run pytest tests/test_use_cases.py -v
