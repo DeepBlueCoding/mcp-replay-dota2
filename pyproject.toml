@@ -30,6 +30,9 @@ dependencies = [
     "anthropic>=0.75.0",
 ]
 
+[project.scripts]
+dota-match-mcp-server = "dota_match_mcp_server:main"
+
 [project.urls]
 Homepage = "https://github.com/DeepBlueCoding/mcp-replay-dota2"
 Documentation = "https://deepbluecoding.github.io/mcp-replay-dota2/"
