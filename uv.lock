@@ -1258,8 +1258,8 @@ wheels = [
 
 [[package]]
 name = "mcp-replay-dota2"
-version = "1.0.5"
-source = { virtual = "." }
+version = "1.0.7"
+source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "anthropic" },
