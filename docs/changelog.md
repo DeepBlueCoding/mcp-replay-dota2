@@ -6,6 +6,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-12-11
+
+### Added
+
+- **Position (1-5) assignment** for all match tools:
+  - `get_match_heroes`, `get_match_players`, `get_match_draft` now include `position` field
+  - Position determined from OpenDota lane data (`lane_role`) and GPM:
+    - **Pos 1** = Safelane core (lane_role=1, highest GPM)
+    - **Pos 2** = Mid (lane_role=2)
+    - **Pos 3** = Offlane core (lane_role=3, highest GPM)
+    - **Pos 4** = Soft support (higher GPM support)
+    - **Pos 5** = Hard support (lowest GPM support)
+  - Fixes LLM incorrectly guessing positions (e.g., Axe as pos5 instead of pos3)
+
+- **Draft context data** in `get_match_draft` picks:
+  - `counters`: Heroes that counter this pick (bad matchups)
+  - `good_against`: Heroes this pick counters (favorable matchups)
+  - `when_to_pick`: Conditions when this hero is strong
+  - Helps LLM understand draft decisions and counter-picking
+
+### Changed
+
+- `assign_roles()` renamed to `assign_positions()` in match_fetcher.py
+- `DraftAction` model now includes `position`, `counters`, `good_against`, `when_to_pick` fields
+- `HeroStats` and `MatchPlayerInfo` models now include `position` field
+
+---
+
+## [1.1.4] - 2025-12-11
+
+### Changed
+
+- **`get_pro_matches` tool** - Enhanced team filtering with head-to-head support:
+  - Renamed `team_name` parameter to `team1_name`
+  - Added `team2_name` parameter for head-to-head filtering
+  - **Single team filter** (`team1_name` only): Returns all matches involving that team
+  - **Head-to-head filter** (`team1_name` + `team2_name`): Returns only matches where both teams played against each other, regardless of radiant/dire side
+  - Combine with `league_name`, `tier`, and `days_back` for deep filtering (e.g., Spirit vs OG at The International)
+
+---
+
 ## [1.1.3] - 2025-12-10
 
 ### Added

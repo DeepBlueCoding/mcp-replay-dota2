@@ -109,6 +109,7 @@ class HeroStats(BaseModel):
     team: Literal["radiant", "dire"] = Field(description="Team")
     player_name: Optional[str] = Field(default=None, description="Player name")
     pro_name: Optional[str] = Field(default=None, description="Pro player name if known")
+    position: Optional[int] = Field(default=None, description="Position 1-5")
     kills: int = Field(description="Kills")
     deaths: int = Field(description="Deaths")
     assists: int = Field(description="Assists")
@@ -145,6 +146,7 @@ class MatchPlayerInfo(BaseModel):
     hero_id: int = Field(description="Hero ID")
     hero_name: str = Field(description="Hero internal name")
     localized_name: str = Field(description="Hero display name")
+    position: Optional[int] = Field(default=None, description="Position 1-5")
 
 
 class MatchPlayersResponse(BaseModel):

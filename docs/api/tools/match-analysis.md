@@ -559,7 +559,7 @@ get_rune_pickups(match_id=8461956309)
 
 ## get_match_draft
 
-Complete draft with bans and picks in order (for Captains Mode matches).
+Complete draft with bans and picks in order (for Captains Mode matches). Includes **position assignment** and **drafting context** (counters, good matchups, when to pick) for each hero.
 
 ```python
 get_match_draft(match_id=8461956309)
@@ -572,8 +572,30 @@ get_match_draft(match_id=8461956309)
   "game_mode": 2,
   "game_mode_name": "Captains Mode",
   "actions": [
-    {"order": 1, "is_pick": false, "team": "radiant", "hero_id": 23, "hero_name": "kunkka", "localized_name": "Kunkka"},
-    {"order": 8, "is_pick": true, "team": "dire", "hero_id": 89, "hero_name": "naga_siren", "localized_name": "Naga Siren"}
+    {
+      "order": 1,
+      "is_pick": false,
+      "team": "radiant",
+      "hero_id": 23,
+      "hero_name": "kunkka",
+      "localized_name": "Kunkka",
+      "position": null,
+      "counters": [{"hero_id": 6, "localized_name": "Doom", "reason": "Doom disables all abilities..."}],
+      "good_against": [{"hero_id": 32, "localized_name": "Riki", "reason": "Torrent and X reveal invis..."}],
+      "when_to_pick": ["Team needs stun setup", "Against melee cores"]
+    },
+    {
+      "order": 8,
+      "is_pick": true,
+      "team": "dire",
+      "hero_id": 89,
+      "hero_name": "naga_siren",
+      "localized_name": "Naga Siren",
+      "position": 1,
+      "counters": [...],
+      "good_against": [...],
+      "when_to_pick": [...]
+    }
   ],
   "radiant_picks": [...],
   "radiant_bans": [...],
@@ -581,6 +603,19 @@ get_match_draft(match_id=8461956309)
   "dire_bans": [...]
 }
 ```
+
+**Position Field:**
+
+- `position` is `1-5` for picks (determined from OpenDota lane data and GPM):
+  - **1** = Carry (safelane core)
+  - **2** = Mid
+  - **3** = Offlane
+  - **4** = Soft support
+  - **5** = Hard support
+- `position` is `null` for bans (hero wasn't picked)
+
+!!! tip "Draft Analysis"
+    Use `counters`, `good_against`, and `when_to_pick` fields to analyze draft decisions. The `position` field tells you which role the hero was played in.
 
 ---
 
@@ -617,7 +652,7 @@ get_match_info(match_id=8461956309)
 
 ## get_match_heroes
 
-Get the 10 heroes in a match with detailed stats and **counter picks data** for draft analysis.
+Get the 10 heroes in a match with detailed stats, **position assignment**, and **counter picks data** for draft analysis.
 
 ```python
 get_match_heroes(match_id=8461956309)
@@ -632,6 +667,7 @@ get_match_heroes(match_id=8461956309)
       "hero_name": "antimage",
       "localized_name": "Anti-Mage",
       "team": "radiant",
+      "position": 1,
       "lane": "safe_lane",
       "role": "core",
       "kills": 8,
@@ -658,14 +694,24 @@ get_match_heroes(match_id=8461956309)
 }
 ```
 
+**Position Field:**
+
+| Position | Role | Lane |
+|----------|------|------|
+| 1 | Carry | Safelane core |
+| 2 | Mid | Mid lane |
+| 3 | Offlane | Offlane core |
+| 4 | Soft support | Higher GPM support |
+| 5 | Hard support | Lowest GPM support |
+
 !!! tip "Draft Analysis"
-    Use the `counters` and `good_against` fields to analyze draft advantages. Check which enemy heroes counter each of your picks, and identify favorable matchups.
+    Use the `counters` and `good_against` fields to analyze draft advantages. The `position` field tells you which role each hero played (1-5).
 
 ---
 
 ## get_match_players
 
-Get the 10 players in a match with their hero assignments.
+Get the 10 players in a match with their hero assignments and **position (1-5)**.
 
 ```python
 get_match_players(match_id=8461956309)
@@ -674,17 +720,19 @@ get_match_players(match_id=8461956309)
 **Returns:**
 ```json
 {
-  "radiant_players": [
+  "radiant": [
     {
       "player_name": "PlayerOne",
       "pro_name": "Yatoro",
       "account_id": 311360822,
-      "team": "radiant",
       "hero_id": 1,
       "hero_name": "antimage",
-      "localized_name": "Anti-Mage"
+      "localized_name": "Anti-Mage",
+      "position": 1
     }
   ],
-  "dire_players": [...]
+  "dire": [...]
 }
 ```
+
+The `position` field indicates the player's role (1=carry, 2=mid, 3=offlane, 4=soft support, 5=hard support) based on lane assignment and farm priority (GPM).

@@ -4,14 +4,18 @@ Match info parser for extracting match metadata and draft from Dota 2 replays.
 Uses v2 ParsedReplayData which contains game_info from python-manta.
 """
 
+import json
 import logging
-from typing import Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from python_manta import Team
 
+from src.models.hero_counters import HeroCounters, HeroCountersDatabase
 from src.models.match_info import (
     DraftAction,
     DraftResult,
+    HeroMatchupInfo,
     MatchInfoResult,
     PlayerInfo,
     TeamInfo,
@@ -55,7 +59,57 @@ class MatchInfoParser:
     """Parses match info and draft data from Dota 2 replays."""
 
     def __init__(self):
-        pass
+        self._hero_counters: Optional[HeroCountersDatabase] = None
+
+    def _load_hero_counters(self) -> Optional[HeroCountersDatabase]:
+        """Load hero counters database from JSON file."""
+        if self._hero_counters is not None:
+            return self._hero_counters
+
+        counters_path = Path(__file__).parent.parent.parent / "data" / "constants" / "hero_counters.json"
+        if not counters_path.exists():
+            logger.warning(f"Hero counters file not found: {counters_path}")
+            return None
+
+        with open(counters_path) as f:
+            data = json.load(f)
+            self._hero_counters = HeroCountersDatabase(**data)
+
+        return self._hero_counters
+
+    def _get_hero_counters(self, hero_id: int) -> Optional[HeroCounters]:
+        """Get counter data for a specific hero."""
+        counters_db = self._load_hero_counters()
+        if not counters_db:
+            return None
+        return counters_db.heroes.get(str(hero_id))
+
+    def _build_matchup_info(
+        self, counters: Optional[HeroCounters]
+    ) -> tuple[List[HeroMatchupInfo], List[HeroMatchupInfo], List[str]]:
+        """Build matchup info lists from hero counters data."""
+        if not counters:
+            return [], [], []
+
+        counter_list = [
+            HeroMatchupInfo(
+                hero_id=c.hero_id,
+                localized_name=c.localized_name,
+                reason=c.reason
+            )
+            for c in counters.counters
+        ]
+
+        good_against_list = [
+            HeroMatchupInfo(
+                hero_id=g.hero_id,
+                localized_name=g.localized_name,
+                reason=g.reason
+            )
+            for g in counters.good_against
+        ]
+
+        return counter_list, good_against_list, counters.when_to_pick
 
     def _get_hero_info(self, hero_id: int) -> tuple[str, str]:
         """Get hero internal name and localized name from hero_id."""
@@ -77,12 +131,17 @@ class MatchInfoParser:
         secs = int(seconds % 60)
         return f"{minutes}:{secs:02d}"
 
-    def get_draft(self, data: ParsedReplayData) -> Optional[DraftResult]:
+    def get_draft(
+        self,
+        data: ParsedReplayData,
+        hero_positions: Optional[Dict[int, int]] = None
+    ) -> Optional[DraftResult]:
         """
         Get draft information from parsed replay data.
 
         Args:
             data: ParsedReplayData from ReplayService
+            hero_positions: Optional mapping of hero_id -> position (1-5) from OpenDota
 
         Returns:
             DraftResult with all picks and bans in order, or None on error
@@ -93,6 +152,7 @@ class MatchInfoParser:
                 logger.error("No game info in parsed data")
                 return None
 
+            hero_positions = hero_positions or {}
             actions = []
             radiant_picks = []
             radiant_bans = []
@@ -103,6 +163,10 @@ class MatchInfoParser:
                 team = "radiant" if pb.team == Team.RADIANT.value else "dire"
                 hero_name, hero_localized = self._get_hero_info(pb.hero_id)
 
+                counters, good_against, when_to_pick = self._build_matchup_info(
+                    self._get_hero_counters(pb.hero_id)
+                )
+
                 action = DraftAction(
                     order=i + 1,
                     is_pick=pb.is_pick,
@@ -110,6 +174,10 @@ class MatchInfoParser:
                     hero_id=pb.hero_id,
                     hero_name=hero_name,
                     localized_name=hero_localized,
+                    position=hero_positions.get(pb.hero_id) if pb.is_pick else None,
+                    counters=counters,
+                    good_against=good_against,
+                    when_to_pick=when_to_pick,
                 )
                 actions.append(action)
 

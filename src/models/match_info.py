@@ -1,8 +1,16 @@
 """Pydantic models for match info and draft data."""
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+class HeroMatchupInfo(BaseModel):
+    """Simplified matchup info for draft context."""
+
+    hero_id: int = Field(description="Hero ID")
+    localized_name: str = Field(description="Hero display name")
+    reason: str = Field(description="Explanation of the matchup")
 
 
 class DraftAction(BaseModel):
@@ -14,6 +22,10 @@ class DraftAction(BaseModel):
     hero_id: int = Field(description="Hero ID")
     hero_name: str = Field(description="Hero internal name (e.g., 'juggernaut')")
     localized_name: str = Field(description="Hero display name (e.g., 'Juggernaut')")
+    position: Optional[int] = Field(default=None, description="Position 1-5 if known")
+    counters: List[HeroMatchupInfo] = Field(default_factory=list, description="Bad matchups")
+    good_against: List[HeroMatchupInfo] = Field(default_factory=list, description="Good matchups")
+    when_to_pick: List[str] = Field(default_factory=list, description="When this hero is strong")
 
 
 class DraftResult(BaseModel):

@@ -164,11 +164,29 @@ def register_match_tools(mcp, services):
             success=True, match_id=match_id, minute=minute, players=players
         )
 
+    async def _get_hero_positions_from_opendota(match_id: int) -> Dict[int, int]:
+        """Fetch hero positions (1-5) from OpenDota API."""
+        hero_positions: Dict[int, int] = {}
+        try:
+            match_data = await match_fetcher.get_match(match_id)
+            if match_data and "players" in match_data:
+                from ..utils.match_fetcher import assign_positions
+                players = match_data["players"]
+                assign_positions(players)
+                for player in players:
+                    hero_id = player.get("hero_id")
+                    position = player.get("position")
+                    if hero_id and position:
+                        hero_positions[hero_id] = position
+        except Exception:
+            pass
+        return hero_positions
+
     @mcp.tool
     async def get_match_draft(
         match_id: int, ctx: Optional[Context] = None
     ) -> MatchDraftResponse:
-        """Get the complete draft (picks and bans) for a Dota 2 match."""
+        """Get the complete draft (picks and bans) for a Dota 2 match with drafting context."""
         from ..utils.match_info_parser import match_info_parser
 
         async def progress_callback(current: int, total: int, message: str) -> None:
@@ -180,7 +198,8 @@ def register_match_tools(mcp, services):
         except ValueError as e:
             return MatchDraftResponse(success=False, match_id=match_id, error=str(e))
 
-        draft = match_info_parser.get_draft(data)
+        hero_positions = await _get_hero_positions_from_opendota(match_id)
+        draft = match_info_parser.get_draft(data, hero_positions=hero_positions)
         if not draft:
             return MatchDraftResponse(
                 success=False, match_id=match_id, error="Could not parse draft"
@@ -237,6 +256,7 @@ def register_match_tools(mcp, services):
                     team="radiant",
                     player_name=h.get("player_name"),
                     pro_name=h.get("pro_name"),
+                    position=h.get("position"),
                     kills=h.get("kills", 0),
                     deaths=h.get("deaths", 0),
                     assists=h.get("assists", 0),
@@ -266,6 +286,7 @@ def register_match_tools(mcp, services):
                     team="dire",
                     player_name=h.get("player_name"),
                     pro_name=h.get("pro_name"),
+                    position=h.get("position"),
                     kills=h.get("kills", 0),
                     deaths=h.get("deaths", 0),
                     assists=h.get("assists", 0),
@@ -312,6 +333,7 @@ def register_match_tools(mcp, services):
                     hero_id=h.get("hero_id", 0),
                     hero_name=h.get("hero_name", ""),
                     localized_name=h.get("localized_name", ""),
+                    position=h.get("position"),
                 )
                 for h in heroes
                 if h.get("team") == "radiant"
@@ -324,6 +346,7 @@ def register_match_tools(mcp, services):
                     hero_id=h.get("hero_id", 0),
                     hero_name=h.get("hero_name", ""),
                     localized_name=h.get("localized_name", ""),
+                    position=h.get("position"),
                 )
                 for h in heroes
                 if h.get("team") == "dire"
