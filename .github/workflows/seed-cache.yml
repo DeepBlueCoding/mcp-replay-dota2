@@ -1,0 +1,108 @@
+name: Seed Test Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: 'Match ID to download and parse'
+        required: true
+        default: '8594217096'
+
+env:
+  REPLAY_DIR: ~/dota2/replays
+
+jobs:
+  seed-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Restore existing parsed cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/mcp_dota2/parsed_replays_v2
+          key: parsed-all-matches-v1
+          restore-keys: |
+            parsed-8461956309-v4
+            parsed-
+
+      - name: Restore existing replay cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/dota2/replays
+          key: replays-all-v1
+          restore-keys: |
+            replay-8461956309-v2
+            replay-
+
+      - name: Download replay
+        run: |
+          mkdir -p ~/dota2/replays
+          MATCH_ID=${{ github.event.inputs.match_id }}
+          if [ ! -f ~/dota2/replays/${MATCH_ID}.dem ]; then
+            echo "Downloading replay ${MATCH_ID}..."
+            uv run python -c "
+          import asyncio
+          from src.utils.replay_downloader import ReplayDownloader
+          downloader = ReplayDownloader()
+          asyncio.run(downloader.download_replay(${MATCH_ID}))
+          "
+          else
+            echo "Replay ${MATCH_ID} already cached"
+          fi
+
+      - name: Verify replay file
+        run: |
+          MATCH_ID=${{ github.event.inputs.match_id }}
+          REPLAY_FILE=~/dota2/replays/${MATCH_ID}.dem
+          if [ ! -f "$REPLAY_FILE" ]; then
+            echo "ERROR: Replay file not found!"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "$REPLAY_FILE")
+          echo "Replay file size: $SIZE bytes"
+          if [ "$SIZE" -lt 100000000 ]; then
+            echo "ERROR: Replay file too small, likely corrupted"
+            exit 1
+          fi
+          echo "Replay file verified OK"
+
+      - name: Parse replay
+        timeout-minutes: 15
+        run: |
+          MATCH_ID=${{ github.event.inputs.match_id }}
+          echo "Parsing replay ${MATCH_ID}..."
+          uv run python -c "
+          import asyncio
+          from src.services.replay.replay_service import ReplayService
+          rs = ReplayService()
+          data = asyncio.run(rs.get_parsed_data(${MATCH_ID}))
+          print(f'Parsed {len(data.combat_log_entries)} combat log entries')
+          "
+          echo "Parse complete"
+
+      - name: Save parsed cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/mcp_dota2/parsed_replays_v2
+          key: parsed-all-matches-v1
+
+      - name: Save replay cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/dota2/replays
+          key: replays-all-v1

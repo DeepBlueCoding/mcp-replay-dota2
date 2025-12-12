@@ -7,7 +7,8 @@ on:
     branches: [master]
 
 env:
-  TEST_MATCH_ID: "8461956309"
+  TEST_MATCH_ID_1: "8461956309"
+  TEST_MATCH_ID_2: "8594217096"
   REPLAY_DIR: ~/dota2/replays
 
 jobs:
@@ -38,61 +39,100 @@ jobs:
       - name: Type check with mypy
         run: uv run mypy src/ dota_match_mcp_server.py --ignore-missing-imports
 
-      - name: Cache test replay
-        id: cache-replay
-        uses: actions/cache@v4
+      - name: Restore replay cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/dota2/replays
-          key: replay-${{ env.TEST_MATCH_ID }}-v2
+          key: replays-all-v1
+          restore-keys: |
+            replay-${{ env.TEST_MATCH_ID_1 }}-v2
+            replay-
 
-      - name: Cache parsed replay data
-        id: cache-parsed
-        uses: actions/cache@v4
+      - name: Restore parsed cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/mcp_dota2/parsed_replays_v2
-          key: parsed-${{ env.TEST_MATCH_ID }}-v4
+          key: parsed-all-matches-v1
+          restore-keys: |
+            parsed-${{ env.TEST_MATCH_ID_1 }}-v4
+            parsed-
 
-      - name: Download test replay
-        if: steps.cache-replay.outputs.cache-hit != 'true'
+      - name: Download missing replays
         run: |
           mkdir -p ~/dota2/replays
-          uv run python -c "
+          for MATCH_ID in ${{ env.TEST_MATCH_ID_1 }} ${{ env.TEST_MATCH_ID_2 }}; do
+            if [ ! -f ~/dota2/replays/${MATCH_ID}.dem ]; then
+              echo "Downloading replay ${MATCH_ID}..."
+              uv run python -c "
           import asyncio
           from src.utils.replay_downloader import ReplayDownloader
           downloader = ReplayDownloader()
-          asyncio.run(downloader.download_replay(${{ env.TEST_MATCH_ID }}))
+          asyncio.run(downloader.download_replay(${MATCH_ID}))
           "
+            else
+              echo "Replay ${MATCH_ID} already cached"
+            fi
+          done
 
-      - name: Verify replay file
+      - name: Verify replay files
         run: |
-          REPLAY_FILE=~/dota2/replays/${{ env.TEST_MATCH_ID }}.dem
-          if [ ! -f "$REPLAY_FILE" ]; then
-            echo "ERROR: Replay file not found!"
-            exit 1
-          fi
-          SIZE=$(stat -c%s "$REPLAY_FILE")
-          echo "Replay file size: $SIZE bytes"
-          # Replay should be at least 100MB (this match is ~400MB)
-          if [ "$SIZE" -lt 100000000 ]; then
-            echo "ERROR: Replay file too small, likely corrupted"
-            exit 1
-          fi
-          echo "Replay file verified OK"
+          for MATCH_ID in ${{ env.TEST_MATCH_ID_1 }} ${{ env.TEST_MATCH_ID_2 }}; do
+            REPLAY_FILE=~/dota2/replays/${MATCH_ID}.dem
+            if [ ! -f "$REPLAY_FILE" ]; then
+              echo "ERROR: Replay file $MATCH_ID not found!"
+              exit 1
+            fi
+            SIZE=$(stat -c%s "$REPLAY_FILE")
+            echo "Replay $MATCH_ID size: $SIZE bytes"
+            if [ "$SIZE" -lt 100000000 ]; then
+              echo "ERROR: Replay file $MATCH_ID too small, likely corrupted"
+              exit 1
+            fi
+          done
+          echo "All replay files verified OK"
 
-      - name: Pre-parse replay (populate cache)
-        if: steps.cache-parsed.outputs.cache-hit != 'true'
-        timeout-minutes: 10
+      - name: Check and parse missing matches
+        timeout-minutes: 15
         run: |
-          echo "Parsed replay cache not found, pre-parsing..."
-          uv run python -c "
+          echo "Checking which matches need parsing..."
+          uv run python << 'EOF'
           import asyncio
-          from src.services.replay.replay_service import ReplayService
-          rs = ReplayService()
-          data = asyncio.run(rs.get_parsed_data(${{ env.TEST_MATCH_ID }}))
-          print(f'Parsed {len(data.combat_log_entries)} combat log entries')
-          "
-          echo "Pre-parse complete, cache populated"
+          import os
+          from diskcache import Cache
+
+          cache_dir = os.path.expanduser('~/.cache/mcp_dota2/parsed_replays_v2')
+          os.makedirs(cache_dir, exist_ok=True)
+
+          matches_to_parse = []
+          try:
+              cache = Cache(cache_dir)
+              for match_id in [8461956309, 8594217096]:
+                  if match_id not in cache:
+                      print(f"Match {match_id} not in cache, will parse")
+                      matches_to_parse.append(match_id)
+                  else:
+                      print(f"Match {match_id} already cached")
+              cache.close()
+          except Exception as e:
+              print(f"Cache error: {e}")
+              matches_to_parse = [8461956309, 8594217096]
+
+          if matches_to_parse:
+              from src.services.replay.replay_service import ReplayService
+              rs = ReplayService()
+              for match_id in matches_to_parse:
+                  print(f"Parsing match {match_id}...")
+                  data = asyncio.run(rs.get_parsed_data(match_id))
+                  print(f"Parsed {len(data.combat_log_entries)} combat log entries")
+          else:
+              print("All matches already cached!")
+          EOF
 
       - name: Run tests
         timeout-minutes: 15
         run: uv run pytest tests/ -v
+
+      - name: Save updated caches
+        if: always()
+        run: |
+          echo "Caches will be saved automatically by actions/cache"

@@ -780,6 +780,143 @@ def lane_summary_2(parsed_replay_data_2):
     return ls.get_lane_summary(parsed_replay_data_2)
 
 
+@pytest.fixture(scope="session")
+def all_fights_2(parsed_replay_data_2):
+    """All fights from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return None
+    fs = _get_fight_service()
+    return fs.get_all_fights(parsed_replay_data_2)
+
+
+@pytest.fixture(scope="session")
+def combat_log_1800_1900_2(parsed_replay_data_2):
+    """Combat log 30:00-31:40 from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_combat_log(parsed_replay_data_2, start_time=1800, end_time=1900)
+
+
+@pytest.fixture(scope="session")
+def combat_log_narrative_2(parsed_replay_data_2):
+    """Combat log 30:00-31:40 NARRATIVE from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_combat_log(
+        parsed_replay_data_2, start_time=1800, end_time=1900,
+        detail_level=DetailLevel.NARRATIVE
+    )
+
+
+@pytest.fixture(scope="session")
+def combat_log_tactical_2(parsed_replay_data_2):
+    """Combat log 30:00-31:40 TACTICAL from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_combat_log(
+        parsed_replay_data_2, start_time=1800, end_time=1900,
+        detail_level=DetailLevel.TACTICAL
+    )
+
+
+@pytest.fixture(scope="session")
+def combat_log_full_2(parsed_replay_data_2):
+    """Combat log 30:00-31:40 FULL from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_combat_log(
+        parsed_replay_data_2, start_time=1800, end_time=1900,
+        detail_level=DetailLevel.FULL
+    )
+
+
+@pytest.fixture(scope="session")
+def combat_log_juggernaut_2(parsed_replay_data_2):
+    """Combat log filtered to Juggernaut from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_combat_log(
+        parsed_replay_data_2, start_time=1800, end_time=1900,
+        hero_filter="juggernaut"
+    )
+
+
+@pytest.fixture(scope="session")
+def item_purchases_2(parsed_replay_data_2):
+    """Item purchases from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_item_purchases(parsed_replay_data_2)
+
+
+@pytest.fixture(scope="session")
+def item_purchases_juggernaut_2(parsed_replay_data_2):
+    """Item purchases for Juggernaut from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return []
+    cs = _get_combat_service()
+    return cs.get_item_purchases(parsed_replay_data_2, hero_filter="juggernaut")
+
+
+@pytest.fixture(scope="session")
+def juggernaut_farming_2(parsed_replay_data_2):
+    """Farming pattern for Juggernaut (0-15 min) from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return None
+    fs = _get_farming_service()
+    return fs.get_farming_pattern(
+        parsed_replay_data_2, "juggernaut", start_minute=0, end_minute=15, item_timings=[]
+    )
+
+
+@pytest.fixture(scope="session")
+def void_spirit_farming_2(parsed_replay_data_2):
+    """Farming pattern for Void Spirit (0-15 min) from match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return None
+    fs = _get_farming_service()
+    return fs.get_farming_pattern(
+        parsed_replay_data_2, "void_spirit", start_minute=0, end_minute=15, item_timings=[]
+    )
+
+
+@pytest.fixture(scope="session")
+def cs_at_10_2(parsed_replay_data_2):
+    """CS data at 10 minutes for match 8594217096."""
+    if parsed_replay_data_2 is None:
+        return {}
+    ls = _get_lane_service()
+    return ls.get_cs_at_minute(parsed_replay_data_2, 10)
+
+
+@pytest.fixture(scope="session")
+def hero_combat_analysis_juggernaut_2(parsed_replay_data_2, all_fights_2):
+    """Hero combat analysis for Juggernaut from match 8594217096."""
+    if parsed_replay_data_2 is None or all_fights_2 is None:
+        return None
+    cs = _get_combat_service()
+    return cs.get_hero_combat_analysis(
+        parsed_replay_data_2, TEST_MATCH_ID_2, "juggernaut", all_fights_2.fights
+    )
+
+
+@pytest.fixture(scope="session")
+def hero_combat_analysis_centaur_2(parsed_replay_data_2, all_fights_2):
+    """Hero combat analysis for Centaur from match 8594217096."""
+    if parsed_replay_data_2 is None or all_fights_2 is None:
+        return None
+    cs = _get_combat_service()
+    return cs.get_hero_combat_analysis(
+        parsed_replay_data_2, TEST_MATCH_ID_2, "centaur", all_fights_2.fights
+    )
+
+
 # =============================================================================
 # Pro Scene fixtures (real data from OpenDota)
 # =============================================================================

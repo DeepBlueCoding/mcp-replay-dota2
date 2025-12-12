@@ -13,8 +13,8 @@ uv run ruff check src/ tests/ dota_match_mcp_server.py
 # 2. Type check
 uv run mypy src/ dota_match_mcp_server.py --ignore-missing-imports
 
-# 3. Tests (skip integration if no replay available)
-uv run pytest -m "not integration"
+# 3. Tests (requires replay files in ~/dota2/replays/)
+uv run pytest
 ```
 
 **ALL THREE must pass before committing.** Do not push code that fails any step.
@@ -29,9 +29,6 @@ uv run pytest tests/
 
 # Run specific tests
 uv run pytest tests/test_combat_log_parser.py -v
-
-# Skip integration tests (require replays)
-uv run pytest -m "not integration"
 
 # Fetch latest constants from dotaconstants
 uv run python scripts/fetch_constants.py
@@ -249,21 +246,17 @@ Multi-camp detection example:
    ```bash
    uv run ruff check src/ tests/ dota_match_mcp_server.py
    uv run mypy src/ dota_match_mcp_server.py --ignore-missing-imports
-   uv run pytest -m "not integration"
+   uv run pytest
    ```
 
-With disk caching (`ReplayService`), the full test suite runs in ~3 seconds once the replay is cached.
+With disk caching (`ReplayService`), the full test suite runs in ~15 seconds once replays are cached.
 
 ### Adding New Tests
 
 1. Check if data already exists in conftest.py fixtures
 2. If not, add a new fixture that parses ONCE at session start
 3. Tests should use fixtures, not parse replays themselves
-
-**For unit tests that don't need replay data:**
-- Don't request any replay fixtures (hero_deaths, combat_log_*, etc.)
-- Tests will run fast (<1 second) without triggering replay parsing
-- Replay is only parsed when a fixture that needs it is requested
+4. All tests require replay files in `~/dota2/replays/` (matches 8461956309 and 8594217096)
 
 ### Adding New Parsers/Tools
 
