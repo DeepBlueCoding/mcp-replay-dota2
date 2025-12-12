@@ -4,7 +4,16 @@ High-resolution game state analysis tools. Many of these are **parallel-safe** a
 
 ## list_fights
 
-List all fights in a match. Fights are grouped by deaths occurring within 15 seconds of each other.
+List all fights/skirmishes in a match with death summaries.
+
+!!! warning "When NOT to use"
+    - You already called `get_hero_performance` → It includes `fights[]` array
+    - Asking about specific hero → Use `get_hero_performance` instead
+
+**Use for:**
+
+- "How many fights happened?" / "List all teamfights"
+- "When were the major fights?" (overview, not hero-specific)
 
 ```python
 list_fights(match_id=8461956309)
@@ -33,10 +42,29 @@ list_fights(match_id=8461956309)
 
 ## get_teamfights
 
-Get only major teamfights (3+ deaths by default).
+Get major teamfights (3+ deaths) with coaching analysis.
+
+!!! warning "When NOT to use"
+    - You already called `get_hero_performance` → It includes teamfight participation
+    - Asking about specific hero → Use `get_hero_performance` instead
+
+**Use for:**
+
+- "What were the big teamfights?" / "Analyze the teamfights"
+- General teamfight overview (not hero-specific)
 
 ```python
 get_teamfights(match_id=8461956309, min_deaths=3)
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "total_teamfights": 5,
+  "teamfights": [...],
+  "coaching_analysis": "AI analysis of the biggest teamfight (if client supports sampling)"
+}
 ```
 
 ---
@@ -111,7 +139,7 @@ get_jungle_summary(match_id=8461956309)
 
 ## get_lane_summary
 
-Laning phase analysis (first 10 minutes).
+Laning phase analysis (first 10 minutes) with coaching analysis.
 
 ```python
 get_lane_summary(match_id=8461956309)
@@ -134,7 +162,8 @@ get_lane_summary(match_id=8461956309)
       "gold_10min": 4850,
       "level_10min": 10
     }
-  ]
+  ],
+  "coaching_analysis": "AI analysis of laning phase (if client supports sampling)"
 }
 ```
 

@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.models.types import CoercedInt
+
 
 class CreepKill(BaseModel):
     """A single creep kill event."""
@@ -59,14 +61,14 @@ class MultiCampClear(BaseModel):
     time_str: str = Field(description="Game time when multi-camp clear started (M:SS)")
     camps: List[str] = Field(description="List of camp types cleared together")
     duration_seconds: float = Field(description="Time span of all kills in this clear")
-    creeps_killed: int = Field(description="Total creeps killed across all camps")
+    creeps_killed: CoercedInt = Field(description="Total creeps killed across all camps")
     area: str = Field(description="Map area where multi-camp clear occurred")
 
 
 class MinuteFarmingData(BaseModel):
     """Farming data for a single minute."""
 
-    minute: int = Field(description="Game minute")
+    minute: CoercedInt = Field(description="Game minute")
 
     # Position at minute boundaries
     position_at_start: Optional[MapPositionSnapshot] = Field(
@@ -83,23 +85,23 @@ class MinuteFarmingData(BaseModel):
     )
 
     # Summary counts
-    lane_creeps_killed: int = Field(
+    lane_creeps_killed: CoercedInt = Field(
         default=0, description="Lane creeps killed during this minute"
     )
-    camps_cleared: int = Field(
+    camps_cleared: CoercedInt = Field(
         default=0, description="Number of neutral camps cleared during this minute"
     )
 
     # Stats at end of minute
-    gold: int = Field(default=0, description="Net worth at end of minute")
-    last_hits: int = Field(default=0, description="Total last hits at end of minute")
-    level: int = Field(default=1, description="Hero level at end of minute")
+    gold: CoercedInt = Field(default=0, description="Net worth at end of minute")
+    last_hits: CoercedInt = Field(default=0, description="Total last hits at end of minute")
+    level: CoercedInt = Field(default=1, description="Hero level at end of minute")
 
 
 class LevelTiming(BaseModel):
     """Timing for when a hero reached a specific level."""
 
-    level: int = Field(description="Hero level reached")
+    level: CoercedInt = Field(description="Hero level reached")
     time: float = Field(description="Game time in seconds")
     time_str: str = Field(description="Game time formatted as M:SS")
 
@@ -138,10 +140,10 @@ class FarmingTransitions(BaseModel):
 class FarmingSummary(BaseModel):
     """Summary statistics for farming pattern."""
 
-    total_lane_creeps: int = Field(
+    total_lane_creeps: CoercedInt = Field(
         default=0, description="Total lane creeps killed in the time range"
     )
-    total_neutral_creeps: int = Field(
+    total_neutral_creeps: CoercedInt = Field(
         default=0, description="Total neutral creeps killed in the time range"
     )
     jungle_percentage: float = Field(
@@ -155,7 +157,7 @@ class FarmingSummary(BaseModel):
         default_factory=dict,
         description="Total neutral kills by camp type"
     )
-    multi_camp_clears: int = Field(
+    multi_camp_clears: CoercedInt = Field(
         default=0, description="Number of times hero farmed 2+ camps simultaneously"
     )
 
@@ -166,8 +168,8 @@ class FarmingPatternResponse(BaseModel):
     success: bool
     match_id: int
     hero: str = Field(description="Hero name analyzed")
-    start_minute: int = Field(description="Start of analysis range")
-    end_minute: int = Field(description="End of analysis range")
+    start_minute: CoercedInt = Field(description="Start of analysis range")
+    end_minute: CoercedInt = Field(description="End of analysis range")
 
     # Power spike tracking
     level_timings: List[LevelTiming] = Field(

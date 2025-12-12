@@ -36,7 +36,19 @@ If already cached:
 
 ## get_hero_deaths
 
-All hero deaths in the match.
+Chronological list of ALL hero deaths in the match.
+
+!!! warning "When NOT to use"
+    - You already called `get_hero_performance` → It includes deaths per hero
+    - Asking about specific hero's deaths → Use `get_hero_performance` instead
+    - Asking about ability effectiveness → Use `get_hero_performance` instead
+
+**Use for:**
+
+- "Show me all deaths in the game" (global death timeline)
+- "Who died the most?" (need to count across all heroes)
+- "What was first blood?" (earliest death)
+- Death pattern analysis across entire match
 
 ```python
 get_hero_deaths(match_id=8461956309)
@@ -56,7 +68,8 @@ get_hero_deaths(match_id=8461956309)
       "ability": "disruptor_thunder_strike",
       "position": {"x": 4200, "y": 1800, "region": "dire_safelane", "location": "Dire safelane near tower"}
     }
-  ]
+  ],
+  "coaching_analysis": "AI analysis of death patterns (if client supports sampling)"
 }
 ```
 
@@ -64,16 +77,28 @@ get_hero_deaths(match_id=8461956309)
 
 ## get_hero_performance
 
-**THE PRIMARY TOOL for analyzing a hero's performance in a match.** Use this for ANY question about how a player/hero performed.
+**THE PRIMARY TOOL for hero/ability analysis.** Use this FIRST and ONLY for any question about how a player/hero/ability performed.
 
-**Use this for:**
+**Use for:**
 
-- "How did Whitemon's Jakiro perform?"
-- "What was Collapse's impact on Mars?"
-- "How many Ice Paths landed?"
-- "Show me Yatoro's fight participation"
+- "How did X hero perform?" / "How many kills did X get?"
+- "How many Chronospheres landed?" / "Analyze Lasso effectiveness"
+- "Show me fight participation" / "What was X's impact?"
 
-Returns per-fight statistics including kills, deaths, assists, ability usage with hit rates, and damage dealt/received.
+**Response includes (no need for additional tools):**
+
+- `total_kills`, `total_deaths`, `total_assists` (aggregated)
+- `ability_summary`: casts, hero_hits, hit_rate per ability
+- `fights[]`: per-fight breakdown with kills/deaths/abilities used
+- `coaching_analysis`: AI evaluation (if client supports sampling)
+
+!!! danger "DO NOT chain to other tools after this"
+    - ❌ Don't call `get_fight_combat_log` - `fights[]` already has per-fight data
+    - ❌ Don't call `get_hero_deaths` - `total_deaths` already included
+    - ❌ Don't call `list_fights` - `fights[]` already lists all fights
+
+**For ability questions:** Use `ability_filter` param (e.g., "flaming_lasso", "chronosphere").
+The response shows: casts, hits on heroes, and kills in fights where ability was used.
 
 ```python
 get_hero_performance(
@@ -136,14 +161,16 @@ get_hero_performance(
 
 ## get_raw_combat_events
 
-Raw combat events for a **SPECIFIC TIME WINDOW ONLY**.
+Raw combat events for a **SPECIFIC TIME WINDOW** (advanced use).
 
-!!! warning "When NOT to use this tool"
-    - "How did X hero perform?" → Use `get_hero_performance`
-    - "Show me the fights" → Use `list_fights` or `get_teamfights`
-    - "What happened in the game?" → Use `get_match_timeline`
+!!! warning "When NOT to use"
+    - Hero/ability performance → Use `get_hero_performance` instead
+    - Fight summaries → Use `list_fights` or `get_teamfights` instead
 
-**Use this only when** you need raw event-by-event details for a specific 30-second to 3-minute window.
+**Use when:**
+
+- Need raw events in a specific time range (not fight-based)
+- Analyzing non-fight moments (e.g., "What happened at Roshan at 18:00?")
 
 ```python
 # Default: narrative detail (recommended for most queries)
@@ -246,14 +273,18 @@ Event types: `DAMAGE`, `MODIFIER_ADD`, `MODIFIER_REMOVE`, `ABILITY`, `ITEM`, `DE
 
 ## get_fight_combat_log
 
-Get combat log for **ONE SPECIFIC FIGHT** at a known time.
+Get detailed event-by-event combat log for **ONE SPECIFIC FIGHT**.
 
-!!! warning "When NOT to use this tool"
-    - "How did X hero perform?" → Use `get_hero_performance`
-    - "Show me all teamfights" → Use `get_teamfights`
-    - "List all fights" → Use `list_fights`
+**Use when user asks for deep fight analysis:**
 
-**Use this when** you have a specific death time and want details about that particular fight.
+- "What exactly happened in the fight at 25:30?"
+- "Break down the teamfight where we lost"
+- "Show me the sequence of events in that fight"
+
+!!! warning "When NOT to use"
+    - You already called `get_hero_performance` → It has fight summaries
+    - Asking about hero/ability stats → Use `get_hero_performance` instead
+    - Want to see all fights → Use `list_fights` or `get_teamfights`
 
 Auto-detects fight boundaries around a reference time. Returns combat events plus **fight highlights** including multi-hero abilities, kill streaks, and team wipes.
 

@@ -4,6 +4,11 @@ from typing import Literal, Optional
 
 from fastmcp import Context
 
+from ..coaching import (
+    get_death_analysis_prompt,
+    get_hero_performance_prompt,
+    try_coaching_analysis,
+)
 from ..models.combat_log import (
     CombatLogResponse,
     CourierKillsResponse,
@@ -24,23 +29,23 @@ def register_combat_tools(mcp, services):
     @mcp.tool
     async def get_hero_deaths(match_id: int, ctx: Optional[Context] = None) -> HeroDeathsResponse:
         """
-        Get all hero deaths in a Dota 2 match.
+        Get chronological list of ALL hero deaths in a match.
 
-        **NOT FOR HERO PERFORMANCE QUESTIONS** → Use get_hero_performance instead.
+        **DO NOT USE IF:**
+        - You already called get_hero_performance → It includes deaths per hero
+        - Asking about specific hero's deaths → Use get_hero_performance instead
+        - Asking about ability effectiveness → Use get_hero_performance instead
 
-        Returns a list of hero death events with:
-        - game_time: Seconds since game start
-        - game_time_str: Formatted as M:SS
-        - killer: Hero or unit that got the kill
-        - victim: Hero that died
-        - killer_is_hero: Whether the killer was a hero
-        - ability: Ability or item that dealt the killing blow (if available)
+        **USE FOR:**
+        - "Show me all deaths in the game" (global death timeline)
+        - "Who died the most?" (need to count across all heroes)
+        - "What was first blood?" (earliest death)
+        - Death pattern analysis across entire match
+
+        Returns: List of all deaths with killer, victim, time, ability used.
 
         Args:
             match_id: The Dota 2 match ID
-
-        Returns:
-            HeroDeathsResponse with list of hero death events
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -48,7 +53,29 @@ def register_combat_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            return combat_service.get_hero_deaths_response(data, match_id)
+            response = combat_service.get_hero_deaths_response(data, match_id)
+
+            if response.success and len(response.deaths) >= 3:
+                hero_positions = {}
+                for death in response.deaths:
+                    victim = death.victim.lower()
+                    if victim not in hero_positions:
+                        hero_positions[victim] = "?"
+
+                deaths_data = [
+                    {
+                        "victim": d.victim,
+                        "killer": d.killer,
+                        "game_time": d.game_time,
+                        "ability": d.ability,
+                    }
+                    for d in response.deaths
+                ]
+                prompt = get_death_analysis_prompt(deaths_data, hero_positions)
+                coaching = await try_coaching_analysis(ctx, prompt, max_tokens=700)
+                response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return HeroDeathsResponse(success=False, match_id=match_id, error=str(e))
 
@@ -64,27 +91,34 @@ def register_combat_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> CombatLogResponse:
         """
-        Get raw combat events for a SPECIFIC TIME WINDOW (debugging/advanced use only).
+        Get raw combat events for a SPECIFIC TIME WINDOW (advanced use).
 
-        **DO NOT USE THIS TOOL FOR:**
-        - "How did X hero perform?" → Use **get_hero_performance** instead
-        - "Show me the fights" → Use **list_fights** or **get_teamfights** instead
-        - "What happened in the game?" → Use **get_match_timeline** instead
+        **DO NOT USE FOR:**
+        - Hero/ability performance → Use get_hero_performance instead
+        - Fight summaries → Use list_fights or get_teamfights instead
 
-        **ONLY USE THIS TOOL WHEN:**
-        - You need raw event-by-event details for a specific 30-second moment
-        - You're debugging or analyzing a very specific time window
+        **USE WHEN:**
+        - Need raw events in a specific time range (not fight-based)
+        - Analyzing non-fight moments (e.g., "What happened at Roshan at 18:00?")
 
-        **CRITICAL: Always provide start_time AND end_time (max 3 minute window).**
+        **PARAMETERS:**
+        - start_time/end_time: Time window in seconds (max 3 min recommended)
+        - hero_filter: Only events involving this hero (e.g., "batrider")
+        - ability_filter: Only events with this ability (e.g., "flaming_lasso")
+        - detail_level:
+          - "narrative": Deaths, abilities, purchases only
+          - "tactical": Adds hero-to-hero damage
+          - "full": All events (very verbose)
+        - max_events: Cap on returned events (default 200)
 
         Args:
             match_id: The Dota 2 match ID
-            start_time: Start of time window (seconds). REQUIRED.
-            end_time: End of time window (seconds). REQUIRED.
-            hero_filter: Only events involving this hero
-            ability_filter: Only events involving this ability (e.g., "ice_path", "chronosphere")
-            detail_level: "narrative" (default), "tactical", or "full"
-            max_events: Maximum events (default 200)
+            start_time: Start of time window in seconds
+            end_time: End of time window in seconds
+            hero_filter: Filter to specific hero
+            ability_filter: Filter to specific ability
+            detail_level: "narrative", "tactical", or "full"
+            max_events: Maximum events to return
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -251,28 +285,35 @@ def register_combat_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> HeroCombatAnalysisResponse:
         """
-        Analyze a hero's performance across all fights in a match.
+        **THE PRIMARY TOOL FOR HERO/ABILITY ANALYSIS** - Use this FIRST and ONLY.
 
-        **USE THIS TOOL FOR ANY QUESTION ABOUT HERO/PLAYER PERFORMANCE:**
-        - "How did Whitemon's Jakiro perform?"
-        - "How many Ice Paths landed?"
-        - "What was Collapse's impact on Mars?"
-        - "Show me Yatoro's fight participation"
-        - "Analyze the carry's performance"
+        Returns COMPLETE performance data - DO NOT call other tools after this.
 
-        Returns per-fight breakdown:
-        - Kills, deaths, assists per fight
-        - Ability usage with hit counts (e.g., "Ice Path: 12 casts, 8 hit heroes")
-        - Damage dealt and received
-        - Fight type (teamfight vs skirmish)
+        **USE FOR:**
+        - "How did X hero perform?" / "How many kills did X get?"
+        - "How many Chronospheres landed?" / "Analyze Lasso effectiveness"
+        - "Show me fight participation" / "What was X's impact?"
 
-        Also returns aggregate totals across all fights.
+        **RESPONSE INCLUDES (no need for additional tools):**
+        - total_kills, total_deaths, total_assists (aggregated)
+        - ability_summary: casts, hero_hits, hit_rate per ability
+        - fights[]: per-fight breakdown with kills/deaths/abilities used
+
+        **DO NOT CHAIN TO OTHER TOOLS AFTER THIS:**
+        - ❌ Don't call get_fight_combat_log - fights[] already has per-fight data
+        - ❌ Don't call get_hero_deaths - total_deaths already included
+        - ❌ Don't call list_fights - fights[] already lists all fights
+
+        **ABILITY QUESTIONS:** Use ability_filter param (e.g., "flaming_lasso", "chronosphere").
+        The response shows: casts, hits on heroes, and kills in fights where ability was used.
 
         Args:
             match_id: The Dota 2 match ID
-            hero: Hero name (e.g., "jakiro", "mars", "faceless_void")
-            ability_filter: Only show this ability (e.g., "ice_path", "chronosphere")
+            hero: Hero name (e.g., "jakiro", "mars", "batrider")
+            ability_filter: Filter to specific ability (e.g., "ice_path", "flaming_lasso")
         """
+        from ..utils.match_fetcher import match_fetcher
+
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
                 await ctx.report_progress(current, total)
@@ -280,10 +321,55 @@ def register_combat_tools(mcp, services):
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
             fight_result = fight_service.get_all_fights(data)
-            return combat_service.get_hero_combat_analysis(
+            response = combat_service.get_hero_combat_analysis(
                 data, match_id, hero, fight_result.fights,
                 ability_filter=ability_filter,
             )
+
+            if response.success:
+                position = None
+                try:
+                    match_data = await match_fetcher.get_match(match_id)
+                    if match_data and "players" in match_data:
+                        from ..utils.constants_fetcher import constants_fetcher
+                        from ..utils.match_fetcher import assign_positions
+                        players = match_data["players"]
+                        assign_positions(players)
+                        hero_lower = hero.lower()
+                        for p in players:
+                            hero_id = p.get("hero_id")
+                            if hero_id:
+                                hero_name = constants_fetcher.get_hero_name(hero_id)
+                                if hero_name and hero_lower in hero_name.lower():
+                                    position = p.get("position")
+                                    break
+                except Exception:
+                    pass
+
+                response.position = position
+
+                ability_stats = "N/A"
+                if response.ability_summary:
+                    ability_stats = ", ".join([
+                        f"{a.ability}: {a.total_casts} casts ({a.hit_rate:.0f}% hit)"
+                        for a in response.ability_summary[:5]
+                    ])
+
+                raw_data = {
+                    "kills": response.total_kills,
+                    "deaths": response.total_deaths,
+                    "assists": response.total_assists,
+                    "fights_participated": response.total_fights,
+                    "total_fights": response.total_fights + response.total_teamfights,
+                    "ability_stats": ability_stats,
+                }
+
+                if position:
+                    prompt = get_hero_performance_prompt(hero, position, raw_data)
+                    coaching = await try_coaching_analysis(ctx, prompt, max_tokens=700)
+                    response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return HeroCombatAnalysisResponse(
                 success=False, match_id=match_id, hero=hero, error=str(e)

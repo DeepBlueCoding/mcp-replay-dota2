@@ -5,14 +5,12 @@ Uses pre-parsed replay data from conftest.py fixtures.
 All data is from match 8461956309 with verified values from Dotabuff.
 """
 
-import pytest
-
+from src.models.combat_log import RunePickup
 from src.services.models.combat_data import (
     CombatLogEvent,
     Fight,
     HeroDeath,
     ObjectiveKill,
-    RunePickup,
 )
 
 # Verified data from Dotabuff for match 8461956309
@@ -123,17 +121,17 @@ class TestObjectiveKills:
 
     def test_tormentor_kills_detected(self, objectives):
         _, tormentor, _, _ = objectives
-        # Tormentor kills may be detected depending on combat log data
-        assert isinstance(tormentor, list)
-        if len(tormentor) > 0:
-            assert all(isinstance(t, ObjectiveKill) for t in tormentor)
+        # Match 8461956309 has 4 tormentor kills (Dire team killed all)
+        assert len(tormentor) == 4
+        assert all(isinstance(t, ObjectiveKill) for t in tormentor)
 
     def test_first_tormentor_kill_details(self, objectives):
         _, tormentor, _, _ = objectives
-        if len(tormentor) == 0:
-            pytest.skip("No tormentor kills detected in this replay")
         first_tormentor = tormentor[0]
         assert first_tormentor.objective_type == "tormentor"
+        assert first_tormentor.game_time_str == "20:15"
+        assert first_tormentor.killer == "medusa"
+        assert first_tormentor.team == "dire"
 
     def test_tower_kills_correct_count(self, objectives):
         _, _, towers, _ = objectives
@@ -194,39 +192,35 @@ class TestPositionTracking:
 class TestRunePickups:
 
     def test_get_rune_pickups_returns_list_of_rune_pickup_models(self, rune_pickups):
-        # Rune pickups require PICKUP_RUNE in combat log types
         assert isinstance(rune_pickups, list)
-        if len(rune_pickups) > 0:
-            assert all(isinstance(p, RunePickup) for p in rune_pickups)
+        assert all(isinstance(p, RunePickup) for p in rune_pickups)
 
     def test_rune_pickups_detected(self, rune_pickups):
-        # Number of rune pickups depends on match and parsing config
-        assert isinstance(rune_pickups, list)
+        # Match 8461956309 has 19 power rune pickups
+        assert len(rune_pickups) == 19
+
+    def test_first_rune_pickup_details(self, rune_pickups):
+        first_rune = rune_pickups[0]
+        assert first_rune.game_time_str == "6:15"
+        assert first_rune.hero == "naga_siren"
+        assert first_rune.rune_type == "arcane"
 
     def test_rune_pickup_has_correct_structure(self, rune_pickups):
-        if len(rune_pickups) == 0:
-            pytest.skip("No rune pickups detected")
         first_rune = rune_pickups[0]
         assert hasattr(first_rune, "game_time_str")
         assert hasattr(first_rune, "hero")
         assert hasattr(first_rune, "rune_type")
 
     def test_rune_pickups_sorted_by_time(self, rune_pickups):
-        if len(rune_pickups) == 0:
-            pytest.skip("No rune pickups detected")
         times = [p.game_time for p in rune_pickups]
         assert times == sorted(times)
 
     def test_rune_types_are_valid(self, rune_pickups):
-        if len(rune_pickups) == 0:
-            pytest.skip("No rune pickups detected")
         valid_types = {"double_damage", "haste", "invisibility", "regeneration", "arcane", "shield"}
         for pickup in rune_pickups:
-            assert pickup.rune_type in valid_types or pickup.rune_type.startswith("unknown_")
+            assert pickup.rune_type in valid_types
 
     def test_rune_pickup_hero_names_are_clean(self, rune_pickups):
-        if len(rune_pickups) == 0:
-            pytest.skip("No rune pickups detected")
         for pickup in rune_pickups:
             assert not pickup.hero.startswith("npc_dota_hero_")
 
@@ -235,23 +229,22 @@ class TestAbilityHitDetection:
 
     def test_ability_events_have_hit_field(self, combat_log_280_300_ability):
         ability_events = [e for e in combat_log_280_300_ability if e.type == "ABILITY"]
-        if len(ability_events) == 0:
-            pytest.skip("No ability events in this time range")
+        # Match 8461956309 has 17 ability events in 280-300s window
+        assert len(ability_events) == 17
         for e in ability_events:
             assert e.hit in (True, False, None)
 
     def test_self_buff_abilities_detected(self, combat_log_280_300_earthshaker_ability):
         totem_events = [e for e in combat_log_280_300_earthshaker_ability if e.ability == "earthshaker_enchant_totem"]
-        if len(totem_events) == 0:
-            pytest.skip("No enchant totem events found")
-        # v2: Self-buff abilities have target as 'dota_unknown' and hit is False or None
+        # Match 8461956309 has 1 enchant totem event in 280-300s
+        assert len(totem_events) == 1
         for e in totem_events:
             assert e.hit in (True, False, None)
 
     def test_ensnare_that_hit_shows_as_true(self, combat_log_280_282_naga_ability):
         ensnare_events = [e for e in combat_log_280_282_naga_ability if e.ability == "naga_siren_ensnare"]
-        if len(ensnare_events) == 0:
-            pytest.skip("No ensnare events found")
+        # Match 8461956309 has 1 ensnare event in 280-282s that hit
+        assert len(ensnare_events) == 1
         assert ensnare_events[0].hit is True
 
     def test_non_ability_events_have_hit_none(self, combat_log_280_290_non_ability):
@@ -277,18 +270,17 @@ class TestAbilityTrigger:
 
     def test_lotus_orb_reflections_tracked(self, combat_log_trigger_only):
         lotus_events = [e for e in combat_log_trigger_only if e.ability and "lotus" in e.ability.lower()]
-        # May not have lotus events in all replays
-        assert isinstance(lotus_events, list)
+        # Match 8461956309 has 2 lotus orb trigger events
+        assert len(lotus_events) == 2
 
     def test_lotus_orb_reflection_structure(self, combat_log_trigger_only):
         lotus_events = [e for e in combat_log_trigger_only if e.ability and "lotus" in e.ability.lower()]
-        if len(lotus_events) == 0:
-            pytest.skip("No lotus orb events found")
+        assert len(lotus_events) >= 1
 
         first = lotus_events[0]
-        assert hasattr(first, "attacker")
+        assert first.attacker == "naga_siren"
+        assert first.ability == "item_lotus_orb"
         assert hasattr(first, "target")
-        assert hasattr(first, "ability")
 
     def test_ability_trigger_in_combat_log(self, combat_log_360_370):
         # Verify combat log structure

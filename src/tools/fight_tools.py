@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 from fastmcp import Context
 
+from ..coaching import get_teamfight_analysis_prompt, try_coaching_analysis
 from ..models.combat_log import (
     CombatLogEvent as CombatLogEventModel,
 )
@@ -52,30 +53,33 @@ def register_fight_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> FightCombatLogResponse:
         """
-        Get combat log for ONE SPECIFIC FIGHT at a known time.
+        Get detailed event-by-event combat log for ONE SPECIFIC fight.
 
-        **WHEN TO USE THIS TOOL:**
-        - You have a specific death time and want details about that fight
-        - You're drilling into a specific moment (e.g., "What happened at 25:30?")
+        **USE WHEN user asks for deep fight analysis:**
+        - "What exactly happened in the fight at 25:30?"
+        - "Break down the teamfight where we lost"
+        - "Show me the sequence of events in that fight"
 
-        **DO NOT USE THIS TOOL FOR:**
-        - "How did X hero perform?" → Use get_hero_performance instead
-        - "Show me all teamfights" → Use get_teamfights instead
-        - "List all fights" → Use list_fights instead
+        **DO NOT USE IF:**
+        - You already called get_hero_performance → It has fight summaries
+        - Asking about hero/ability stats → Use get_hero_performance instead
+        - Want to see all fights → Use list_fights or get_teamfights
 
-        Auto-detects fight boundaries around reference_time.
-
-        Detail levels (use "narrative" for most queries):
-        - **narrative** (default): Deaths, abilities, purchases
-        - **tactical**: Adds damage events (only for debugging)
-        - **full**: All events (debugging only)
+        **PARAMETERS:**
+        - reference_time: Game time in seconds (fight auto-detected around this time)
+        - hero: Filter to anchor fight detection on specific hero
+        - detail_level:
+          - "narrative" (default): Deaths, abilities, key moments (~2k tokens)
+          - "tactical": Adds damage events (~5k tokens)
+          - "full": All events including creeps (~14k tokens) - debugging only
+        - max_events: Limit events returned (default 200)
 
         Args:
             match_id: The Dota 2 match ID
-            reference_time: Game time in seconds (e.g., from get_hero_deaths)
-            hero: Optional hero to anchor detection
-            detail_level: Use "narrative" unless debugging
-            max_events: Max events (default 200)
+            reference_time: Game time in seconds (e.g., 1530 for 25:30)
+            hero: Optional hero to filter/anchor detection
+            detail_level: "narrative" (recommended), "tactical", or "full"
+            max_events: Maximum events to return
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -172,9 +176,15 @@ def register_fight_tools(mcp, services):
     @mcp.tool
     async def list_fights(match_id: int, ctx: Context) -> FightListResponse:
         """
-        List all fights in a Dota 2 match.
+        List all fights/skirmishes in a match with death summaries.
 
-        **NOT FOR HERO PERFORMANCE QUESTIONS** → Use get_hero_performance instead.
+        **DO NOT USE IF:**
+        - You already called get_hero_performance → It includes fights[] array
+        - Asking about specific hero → Use get_hero_performance instead
+
+        **USE FOR:**
+        - "How many fights happened?" / "List all teamfights"
+        - "When were the major fights?" (overview, not hero-specific)
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             await ctx.report_progress(current, total)
@@ -229,9 +239,15 @@ def register_fight_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> TeamfightsResponse:
         """
-        Get only teamfights from a Dota 2 match.
+        Get major teamfights (3+ deaths) with coaching analysis.
 
-        **NOT FOR HERO PERFORMANCE QUESTIONS** → Use get_hero_performance instead.
+        **DO NOT USE IF:**
+        - You already called get_hero_performance → It includes teamfight participation
+        - Asking about specific hero → Use get_hero_performance instead
+
+        **USE FOR:**
+        - "What were the big teamfights?" / "Analyze the teamfights"
+        - General teamfight overview (not hero-specific)
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -266,13 +282,37 @@ def register_fight_tools(mcp, services):
                 for f in teamfights
             ]
 
-            return TeamfightsResponse(
+            response = TeamfightsResponse(
                 success=True,
                 match_id=match_id,
                 min_deaths_threshold=min_deaths,
                 total_teamfights=len(teamfights),
                 teamfights=fights,
             )
+
+            if teamfights and len(teamfights) >= 1:
+                biggest_fight = max(teamfights, key=lambda f: f.total_deaths)
+                fight_data = {
+                    "start_time_str": biggest_fight.start_time_str,
+                    "end_time_str": biggest_fight.end_time_str,
+                    "duration": biggest_fight.duration,
+                    "total_deaths": biggest_fight.total_deaths,
+                    "participants": biggest_fight.participants,
+                }
+                deaths_data = [
+                    {
+                        "game_time_str": d.game_time_str,
+                        "killer": d.killer,
+                        "victim": d.victim,
+                        "ability": d.ability,
+                    }
+                    for d in biggest_fight.deaths
+                ]
+                prompt = get_teamfight_analysis_prompt(fight_data, deaths_data)
+                coaching = await try_coaching_analysis(ctx, prompt, max_tokens=700)
+                response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return TeamfightsResponse(success=False, match_id=match_id, error=str(e))
         except Exception as e:

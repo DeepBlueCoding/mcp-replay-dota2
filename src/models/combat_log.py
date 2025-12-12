@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.models.types import CoercedInt
+
 
 class DetailLevel(str, Enum):
     """Detail level for combat log queries.
@@ -41,12 +43,12 @@ class CombatLogEvent(BaseModel):
     target: str = Field(description="Target of the event")
     target_is_hero: bool = Field(description="Whether the target is a hero")
     ability: Optional[str] = Field(default=None, description="Ability or item involved")
-    value: Optional[int] = Field(default=None, description="Damage amount or other numeric value")
+    value: Optional[CoercedInt] = Field(default=None, description="Damage amount or other numeric value")
     hit: Optional[bool] = Field(
         default=None,
         description="For ABILITY events: whether the ability hit an enemy hero.",
     )
-    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
+    tick: Optional[CoercedInt] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class MapLocation(BaseModel):
@@ -71,7 +73,7 @@ class HeroDeath(BaseModel):
     position_x: Optional[float] = Field(default=None, description="World X coordinate of death")
     position_y: Optional[float] = Field(default=None, description="World Y coordinate of death")
     location_description: Optional[str] = Field(default=None, description="Map region description")
-    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
+    tick: Optional[CoercedInt] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class FightResult(BaseModel):
@@ -83,7 +85,7 @@ class FightResult(BaseModel):
     fight_end_str: str = Field(description="Fight end formatted as M:SS")
     duration: float = Field(description="Fight duration in seconds")
     participants: List[str] = Field(description="Heroes involved in the fight")
-    total_events: int = Field(description="Number of combat events in the fight")
+    total_events: CoercedInt = Field(description="Number of combat events in the fight")
     events: List[CombatLogEvent] = Field(description="Combat events in chronological order")
 
 
@@ -92,8 +94,12 @@ class HeroDeathsResponse(BaseModel):
 
     success: bool
     match_id: int
-    total_deaths: int = Field(default=0)
+    total_deaths: CoercedInt = Field(default=0)
     deaths: List[HeroDeath] = Field(default_factory=list)
+    coaching_analysis: Optional[str] = Field(
+        default=None,
+        description="AI coaching analysis of death patterns (requires sampling-capable client)"
+    )
     error: Optional[str] = Field(default=None)
 
 
@@ -110,7 +116,7 @@ class CombatLogResponse(BaseModel):
 
     success: bool
     match_id: int
-    total_events: int = Field(default=0)
+    total_events: CoercedInt = Field(default=0)
     filters: CombatLogFilters = Field(default_factory=CombatLogFilters)
     events: List[CombatLogEvent] = Field(default_factory=list)
     truncated: bool = Field(
@@ -133,7 +139,7 @@ class MultiHeroAbility(BaseModel):
     ability_display: str = Field(description="Human-readable ability name (e.g., 'Chronosphere')")
     caster: str = Field(description="Hero who cast the ability")
     targets: List[str] = Field(default_factory=list, description="Heroes hit by the ability")
-    hero_count: int = Field(description="Number of heroes hit")
+    hero_count: CoercedInt = Field(description="Number of heroes hit")
 
 
 class KillStreak(BaseModel):
@@ -143,7 +149,7 @@ class KillStreak(BaseModel):
     game_time_str: str = Field(description="Game time formatted as M:SS")
     hero: str = Field(description="Hero who achieved the streak")
     streak_type: str = Field(description="Type: double_kill, triple_kill, ultra_kill, rampage")
-    kills: int = Field(description="Number of kills in the streak")
+    kills: CoercedInt = Field(description="Number of kills in the streak")
     victims: List[str] = Field(default_factory=list, description="Heroes killed in the streak")
 
 
@@ -186,7 +192,7 @@ class FightCombatLogResponse(BaseModel):
     fight_end_str: str = Field(default="0:00")
     duration: float = Field(default=0.0)
     participants: List[str] = Field(default_factory=list)
-    total_events: int = Field(default=0)
+    total_events: CoercedInt = Field(default=0)
     events: List[CombatLogEvent] = Field(default_factory=list)
     highlights: Optional[FightHighlights] = Field(
         default=None,
@@ -202,7 +208,7 @@ class ItemPurchase(BaseModel):
     game_time_str: str = Field(description="Game time formatted as M:SS")
     hero: str = Field(description="Hero that purchased the item")
     item: str = Field(description="Item name (e.g., item_bfury, item_power_treads)")
-    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
+    tick: Optional[CoercedInt] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class ItemPurchasesResponse(BaseModel):
@@ -211,7 +217,7 @@ class ItemPurchasesResponse(BaseModel):
     success: bool
     match_id: int
     hero_filter: Optional[str] = Field(default=None, description="Hero filter applied")
-    total_purchases: int = Field(default=0)
+    total_purchases: CoercedInt = Field(default=0)
     purchases: List[ItemPurchase] = Field(default_factory=list)
     error: Optional[str] = Field(default=None)
 
@@ -226,7 +232,7 @@ class CourierKill(BaseModel):
     owner: str = Field(description="Hero who owns the courier that was killed")
     team: str = Field(description="Team whose courier was killed (radiant/dire)")
     position: Optional[MapLocation] = Field(default=None, description="Where the courier was killed")
-    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
+    tick: Optional[CoercedInt] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class CourierKillsResponse(BaseModel):
@@ -234,7 +240,7 @@ class CourierKillsResponse(BaseModel):
 
     success: bool
     match_id: int
-    total_kills: int = Field(default=0)
+    total_kills: CoercedInt = Field(default=0)
     kills: List[CourierKill] = Field(default_factory=list)
     error: Optional[str] = Field(default=None)
 
@@ -246,7 +252,7 @@ class RoshanKill(BaseModel):
     game_time_str: str = Field(description="Game time formatted as M:SS")
     killer: str = Field(description="Hero that got the last hit on Roshan")
     team: str = Field(description="Team that killed Roshan (radiant/dire)")
-    kill_number: int = Field(description="Which Roshan kill this is (1st, 2nd, etc.)")
+    kill_number: CoercedInt = Field(description="Which Roshan kill this is (1st, 2nd, etc.)")
 
 
 class TormentorKill(BaseModel):
@@ -266,7 +272,7 @@ class TowerKill(BaseModel):
     game_time_str: str = Field(description="Game time formatted as M:SS")
     tower: str = Field(description="Tower name (e.g., 'radiant_t1_mid')")
     team: str = Field(description="Team that lost the tower (radiant/dire)")
-    tier: int = Field(description="Tower tier (1, 2, 3, or 4)")
+    tier: CoercedInt = Field(description="Tower tier (1, 2, 3, or 4)")
     lane: str = Field(description="Lane (top/mid/bot/base)")
     killer: str = Field(description="Unit/hero that destroyed the tower")
     killer_is_hero: bool = Field(description="Whether the killer was a hero")
@@ -317,7 +323,7 @@ class RunePickup(BaseModel):
     rune_type: str = Field(
         description="Type of power rune: haste, double_damage, arcane, etc."
     )
-    tick: Optional[int] = Field(default=None, exclude=True, description="Internal replay tick")
+    tick: Optional[CoercedInt] = Field(default=None, exclude=True, description="Internal replay tick")
 
 
 class RunePickupsResponse(BaseModel):
@@ -325,7 +331,7 @@ class RunePickupsResponse(BaseModel):
 
     success: bool
     match_id: int
-    total_pickups: int = Field(default=0)
+    total_pickups: CoercedInt = Field(default=0)
     pickups: List[RunePickup] = Field(default_factory=list)
     error: Optional[str] = Field(default=None)
 
@@ -334,8 +340,8 @@ class AbilityUsage(BaseModel):
     """Usage statistics for a single ability."""
 
     ability: str = Field(description="Internal ability name (e.g., jakiro_ice_path)")
-    total_casts: int = Field(description="Total times ability was cast")
-    hero_hits: int = Field(
+    total_casts: CoercedInt = Field(description="Total times ability was cast")
+    hero_hits: CoercedInt = Field(
         description="Times it affected an enemy hero (includes stuns/debuffs from ground-targeted abilities)"
     )
     hit_rate: float = Field(description="Percentage of casts that hit heroes (0-100)")
@@ -350,15 +356,15 @@ class FightParticipation(BaseModel):
     fight_end: float = Field(description="Fight end time in seconds")
     fight_end_str: str = Field(description="Fight end formatted as M:SS")
     is_teamfight: bool = Field(description="Whether this was a teamfight (3+ deaths)")
-    kills: int = Field(description="Heroes killed by this hero in the fight")
-    deaths: int = Field(description="Times this hero died in the fight")
-    assists: int = Field(description="Kill assists (dealt damage to victim)")
+    kills: CoercedInt = Field(description="Heroes killed by this hero in the fight")
+    deaths: CoercedInt = Field(description="Times this hero died in the fight")
+    assists: CoercedInt = Field(description="Kill assists (dealt damage to victim)")
     abilities_used: List[AbilityUsage] = Field(
         default_factory=list,
         description="Abilities used during this fight with hit counts"
     )
-    damage_dealt: int = Field(default=0, description="Total damage dealt to enemy heroes")
-    damage_received: int = Field(default=0, description="Total damage received from enemy heroes")
+    damage_dealt: CoercedInt = Field(default=0, description="Total damage dealt to enemy heroes")
+    damage_received: CoercedInt = Field(default=0, description="Total damage received from enemy heroes")
 
 
 class HeroCombatAnalysisResponse(BaseModel):
@@ -367,11 +373,12 @@ class HeroCombatAnalysisResponse(BaseModel):
     success: bool
     match_id: int
     hero: str = Field(description="Hero analyzed")
-    total_fights: int = Field(default=0, description="Total fights participated in")
-    total_teamfights: int = Field(default=0, description="Teamfights (3+ deaths) participated in")
-    total_kills: int = Field(default=0, description="Total kills across all fights")
-    total_deaths: int = Field(default=0, description="Total deaths across all fights")
-    total_assists: int = Field(default=0, description="Total assists across all fights")
+    position: Optional[int] = Field(default=None, description="Hero position (1-5)")
+    total_fights: CoercedInt = Field(default=0, description="Total fights participated in")
+    total_teamfights: CoercedInt = Field(default=0, description="Teamfights (3+ deaths) participated in")
+    total_kills: CoercedInt = Field(default=0, description="Total kills across all fights")
+    total_deaths: CoercedInt = Field(default=0, description="Total deaths across all fights")
+    total_assists: CoercedInt = Field(default=0, description="Total assists across all fights")
     ability_summary: List[AbilityUsage] = Field(
         default_factory=list,
         description="Overall ability usage across all fights"
@@ -379,5 +386,9 @@ class HeroCombatAnalysisResponse(BaseModel):
     fights: List[FightParticipation] = Field(
         default_factory=list,
         description="Per-fight breakdown of participation"
+    )
+    coaching_analysis: Optional[str] = Field(
+        default=None,
+        description="AI coaching analysis of hero performance (requires sampling-capable client)"
     )
     error: Optional[str] = Field(default=None)

@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from fastmcp import Context
 
+from ..coaching import get_lane_analysis_prompt, try_coaching_analysis
 from ..models.tool_responses import (
     CampStack,
     CampStacksResponse,
@@ -144,7 +145,7 @@ def register_analysis_tools(mcp, services):
                     )
                 )
 
-            return LaneSummaryResponse(
+            response = LaneSummaryResponse(
                 success=True,
                 match_id=match_id,
                 lane_winners=LaneWinners(
@@ -158,6 +159,29 @@ def register_analysis_tools(mcp, services):
                 ),
                 hero_stats=hero_stats,
             )
+
+            lane_data = {
+                "top_winner": summary.top_winner,
+                "mid_winner": summary.mid_winner,
+                "bot_winner": summary.bot_winner,
+                "radiant_score": round(summary.radiant_laning_score, 1),
+                "dire_score": round(summary.dire_laning_score, 1),
+            }
+            hero_stats_data = [
+                {
+                    "hero": hs.hero,
+                    "team": hs.team,
+                    "lane": hs.lane,
+                    "last_hits_10min": hs.last_hits_10min,
+                    "level_10min": hs.level_10min,
+                }
+                for hs in hero_stats
+            ]
+            prompt = get_lane_analysis_prompt(lane_data, hero_stats_data)
+            coaching = await try_coaching_analysis(ctx, prompt, max_tokens=800)
+            response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return LaneSummaryResponse(success=False, match_id=match_id, error=str(e))
         except Exception as e:

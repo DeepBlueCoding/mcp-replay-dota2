@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.models.types import CoercedInt
+
 
 class RuneCorrelation(BaseModel):
     """Rune pickup correlated with a rotation."""
@@ -31,7 +33,7 @@ class RotationOutcome(BaseModel):
         default=None,
         description="Fight ID if rotation led to fight (use get_fight for details)"
     )
-    deaths_in_window: int = Field(
+    deaths_in_window: CoercedInt = Field(
         default=0, description="Total deaths within 60s of rotation"
     )
     rotation_hero_died: bool = Field(
@@ -110,7 +112,7 @@ class WisdomRuneEvent(BaseModel):
     fight_id: Optional[str] = Field(
         default=None, description="Fight ID if contested (use get_fight for details)"
     )
-    deaths_nearby: int = Field(
+    deaths_nearby: CoercedInt = Field(
         default=0, description="Deaths within range of wisdom rune"
     )
 
@@ -131,17 +133,17 @@ class HeroRotationStats(BaseModel):
 
     hero: str
     role: str
-    total_rotations: int = 0
-    successful_ganks: int = Field(
+    total_rotations: CoercedInt = 0
+    successful_ganks: CoercedInt = Field(
         default=0, description="Rotations resulting in kill without dying"
     )
-    failed_ganks: int = Field(
+    failed_ganks: CoercedInt = Field(
         default=0, description="Rotations where hero died or no engagement"
     )
-    trades: int = Field(
+    trades: CoercedInt = Field(
         default=0, description="Rotations resulting in kill but also died"
     )
-    rune_rotations: int = Field(
+    rune_rotations: CoercedInt = Field(
         default=0, description="Rotations with rune pickup before"
     )
 
@@ -149,12 +151,12 @@ class HeroRotationStats(BaseModel):
 class RotationSummary(BaseModel):
     """Summary statistics for all rotations."""
 
-    total_rotations: int = 0
+    total_rotations: CoercedInt = 0
     by_hero: Dict[str, HeroRotationStats] = Field(default_factory=dict)
-    runes_leading_to_kills: int = Field(
+    runes_leading_to_kills: CoercedInt = Field(
         default=0, description="Rune pickups followed by kill within 60s"
     )
-    wisdom_rune_fights: int = Field(
+    wisdom_rune_fights: CoercedInt = Field(
         default=0, description="Fights at wisdom rune spawns"
     )
     most_active_rotator: Optional[str] = Field(
@@ -167,8 +169,8 @@ class RotationAnalysisResponse(BaseModel):
 
     success: bool
     match_id: int
-    start_minute: int = Field(description="Start of analysis range")
-    end_minute: int = Field(description="End of analysis range")
+    start_minute: CoercedInt = Field(description="Start of analysis range")
+    end_minute: CoercedInt = Field(description="End of analysis range")
     rotations: List[Rotation] = Field(
         default_factory=list, description="All detected rotations"
     )

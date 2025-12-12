@@ -70,4 +70,5 @@ nav:
           - Game State: api/tools/game-state.md
           - Farming & Rotation: api/tools/farming-rotation.md
       - Resources: api/resources.md
+      - AI Coaching: api/coaching.md
   - Changelog: changelog.md

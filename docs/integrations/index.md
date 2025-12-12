@@ -6,6 +6,30 @@
 
 This MCP server can connect to any LLM that supports the Model Context Protocol or tool calling.
 
+## Feature Support by Client
+
+Different clients support different MCP features. **Coaching Analysis** requires MCP Sampling support.
+
+| Client | Tools | Resources | Sampling | Coaching Analysis |
+|--------|:-----:|:---------:|:--------:|:-----------------:|
+| **Claude Desktop** | ✅ | ✅ | ✅ | ✅ Full |
+| **Claude Code CLI** | ✅ | ✅ | ✅ | ✅ Full |
+| **Cursor** | ✅ | ✅ | ❌ | ⚠️ Data only |
+| **Windsurf** | ✅ | ✅ | ❌ | ⚠️ Data only |
+| **Zed** | ✅ | ✅ | ❌ | ⚠️ Data only |
+| **Continue.dev** | ✅ | ✅ | ❌ | ⚠️ Data only |
+| **LangChain** | ✅ | ✅ | ⚠️ Manual | ⚠️ Requires setup |
+| **OpenAI API** | ✅ | ❌ | ❌ | ⚠️ Data only |
+| **Custom MCP SDK** | ✅ | ✅ | ⚠️ Optional | Depends on impl |
+
+**Legend:**
+
+- ✅ Full: Feature fully supported with automatic coaching
+- ⚠️ Data only: Raw data returned, client LLM interprets it
+- ⚠️ Manual/Requires setup: Possible but requires custom implementation
+
+See [AI Coaching Features](../api/coaching.md) for details on coaching analysis and how to implement sampling in custom clients.
+
 ## Native MCP Support
 
 These clients have built-in MCP support:

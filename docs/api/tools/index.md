@@ -1,18 +1,28 @@
 # Tools Reference
 
-??? info "AI Summary"
+??? info "AI Summary - Tool Selection Guide"
 
-    **Match Analysis Tools** (require `match_id`): `download_replay` (call first), `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, `get_rune_pickups`, `get_match_draft`, `get_match_info`, `get_match_heroes`, `get_match_players`.
+    **CRITICAL: Choose the right tool FIRST to avoid redundant calls.**
 
-    **Game State Tools**: `list_fights`, `get_teamfights`, `get_fight`, `get_camp_stacks`, `get_jungle_summary`, `get_lane_summary`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_position_timeline`, `get_fight_replay`.
+    | Question Type | Use This Tool | DO NOT Chain To |
+    |--------------|---------------|-----------------|
+    | Hero/ability performance | `get_hero_performance` | ❌ `get_fight_combat_log`, `get_hero_deaths`, `list_fights` |
+    | Deep fight breakdown | `get_fight_combat_log` | ❌ `get_hero_performance` (if already called) |
+    | All deaths in match | `get_hero_deaths` | ❌ `get_hero_performance` (for same hero) |
+    | Fight overview | `list_fights` or `get_teamfights` | ❌ `get_fight_combat_log` for each fight |
+    | Farming patterns | `get_farming_pattern` | - |
+    | Rotations | `get_rotation_analysis` | - |
 
-    **Farming Analysis**: `get_farming_pattern(hero, start_minute, end_minute)` - THE tool for "how did X farm?" questions. Returns minute-by-minute lane/neutral kills, camp types, positions, transitions (first jungle, first large camp), and summary stats. **Replaces 25+ tool calls with 1 call.**
+    **Primary Tools:**
 
-    **Rotation Analysis**: `get_rotation_analysis(start_minute, end_minute)` - THE tool for "what rotations happened?" questions. Detects when heroes leave assigned lanes, correlates with rune pickups, links outcomes to fight_ids. Returns rotations, power/wisdom rune events, and per-hero statistics.
+    - **`get_hero_performance`**: THE tool for hero/ability questions. Returns kills, deaths, ability stats, per-fight breakdown. Use `ability_filter` for specific abilities. **Call ONCE, don't chain.**
+    - **`get_fight_combat_log`**: Deep event-by-event fight analysis. Use when user asks "what happened in the fight at X?"
+    - **`get_farming_pattern`**: THE tool for farming questions. Returns minute-by-minute data. **Replaces 25+ tool calls.**
+    - **`get_rotation_analysis`**: THE tool for rotation questions. Detects lane departures, correlates with runes.
 
-    **Pro Scene Tools**: `search_pro_player(query)`, `search_team(query)`, `get_pro_player(account_id)`, `get_pro_player_by_name(name)`, `get_team(team_id)`, `get_team_by_name(name)`, `get_team_matches(team_id)`, `get_leagues(tier?)`, `get_pro_matches(limit?, tier?, team1_name?, team2_name?, league_name?, days_back?)`, `get_league_matches(league_id)`. Head-to-head filtering: pass both `team1_name` and `team2_name` to get matches where both teams played against each other.
+    **Pro Scene Tools**: `search_pro_player`, `search_team`, `get_pro_player_by_name`, `get_team_by_name`, `get_pro_matches`, `get_league_matches`.
 
-    **Parallel-safe tools**: `get_stats_at_minute`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_fight`, `get_position_timeline`, `get_fight_replay` - call multiple times with different parameters in parallel for efficiency.
+    **Parallel-safe tools**: `get_stats_at_minute`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_fight`, `get_position_timeline`, `get_fight_replay`.
 
 Tools are functions the LLM can call. All match analysis tools take `match_id` as required parameter.
 

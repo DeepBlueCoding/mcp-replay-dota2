@@ -314,28 +314,60 @@ class CombatService:
             List of RunePickup events sorted by game time
         """
         pickups = []
+        seen_times: dict[tuple[str, float], bool] = {}
+
+        # Rune map for modifier_rune_* inflictor names
+        rune_modifier_map = {
+            "modifier_rune_haste": "haste",
+            "modifier_rune_doubledamage": "double_damage",
+            "modifier_rune_arcane": "arcane",
+            "modifier_rune_regen": "regeneration",
+            "modifier_rune_invis": "invisibility",
+            "modifier_rune_shield": "shield",
+        }
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
-            if entry_type != CombatLogType.PICKUP_RUNE.value:
+
+            # Check PICKUP_RUNE events (type 21)
+            if entry_type == CombatLogType.PICKUP_RUNE.value:
+                hero = self._clean_hero_name(entry.target_name)
+                if hero_filter and hero_filter.lower() not in hero.lower():
+                    continue
+                rune_type = RUNE_TYPE_MAP.get(entry.value, f"unknown_{entry.value}")
+                pickup = RunePickup(
+                    game_time=entry.game_time,
+                    game_time_str=self._format_time(entry.game_time),
+                    tick=entry.tick,
+                    hero=hero,
+                    rune_type=rune_type,
+                )
+                pickups.append(pickup)
                 continue
 
-            hero = self._clean_hero_name(entry.target_name)
+            # Check MODIFIER_ADD events with modifier_rune_* inflictor
+            if entry_type == CombatLogType.MODIFIER_ADD.value:
+                inflictor = getattr(entry, 'inflictor_name', '')
+                if inflictor in rune_modifier_map:
+                    hero = self._clean_hero_name(entry.attacker_name)
+                    if hero_filter and hero_filter.lower() not in hero.lower():
+                        continue
 
-            if hero_filter:
-                if hero_filter.lower() not in hero.lower():
-                    continue
+                    # Dedupe - same hero/time can have duplicate modifier events
+                    key = (hero, round(entry.game_time, 1))
+                    if key in seen_times:
+                        continue
+                    seen_times[key] = True
 
-            rune_type = RUNE_TYPE_MAP.get(entry.value, f"unknown_{entry.value}")
-
-            pickup = RunePickup(
-                game_time=entry.game_time,
-                game_time_str=self._format_time(entry.game_time),
-                tick=entry.tick,
-                hero=hero,
-                rune_type=rune_type,
-            )
-            pickups.append(pickup)
+                    rune_type = rune_modifier_map[inflictor]
+                    pickup = RunePickup(
+                        game_time=entry.game_time,
+                        game_time_str=self._format_time(entry.game_time),
+                        tick=entry.tick,
+                        hero=hero,
+                        rune_type=rune_type,
+                    )
+                    pickups.append(pickup)
 
         pickups.sort(key=lambda p: p.game_time)
         return pickups
@@ -381,11 +413,13 @@ class CombatService:
                 continue
 
             target = entry.target_name.lower()
-            if "tormentor" not in target:
+            # Tormentor is named "npc_dota_miniboss" in replay data
+            if "miniboss" not in target:
                 continue
 
-            # Determine which side's tormentor was killed (radiant or dire side)
-            tormentor_side = "dire" if "badguys" in target else "radiant"
+            # Determine side based on position or team - miniboss doesn't have side in name
+            # Use attacker team to infer which side (enemy tormentor)
+            tormentor_side = "radiant" if entry.attacker_team == Team.RADIANT.value else "dire"
             killer = self._clean_hero_name(entry.attacker_name)
             team = "radiant" if entry.attacker_team == Team.RADIANT.value else "dire"
 
