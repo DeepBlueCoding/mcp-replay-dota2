@@ -133,6 +133,38 @@ class CombatService:
         """Check if a name represents a hero."""
         return name.startswith("npc_dota_hero_")
 
+    def _get_hero_level_at_time(
+        self,
+        data: ParsedReplayData,
+        hero: str,
+        target_time: float,
+    ) -> Optional[int]:
+        """Get hero level at a specific game time from entity snapshots."""
+        hero_lower = hero.lower()
+        best_snapshot = None
+        min_diff = float('inf')
+
+        for snapshot in data.entity_snapshots:
+            diff = abs(snapshot.game_time - target_time)
+            if diff < min_diff:
+                min_diff = diff
+                best_snapshot = snapshot
+
+        if not best_snapshot or min_diff > 60.0:
+            return None
+
+        for hero_snap in best_snapshot.heroes:
+            hero_name = hero_snap.hero_name or ""
+            if hero_name.startswith("npc_dota_hero_"):
+                clean_name = hero_name[14:]
+            else:
+                clean_name = hero_name
+
+            if hero_lower in clean_name.lower():
+                return hero_snap.level if hasattr(hero_snap, 'level') else None
+
+        return None
+
     def get_hero_deaths(
         self,
         data: ParsedReplayData,
@@ -181,6 +213,19 @@ class CombatService:
                 data, victim, game_time
             )
 
+            # Extract hero levels from combat log entry
+            killer_level = None
+            victim_level = None
+            level_advantage = None
+
+            if hasattr(entry, 'attacker_hero_level') and entry.attacker_hero_level and entry.attacker_hero_level > 0:
+                killer_level = entry.attacker_hero_level
+            if hasattr(entry, 'target_hero_level') and entry.target_hero_level and entry.target_hero_level > 0:
+                victim_level = entry.target_hero_level
+
+            if killer_level is not None and victim_level is not None:
+                level_advantage = killer_level - victim_level
+
             death = HeroDeath(
                 game_time=game_time,
                 game_time_str=self._format_time(game_time),
@@ -188,6 +233,9 @@ class CombatService:
                 killer=killer,
                 victim=victim,
                 killer_is_hero=entry.is_attacker_hero,
+                killer_level=killer_level,
+                victim_level=victim_level,
+                level_advantage=level_advantage,
                 ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
                 position_x=pos_x,
                 position_y=pos_y,
@@ -687,6 +735,17 @@ class CombatService:
             if entry_type == CombatLogType.ABILITY.value:
                 hit = entry.is_target_hero if hasattr(entry, 'is_target_hero') else None
 
+            # Extract hero levels for DEATH events
+            attacker_level = None
+            target_level = None
+            if entry_type == CombatLogType.DEATH.value and entry.is_target_hero:
+                atk_lvl = getattr(entry, 'attacker_hero_level', None)
+                if atk_lvl and atk_lvl > 0:
+                    attacker_level = atk_lvl
+                tgt_lvl = getattr(entry, 'target_hero_level', None)
+                if tgt_lvl and tgt_lvl > 0:
+                    target_level = tgt_lvl
+
             event = CombatLogEvent(
                 type=self._get_event_type_name(entry_type),
                 game_time=game_time,
@@ -694,8 +753,10 @@ class CombatService:
                 tick=entry.tick,
                 attacker=attacker,
                 attacker_is_hero=entry.is_attacker_hero,
+                attacker_level=attacker_level,
                 target=target,
                 target_is_hero=entry.is_target_hero,
+                target_level=target_level,
                 ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
                 value=entry.value if hasattr(entry, 'value') else None,
                 hit=hit,
@@ -947,6 +1008,10 @@ class CombatService:
         total_assists = 0
         total_teamfights = 0
 
+        # Track level advantages for kills/deaths
+        kill_level_advantages: List[int] = []
+        death_level_disadvantages: List[int] = []
+
         # First pass: count ALL ability usage across the entire match
         match_ability_casts: dict = {}
         match_ability_hits: dict = {}
@@ -1009,8 +1074,20 @@ class CombatService:
                 if entry_type == CombatLogType.DEATH.value and entry.is_target_hero:
                     if is_our_hero_attacker:
                         kills += 1
+                        # Track level advantage on kills
+                        if hasattr(entry, 'attacker_hero_level') and hasattr(entry, 'target_hero_level'):
+                            attacker_lvl = entry.attacker_hero_level
+                            target_lvl = entry.target_hero_level
+                            if attacker_lvl and attacker_lvl > 0 and target_lvl and target_lvl > 0:
+                                kill_level_advantages.append(attacker_lvl - target_lvl)
                     elif is_our_hero_target:
                         deaths += 1
+                        # Track level disadvantage on deaths
+                        if hasattr(entry, 'attacker_hero_level') and hasattr(entry, 'target_hero_level'):
+                            attacker_lvl = entry.attacker_hero_level
+                            target_lvl = entry.target_hero_level
+                            if attacker_lvl and attacker_lvl > 0 and target_lvl and target_lvl > 0:
+                                death_level_disadvantages.append(attacker_lvl - target_lvl)
                     elif target_lower in heroes_damaged_by_hero:
                         assists += 1
 
@@ -1060,6 +1137,9 @@ class CombatService:
             if fight.is_teamfight:
                 total_teamfights += 1
 
+            # Get hero level at fight start
+            hero_level = self._get_hero_level_at_time(data, hero, fight.start_time)
+
             hero_fights.append(FightParticipation(
                 fight_id=fight.fight_id,
                 fight_start=fight.start_time,
@@ -1067,6 +1147,7 @@ class CombatService:
                 fight_end=fight.end_time,
                 fight_end_str=fight.end_time_str,
                 is_teamfight=fight.is_teamfight,
+                hero_level=hero_level,
                 kills=kills,
                 deaths=deaths,
                 assists=assists,
@@ -1088,6 +1169,14 @@ class CombatService:
             ))
         ability_summary.sort(key=lambda a: a.total_casts, reverse=True)
 
+        # Calculate average level advantages
+        avg_kill_advantage = None
+        avg_death_disadvantage = None
+        if kill_level_advantages:
+            avg_kill_advantage = round(sum(kill_level_advantages) / len(kill_level_advantages), 1)
+        if death_level_disadvantages:
+            avg_death_disadvantage = round(sum(death_level_disadvantages) / len(death_level_disadvantages), 1)
+
         return HeroCombatAnalysisResponse(
             success=True,
             match_id=match_id,
@@ -1097,6 +1186,8 @@ class CombatService:
             total_kills=total_kills,
             total_deaths=total_deaths,
             total_assists=total_assists,
+            avg_kill_level_advantage=avg_kill_advantage,
+            avg_death_level_disadvantage=avg_death_disadvantage,
             ability_summary=ability_summary,
             fights=hero_fights,
         )

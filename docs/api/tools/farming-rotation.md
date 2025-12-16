@@ -31,23 +31,38 @@ get_farming_pattern(
       "lane_creeps_killed": 28,
       "camps_cleared": 2,
       "camp_sequence": [
-        {"time_str": "5:12", "camp": "large_centaur", "tier": "large", "area": "radiant_jungle"},
-        {"time_str": "5:45", "camp": "medium_wolf", "tier": "medium", "area": "radiant_jungle"}
+        {
+          "time_str": "5:12",
+          "camp": "large_centaur",
+          "tier": "large",
+          "area": "radiant_jungle",
+          "position_x": -4500.0,
+          "position_y": 800.0,
+          "creeps_killed": 3
+        },
+        {
+          "time_str": "5:45",
+          "camp": "medium_wolf",
+          "tier": "medium",
+          "area": "radiant_jungle",
+          "position_x": -3200.0,
+          "position_y": -1400.0,
+          "creeps_killed": 3
+        }
+      ],
+      "wave_clears": [
+        {
+          "time_str": "5:02",
+          "creeps_killed": 4,
+          "position_x": -5200.0,
+          "position_y": -4100.0,
+          "area": "radiant_safelane"
+        }
       ],
       "position_at_start": {"x": -5200, "y": -4100, "area": "radiant_safelane"},
+      "position_at_end": {"x": -3200, "y": -1400, "area": "radiant_jungle"},
       "gold": 2100,
       "level": 6
-    }
-  ],
-  "creep_kills": [
-    {
-      "game_time": 312.5,
-      "game_time_str": "5:12",
-      "creep_name": "npc_dota_neutral_centaur_khan",
-      "creep_type": "neutral",
-      "neutral_camp": "large_centaur",
-      "camp_tier": "large",
-      "map_area": "radiant_jungle"
     }
   ],
   "multi_camp_clears": [
@@ -79,8 +94,11 @@ get_farming_pattern(
 
 | Field | Description |
 |-------|-------------|
-| `camp_sequence` | Ordered list of camps cleared each minute |
-| `creep_kills[].camp_tier` | Tier from replay parser: `small`, `medium`, `large`, `ancient` |
+| `camp_sequence` | Ordered list of camps cleared each minute with position for path visualization |
+| `camp_sequence[].position_x/y` | Coordinates where camp was cleared (for map visualization) |
+| `camp_sequence[].creeps_killed` | Number of creeps killed in this camp |
+| `wave_clears` | Grouped lane creep kills (creeps killed within 5s window) |
+| `wave_clears[].position_x/y` | Coordinates where wave was cleared (for path visualization) |
 | `multi_camp_clears` | Detects when hero farms 2+ camps simultaneously (stacked/adjacent camps) |
 | `summary.multi_camp_clears` | Total count of multi-camp clear events |
 

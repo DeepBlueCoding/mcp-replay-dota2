@@ -111,6 +111,7 @@ class HeroStats(BaseModel):
     player_name: Optional[str] = Field(default=None, description="Player name")
     pro_name: Optional[str] = Field(default=None, description="Pro player name if known")
     position: Optional[CoercedInt] = Field(default=None, description="Position 1-5")
+    rank_tier: Optional[CoercedInt] = Field(default=None, description="Player rank tier")
     kills: CoercedInt = Field(description="Kills")
     deaths: CoercedInt = Field(description="Deaths")
     assists: CoercedInt = Field(description="Assists")
@@ -122,10 +123,17 @@ class HeroStats(BaseModel):
     hero_damage: CoercedInt = Field(description="Total hero damage")
     tower_damage: CoercedInt = Field(description="Total tower damage")
     hero_healing: CoercedInt = Field(description="Total hero healing")
+    teamfight_participation: Optional[float] = Field(default=None, description="Teamfight participation %")
+    stuns: Optional[float] = Field(default=None, description="Total stun duration dealt in seconds")
+    camps_stacked: Optional[CoercedInt] = Field(default=None, description="Neutral camps stacked")
+    obs_placed: Optional[CoercedInt] = Field(default=None, description="Observer wards placed")
+    sen_placed: Optional[CoercedInt] = Field(default=None, description="Sentry wards placed")
     lane: Optional[str] = Field(default=None, description="Lane assignment")
+    lane_efficiency: Optional[float] = Field(default=None, description="Lane efficiency (0.0-1.0)")
     role: Optional[str] = Field(default=None, description="Role (core/support)")
     items: List[str] = Field(default_factory=list, description="Final items")
     item_neutral: Optional[str] = Field(default=None, description="Neutral item")
+    item_neutral2: Optional[str] = Field(default=None, description="Second neutral item (7.40+)")
 
 
 class MatchHeroesResponse(BaseModel):
@@ -144,6 +152,7 @@ class MatchPlayerInfo(BaseModel):
     player_name: str = Field(description="Steam display name")
     pro_name: Optional[str] = Field(default=None, description="Pro player name if known")
     account_id: Optional[int] = Field(default=None, description="Steam account ID")
+    rank_tier: Optional[int] = Field(default=None, description="Player rank tier (e.g., 85=Divine 5, 80+=Immortal)")
     hero_id: int = Field(description="Hero ID")
     hero_name: str = Field(description="Hero internal name")
     localized_name: str = Field(description="Hero display name")
@@ -171,7 +180,10 @@ class FightDeath(BaseModel):
     game_time: float = Field(description="Game time in seconds")
     game_time_str: str = Field(description="Game time as M:SS")
     killer: str = Field(description="Hero that got the kill")
+    killer_level: Optional[int] = Field(default=None, description="Killer's hero level")
     victim: str = Field(description="Hero that died")
+    victim_level: Optional[int] = Field(default=None, description="Victim's hero level")
+    level_advantage: Optional[int] = Field(default=None, description="Killer's level advantage")
     ability: Optional[str] = Field(default=None, description="Killing ability")
 
 
@@ -225,7 +237,10 @@ class FightDeathDetail(BaseModel):
     game_time_str: str = Field(description="Game time as M:SS")
     killer: str = Field(description="Hero that got the kill")
     killer_is_hero: bool = Field(description="Whether killer was a hero")
+    killer_level: Optional[int] = Field(default=None, description="Killer's hero level")
     victim: str = Field(description="Hero that died")
+    victim_level: Optional[int] = Field(default=None, description="Victim's hero level")
+    level_advantage: Optional[int] = Field(default=None, description="Killer's level advantage")
     ability: Optional[str] = Field(default=None, description="Killing ability")
     position_x: Optional[float] = Field(default=None, description="X coordinate")
     position_y: Optional[float] = Field(default=None, description="Y coordinate")
@@ -320,6 +335,7 @@ class HeroLaneStats(BaseModel):
     gold_10min: CoercedInt = Field(default=0, description="Gold at 10 minutes")
     level_5min: CoercedInt = Field(default=0, description="Level at 5 minutes")
     level_10min: CoercedInt = Field(default=0, description="Level at 10 minutes")
+    lane_efficiency: Optional[float] = Field(default=None, description="Lane efficiency (0.0-1.0)")
 
 
 class LaneSummaryResponse(BaseModel):

@@ -123,6 +123,7 @@ def register_analysis_tools(mcp, services):
                         opendota_lanes[hero_name.lower()] = {
                             "lane_name": p.get("lane_name"),
                             "role": p.get("role"),
+                            "lane_efficiency": p.get("lane_efficiency"),
                         }
 
             hero_stats = []
@@ -142,6 +143,7 @@ def register_analysis_tools(mcp, services):
                         gold_10min=s.gold_10min,
                         level_5min=s.level_5min,
                         level_10min=s.level_10min,
+                        lane_efficiency=od_data.get("lane_efficiency"),
                     )
                 )
 

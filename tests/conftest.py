@@ -54,6 +54,23 @@ _fight_service: Optional[FightService] = None
 _cache = {}
 
 
+def _clear_in_memory_cache():
+    """Clear all in-memory cached data to force re-parsing."""
+    global _parsed_data, _parsed_data_2, _replay_service, _cache
+    _parsed_data = None
+    _parsed_data_2 = None
+    _replay_service = None
+    _cache = {}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def clear_cache_at_session_start_and_end():
+    """Clear in-memory cache at start and end of each test session."""
+    _clear_in_memory_cache()
+    yield
+    _clear_in_memory_cache()
+
+
 def _get_replay_service() -> ReplayService:
     """Get or create ReplayService singleton."""
     global _replay_service
@@ -62,14 +79,14 @@ def _get_replay_service() -> ReplayService:
     return _replay_service
 
 
-def _get_parsed_data() -> Optional[ParsedReplayData]:
+def _get_parsed_data() -> ParsedReplayData:
     """Get parsed replay data, parsing once if needed."""
     global _parsed_data
     if _parsed_data is not None:
         return _parsed_data
 
     if not REPLAY_PATH.exists():
-        return None
+        raise FileNotFoundError(f"Replay file not found: {REPLAY_PATH}")
 
     print(f"\n[conftest] Loading replay {TEST_MATCH_ID} via v2 ReplayService...")
     rs = _get_replay_service()
@@ -90,14 +107,14 @@ def _get_parsed_data() -> Optional[ParsedReplayData]:
     return _parsed_data
 
 
-def _get_parsed_data_2() -> Optional[ParsedReplayData]:
+def _get_parsed_data_2() -> ParsedReplayData:
     """Get parsed replay data for match 2, parsing once if needed."""
     global _parsed_data_2
     if _parsed_data_2 is not None:
         return _parsed_data_2
 
     if not REPLAY_PATH_2.exists():
-        return None
+        raise FileNotFoundError(f"Replay file not found: {REPLAY_PATH_2}")
 
     print(f"\n[conftest] Loading replay {TEST_MATCH_ID_2} via v2 ReplayService...")
     rs = _get_replay_service()
@@ -138,9 +155,7 @@ def _ensure_parsed():
     if _cache:
         return  # Already parsed
 
-    data = _get_parsed_data()
-    if data is None:
-        return  # Replay not available
+    data = _get_parsed_data()  # Raises FileNotFoundError if not available
 
     combat = _get_combat_service()
     fight = _get_fight_service()
@@ -248,10 +263,10 @@ def test_match_id():
 def parsed_replay_data():
     """Session-scoped fixture for parsed replay data (v2)."""
     if not REPLAY_PATH.exists():
-        pytest.skip("Replay file not available")
+        raise FileNotFoundError(f"Replay file not found: {REPLAY_PATH}")
     data = _get_parsed_data()
     if data is None:
-        pytest.skip("Failed to parse replay")
+        raise ValueError("Failed to parse replay")
     return data
 
 
@@ -260,9 +275,9 @@ def parsed_replay_data():
 # =============================================================================
 
 def _require_replay():
-    """Skip test if replay is not available."""
+    """Fail if replay is not available."""
     if not REPLAY_PATH.exists():
-        pytest.skip("Replay file not available (run locally with replay)")
+        raise FileNotFoundError(f"Replay file not found: {REPLAY_PATH}")
 
 
 @pytest.fixture(scope="session")
@@ -686,21 +701,24 @@ def match_players():
 # Match 2 fixtures (8594217096) - OG match with Pure, bzm, 33, Whitemon, Ari
 # =============================================================================
 
-_parsed_data_2_cache: Optional[ParsedReplayData] = None
 _match_2_players_cache = None
+
+
+def _require_replay_2():
+    """Fail if replay 2 is not available."""
+    if not REPLAY_PATH_2.exists():
+        raise FileNotFoundError(f"Replay file not found: {REPLAY_PATH_2}")
 
 
 @pytest.fixture(scope="session")
 def parsed_replay_data_2():
     """Parsed replay data for match 8594217096."""
-    return _get_parsed_data_2()
+    return _get_parsed_data_2()  # Raises FileNotFoundError if not available
 
 
 @pytest.fixture(scope="session")
 def hero_deaths_2(parsed_replay_data_2):
     """Hero deaths from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     deaths = cs.get_hero_deaths(parsed_replay_data_2)
     # Filter to game deaths only (after 0:00)
@@ -710,8 +728,6 @@ def hero_deaths_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def roshan_kills_2(parsed_replay_data_2):
     """Roshan kills from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_roshan_kills(parsed_replay_data_2)
 
@@ -719,8 +735,6 @@ def roshan_kills_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def tormentor_kills_2(parsed_replay_data_2):
     """Tormentor kills from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_tormentor_kills(parsed_replay_data_2)
 
@@ -728,8 +742,6 @@ def tormentor_kills_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def tower_kills_2(parsed_replay_data_2):
     """Tower kills from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_tower_kills(parsed_replay_data_2)
 
@@ -737,8 +749,6 @@ def tower_kills_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def barracks_kills_2(parsed_replay_data_2):
     """Barracks kills from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_barracks_kills(parsed_replay_data_2)
 
@@ -746,8 +756,6 @@ def barracks_kills_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def rune_pickups_2(parsed_replay_data_2):
     """Rune pickups from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_rune_pickups(parsed_replay_data_2)
 
@@ -755,8 +763,6 @@ def rune_pickups_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def courier_kills_2(parsed_replay_data_2):
     """Courier kills from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_courier_kills(parsed_replay_data_2)
 
@@ -774,8 +780,6 @@ def match_players_2():
 @pytest.fixture(scope="session")
 def lane_summary_2(parsed_replay_data_2):
     """Lane summary for match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return None
     ls = _get_lane_service()
     return ls.get_lane_summary(parsed_replay_data_2)
 
@@ -783,8 +787,6 @@ def lane_summary_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def all_fights_2(parsed_replay_data_2):
     """All fights from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return None
     fs = _get_fight_service()
     return fs.get_all_fights(parsed_replay_data_2)
 
@@ -792,8 +794,6 @@ def all_fights_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def combat_log_1800_1900_2(parsed_replay_data_2):
     """Combat log 30:00-31:40 from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_combat_log(parsed_replay_data_2, start_time=1800, end_time=1900)
 
@@ -801,8 +801,6 @@ def combat_log_1800_1900_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def combat_log_narrative_2(parsed_replay_data_2):
     """Combat log 30:00-31:40 NARRATIVE from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_combat_log(
         parsed_replay_data_2, start_time=1800, end_time=1900,
@@ -813,8 +811,6 @@ def combat_log_narrative_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def combat_log_tactical_2(parsed_replay_data_2):
     """Combat log 30:00-31:40 TACTICAL from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_combat_log(
         parsed_replay_data_2, start_time=1800, end_time=1900,
@@ -825,8 +821,6 @@ def combat_log_tactical_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def combat_log_full_2(parsed_replay_data_2):
     """Combat log 30:00-31:40 FULL from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_combat_log(
         parsed_replay_data_2, start_time=1800, end_time=1900,
@@ -837,8 +831,6 @@ def combat_log_full_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def combat_log_juggernaut_2(parsed_replay_data_2):
     """Combat log filtered to Juggernaut from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_combat_log(
         parsed_replay_data_2, start_time=1800, end_time=1900,
@@ -849,8 +841,6 @@ def combat_log_juggernaut_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def item_purchases_2(parsed_replay_data_2):
     """Item purchases from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_item_purchases(parsed_replay_data_2)
 
@@ -858,8 +848,6 @@ def item_purchases_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def item_purchases_juggernaut_2(parsed_replay_data_2):
     """Item purchases for Juggernaut from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return []
     cs = _get_combat_service()
     return cs.get_item_purchases(parsed_replay_data_2, hero_filter="juggernaut")
 
@@ -867,8 +855,6 @@ def item_purchases_juggernaut_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def juggernaut_farming_2(parsed_replay_data_2):
     """Farming pattern for Juggernaut (0-15 min) from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return None
     fs = _get_farming_service()
     return fs.get_farming_pattern(
         parsed_replay_data_2, "juggernaut", start_minute=0, end_minute=15, item_timings=[]
@@ -878,8 +864,6 @@ def juggernaut_farming_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def void_spirit_farming_2(parsed_replay_data_2):
     """Farming pattern for Void Spirit (0-15 min) from match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return None
     fs = _get_farming_service()
     return fs.get_farming_pattern(
         parsed_replay_data_2, "void_spirit", start_minute=0, end_minute=15, item_timings=[]
@@ -889,8 +873,6 @@ def void_spirit_farming_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def cs_at_10_2(parsed_replay_data_2):
     """CS data at 10 minutes for match 8594217096."""
-    if parsed_replay_data_2 is None:
-        return {}
     ls = _get_lane_service()
     return ls.get_cs_at_minute(parsed_replay_data_2, 10)
 
@@ -898,8 +880,6 @@ def cs_at_10_2(parsed_replay_data_2):
 @pytest.fixture(scope="session")
 def hero_combat_analysis_juggernaut_2(parsed_replay_data_2, all_fights_2):
     """Hero combat analysis for Juggernaut from match 8594217096."""
-    if parsed_replay_data_2 is None or all_fights_2 is None:
-        return None
     cs = _get_combat_service()
     return cs.get_hero_combat_analysis(
         parsed_replay_data_2, TEST_MATCH_ID_2, "juggernaut", all_fights_2.fights
@@ -909,8 +889,6 @@ def hero_combat_analysis_juggernaut_2(parsed_replay_data_2, all_fights_2):
 @pytest.fixture(scope="session")
 def hero_combat_analysis_centaur_2(parsed_replay_data_2, all_fights_2):
     """Hero combat analysis for Centaur from match 8594217096."""
-    if parsed_replay_data_2 is None or all_fights_2 is None:
-        return None
     cs = _get_combat_service()
     return cs.get_hero_combat_analysis(
         parsed_replay_data_2, TEST_MATCH_ID_2, "centaur", all_fights_2.fights

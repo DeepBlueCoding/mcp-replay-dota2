@@ -66,12 +66,30 @@ get_hero_deaths(match_id=8461956309)
       "killer": "disruptor",
       "killer_is_hero": true,
       "ability": "disruptor_thunder_strike",
-      "position": {"x": 4200, "y": 1800, "region": "dire_safelane", "location": "Dire safelane near tower"}
+      "position": {"x": 4200, "y": 1800, "region": "dire_safelane", "location": "Dire safelane near tower"},
+      "killer_level": 5,
+      "victim_level": 4,
+      "level_advantage": 1
     }
   ],
   "coaching_analysis": "AI analysis of death patterns (if client supports sampling)"
 }
 ```
+
+**Level Tracking Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `killer_level` | Killer's level at time of death (null if non-hero killer) |
+| `victim_level` | Victim's level at time of death |
+| `level_advantage` | `killer_level - victim_level` (positive = killer was higher level) |
+
+!!! tip "Level Advantage Analysis"
+    Use `level_advantage` to identify:
+
+    - **Positive values**: Expected kills (higher level hero winning)
+    - **Negative values**: Outplays or ganks (lower level hero getting the kill)
+    - **Large negative values (-3 or more)**: Significant outplays or team rotations
 
 ---
 
@@ -90,6 +108,8 @@ get_hero_deaths(match_id=8461956309)
 - `total_kills`, `total_deaths`, `total_assists` (aggregated)
 - `ability_summary`: casts, hero_hits, hit_rate per ability
 - `fights[]`: per-fight breakdown with kills/deaths/abilities used
+- `avg_kill_level_advantage`: average level advantage when getting kills
+- `avg_death_level_disadvantage`: average level disadvantage when dying
 - `coaching_analysis`: AI evaluation (if client supports sampling)
 
 !!! danger "DO NOT chain to other tools after this"
@@ -118,6 +138,8 @@ get_hero_performance(
   "total_kills": 2,
   "total_deaths": 2,
   "total_assists": 0,
+  "avg_kill_level_advantage": 1.5,
+  "avg_death_level_disadvantage": -0.5,
   "ability_summary": [
     {"ability": "earthshaker_fissure", "total_casts": 3, "hero_hits": 6, "hit_rate": 200.0},
     {"ability": "earthshaker_enchant_totem", "total_casts": 3, "hero_hits": 2, "hit_rate": 66.7},
@@ -131,6 +153,7 @@ get_hero_performance(
       "fight_end": 295.0,
       "fight_end_str": "4:55",
       "is_teamfight": false,
+      "hero_level": 6,
       "kills": 0,
       "deaths": 1,
       "assists": 0,
@@ -153,6 +176,9 @@ get_hero_performance(
 | `hit_rate` | Can exceed 100% for AoE abilities that hit multiple heroes per cast |
 | `fights` | Per-fight breakdown with K/D/A and ability usage |
 | `is_teamfight` | True if the fight had 3+ deaths |
+| `avg_kill_level_advantage` | Average level advantage when getting kills (positive = usually ahead) |
+| `avg_death_level_disadvantage` | Average level disadvantage when dying (negative = dying to higher level) |
+| `hero_level` | Hero's level at the start of each fight (in `fights[]`) |
 
 !!! tip "Ground-Targeted Abilities"
     Abilities like Ice Path, Fissure, and Kinetic Field are tracked via MODIFIER_ADD events (stun debuffs applied to heroes), not just the cast event. This ensures accurate hit detection for ground-targeted CC abilities.
@@ -590,7 +616,7 @@ get_rune_pickups(match_id=8461956309)
 
 ## get_match_draft
 
-Complete draft with bans and picks in order (for Captains Mode matches). Includes **position assignment** and **drafting context** (counters, good matchups, when to pick) for each hero.
+Complete draft with bans and picks in order (for Captains Mode matches). Includes **position assignment**, **drafting context** (counters, good matchups, when to pick), and **draft timing data** for each hero.
 
 ```python
 get_match_draft(match_id=8461956309)
@@ -631,7 +657,18 @@ get_match_draft(match_id=8461956309)
   "radiant_picks": [...],
   "radiant_bans": [...],
   "dire_picks": [...],
-  "dire_bans": [...]
+  "dire_bans": [...],
+  "draft_timings": [
+    {
+      "order": 1,
+      "is_pick": false,
+      "active_team": "radiant",
+      "hero_id": 23,
+      "player_slot": null,
+      "extra_time": 130,
+      "total_time_taken": 15
+    }
+  ]
 }
 ```
 
@@ -645,14 +682,26 @@ get_match_draft(match_id=8461956309)
   - **5** = Hard support
 - `position` is `null` for bans (hero wasn't picked)
 
+**Draft Timings Fields (OpenDota SDK 7.40.1+):**
+
+| Field | Description |
+|-------|-------------|
+| `order` | Draft order (1-24 for CM) |
+| `is_pick` | True if pick, False if ban |
+| `active_team` | Team making this selection ("radiant" or "dire") |
+| `hero_id` | Hero ID selected |
+| `player_slot` | Player slot if this is a pick (null for bans) |
+| `extra_time` | Extra time remaining after this selection (seconds) |
+| `total_time_taken` | Time spent on this selection (seconds) |
+
 !!! tip "Draft Analysis"
-    Use `counters`, `good_against`, and `when_to_pick` fields to analyze draft decisions. The `position` field tells you which role the hero was played in.
+    Use `counters`, `good_against`, and `when_to_pick` fields to analyze draft decisions. The `position` field tells you which role the hero was played in. Use `draft_timings` to analyze time pressure and decision-making speed.
 
 ---
 
 ## get_match_info
 
-Match metadata including teams, players, winner, duration.
+Match metadata including teams, players, winner, duration, and match analysis fields.
 
 ```python
 get_match_info(match_id=8461956309)
@@ -664,13 +713,21 @@ get_match_info(match_id=8461956309)
   "match_id": 8461956309,
   "is_pro_match": true,
   "league_id": 18324,
+  "league": {
+    "league_id": 18324,
+    "name": "The International 2024",
+    "tier": "premium"
+  },
   "game_mode": 2,
   "game_mode_name": "Captains Mode",
   "winner": "dire",
   "duration_seconds": 4672,
   "duration_str": "77:52",
-  "radiant_team": {"team_id": 8291895, "team_tag": "XG", "team_name": "XG"},
-  "dire_team": {"team_id": 8894818, "team_tag": "FLCN", "team_name": "FLCN"},
+  "pre_game_duration": 90,
+  "comeback": 0.15,
+  "stomp": 0.02,
+  "radiant_team": {"team_id": 8291895, "team_tag": "XG", "team_name": "XG", "logo_url": "https://..."},
+  "dire_team": {"team_id": 8894818, "team_tag": "FLCN", "team_name": "FLCN", "logo_url": "https://..."},
   "players": [
     {"player_name": "Ame", "hero_name": "juggernaut", "hero_localized": "Juggernaut", "team": "radiant", "steam_id": 123456}
   ],
@@ -679,11 +736,28 @@ get_match_info(match_id=8461956309)
 }
 ```
 
+**New Fields (OpenDota SDK 7.40.1+):**
+
+| Field | Description |
+|-------|-------------|
+| `league` | League info object with `league_id`, `name`, and `tier` |
+| `pre_game_duration` | Duration before horn in seconds (strategy phase) |
+| `comeback` | Comeback factor (0.0-1.0, higher = bigger comeback by winner) |
+| `stomp` | Stomp factor (0.0-1.0, higher = more one-sided match) |
+| `logo_url` | Team logo URL from OpenDota (in team objects) |
+
+!!! tip "Match Analysis"
+    Use `comeback` and `stomp` to quickly identify close games vs one-sided matches:
+
+    - **High stomp (>0.5)**: Dominant victory, likely draft/lane advantage
+    - **High comeback (>0.5)**: Team recovered from losing position
+    - **Low both (<0.2)**: Evenly contested match
+
 ---
 
 ## get_match_heroes
 
-Get the 10 heroes in a match with detailed stats, **position assignment**, and **counter picks data** for draft analysis.
+Get the 10 heroes in a match with detailed stats, **position assignment**, **counter picks data**, and **player performance metrics** for analysis.
 
 ```python
 get_match_heroes(match_id=8461956309)
@@ -712,6 +786,14 @@ get_match_heroes(match_id=8461956309)
       "items": ["Manta Style", "Battle Fury", "Abyssal Blade"],
       "player_name": "PlayerOne",
       "pro_name": "Yatoro",
+      "rank_tier": 80,
+      "teamfight_participation": 0.65,
+      "stuns": 12.5,
+      "camps_stacked": 3,
+      "obs_placed": 0,
+      "sen_placed": 2,
+      "lane_efficiency": 0.85,
+      "item_neutral2": "item_havoc_hammer",
       "counters": [
         {"hero_id": 6, "localized_name": "Doom", "reason": "Doom silences AM completely..."}
       ],
@@ -735,14 +817,30 @@ get_match_heroes(match_id=8461956309)
 | 4 | Soft support | Higher GPM support |
 | 5 | Hard support | Lowest GPM support |
 
+**New Fields (OpenDota SDK 7.40.1+):**
+
+| Field | Description |
+|-------|-------------|
+| `rank_tier` | Player rank tier (e.g., 80+ = Immortal, 85 = Divine 5) |
+| `teamfight_participation` | Percentage of team kills player was involved in (0.0-1.0) |
+| `stuns` | Total stun duration dealt to enemies in seconds |
+| `camps_stacked` | Number of neutral camps stacked |
+| `obs_placed` | Observer wards placed |
+| `sen_placed` | Sentry wards placed |
+| `lane_efficiency` | Lane efficiency score (0.0-1.0, gold earned vs max possible) |
+| `item_neutral2` | Second neutral item slot (patch 7.40+) |
+
 !!! tip "Draft Analysis"
     Use the `counters` and `good_against` fields to analyze draft advantages. The `position` field tells you which role each hero played (1-5).
+
+!!! tip "Support Analysis"
+    Use `obs_placed`, `sen_placed`, and `camps_stacked` to evaluate support performance. High `teamfight_participation` on supports indicates good positioning.
 
 ---
 
 ## get_match_players
 
-Get the 10 players in a match with their hero assignments and **position (1-5)**.
+Get the 10 players in a match with their hero assignments, **position (1-5)**, and **rank tier**.
 
 ```python
 get_match_players(match_id=8461956309)
@@ -759,11 +857,30 @@ get_match_players(match_id=8461956309)
       "hero_id": 1,
       "hero_name": "antimage",
       "localized_name": "Anti-Mage",
-      "position": 1
+      "position": 1,
+      "rank_tier": 80
     }
   ],
   "dire": [...]
 }
 ```
 
-The `position` field indicates the player's role (1=carry, 2=mid, 3=offlane, 4=soft support, 5=hard support) based on lane assignment and farm priority (GPM).
+**Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `position` | Player's role (1=carry, 2=mid, 3=offlane, 4=soft support, 5=hard support) |
+| `rank_tier` | Player rank tier (OpenDota SDK 7.40.1+). Can be null for pro matches. |
+
+**Rank Tier Values:**
+
+| Range | Rank |
+|-------|------|
+| 10-15 | Herald |
+| 20-25 | Guardian |
+| 30-35 | Crusader |
+| 40-45 | Archon |
+| 50-55 | Legend |
+| 60-65 | Ancient |
+| 70-75 | Divine |
+| 80+ | Immortal |

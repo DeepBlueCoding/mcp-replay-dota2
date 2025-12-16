@@ -40,8 +40,10 @@ class CombatLogEvent(BaseModel):
     game_time_str: str = Field(description="Game time formatted as M:SS")
     attacker: str = Field(description="Source of the event (hero name without npc_dota_hero_ prefix)")
     attacker_is_hero: bool = Field(description="Whether the attacker is a hero")
+    attacker_level: Optional[int] = Field(default=None, description="Attacker's hero level (for DEATH events)")
     target: str = Field(description="Target of the event")
     target_is_hero: bool = Field(description="Whether the target is a hero")
+    target_level: Optional[int] = Field(default=None, description="Target's hero level (for DEATH events)")
     ability: Optional[str] = Field(default=None, description="Ability or item involved")
     value: Optional[CoercedInt] = Field(default=None, description="Damage amount or other numeric value")
     hit: Optional[bool] = Field(
@@ -69,6 +71,9 @@ class HeroDeath(BaseModel):
     killer: str = Field(description="Hero or unit that got the kill")
     victim: str = Field(description="Hero that died")
     killer_is_hero: bool = Field(description="Whether the killer was a hero")
+    killer_level: Optional[int] = Field(default=None, description="Killer's hero level")
+    victim_level: Optional[int] = Field(default=None, description="Victim's hero level")
+    level_advantage: Optional[int] = Field(default=None, description="Killer's level advantage")
     ability: Optional[str] = Field(default=None, description="Ability or item that dealt the killing blow")
     position_x: Optional[float] = Field(default=None, description="World X coordinate of death")
     position_y: Optional[float] = Field(default=None, description="World Y coordinate of death")
@@ -356,6 +361,7 @@ class FightParticipation(BaseModel):
     fight_end: float = Field(description="Fight end time in seconds")
     fight_end_str: str = Field(description="Fight end formatted as M:SS")
     is_teamfight: bool = Field(description="Whether this was a teamfight (3+ deaths)")
+    hero_level: Optional[int] = Field(default=None, description="Hero's level at start of fight")
     kills: CoercedInt = Field(description="Heroes killed by this hero in the fight")
     deaths: CoercedInt = Field(description="Times this hero died in the fight")
     assists: CoercedInt = Field(description="Kill assists (dealt damage to victim)")
@@ -379,6 +385,14 @@ class HeroCombatAnalysisResponse(BaseModel):
     total_kills: CoercedInt = Field(default=0, description="Total kills across all fights")
     total_deaths: CoercedInt = Field(default=0, description="Total deaths across all fights")
     total_assists: CoercedInt = Field(default=0, description="Total assists across all fights")
+    avg_kill_level_advantage: Optional[float] = Field(
+        default=None,
+        description="Average level advantage when getting kills (positive = higher level than victim)"
+    )
+    avg_death_level_disadvantage: Optional[float] = Field(
+        default=None,
+        description="Average level disadvantage when dying (positive = lower level than killer)"
+    )
     ability_summary: List[AbilityUsage] = Field(
         default_factory=list,
         description="Overall ability usage across all fights"

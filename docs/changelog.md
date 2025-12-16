@@ -6,6 +6,82 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0-dev3] - 2025-12-16
+
+### Added
+
+- **python-manta 1.4.7.1.dev1** - Upgrade with attack collector and hero naming fixes:
+  - Fixed hero naming: proper camelToSnake conversion (`shadow_demon` not `shadow__demon`)
+  - New melee attack tracking from combat log DAMAGE events
+  - Unified `AttackEvent` model for ranged and melee attacks
+  - ~32,000 attack events per match for complete last-hit analysis
+
+### Changed
+
+- **Test suite restructured to mirror source hierarchy**:
+  - `tests/services/combat/` - CombatService tests
+  - `tests/services/farming/` - FarmingService tests
+  - `tests/services/lane/` - LaneService tests
+  - `tests/services/rotation/` - RotationService tests
+  - `tests/services/analyzers/` - FightAnalyzer tests
+  - `tests/examples/` - Match-specific validation tests
+  - `tests/models/` - Pydantic model tests
+  - `tests/resources/` - Resource tests
+  - `tests/utils/` - Utility tests
+
+### Fixed
+
+- Hero names now consistent across entity snapshots and combat log (python-manta fix)
+
+---
+
+## [1.1.0-dev2] - 2025-12-16
+
+### Added
+
+- **OpenDota SDK 7.40.1 field integration** - New player/match metrics:
+  - `get_match_heroes`: Added `rank_tier`, `teamfight_participation`, `stuns`, `camps_stacked`, `obs_placed`, `sen_placed`, `lane_efficiency`, `item_neutral2`
+  - `get_match_players`: Added `rank_tier` field
+  - `get_match_info`: Added `league` object (league_id, name, tier), `pre_game_duration`, `comeback`, `stomp`, and `logo_url` in team objects
+  - `get_match_draft`: Added `draft_timings` array with pick/ban timing data (order, extra_time, total_time_taken)
+  - `get_lane_summary`: Added `lane_efficiency` to hero stats
+
+- **New Pydantic models**:
+  - `DraftTiming`: Draft timing data for each pick/ban
+  - `LeagueInfo`: League information with tier
+  - Updated `TeamInfo` with `logo_url`
+  - Updated `MatchInfoResult` with `league`, `comeback`, `stomp`, `pre_game_duration`
+
+- **New tests for OpenDota SDK 7.40.1 fields** in `test_match_fetcher.py`:
+  - `TestOpenDotaSDK740Fields`: 10 tests for new player fields
+  - `TestEnhancedMatchInfo`: 7 async tests for enhanced match info
+
+### Refactored
+
+- **Test suite converted to real match data validation**:
+  - `test_fight_analyzer.py`: Rewritten from ~1247 lines of mock events to ~366 lines testing actual fight patterns
+  - `test_rotation_service.py`: Converted from synthetic data tests to real rotation analysis
+  - `test_model_validation.py`: Changed from Pydantic type validation to testing actual service outputs
+  - All tests now verify real match data instead of mock/synthetic events
+
+### Test Coverage
+
+- **Match 8461956309 (primary test match)**:
+  - 31 hero deaths, first blood Earthshaker by Disruptor at 4:48
+  - 19 rune pickups, Naga Siren arcane at 6:15
+  - 4 Roshan kills, 14 tower kills (first: Dire mid T1 at 11:09)
+  - 24 fights detected, 24 rotations (Shadow Demon most active with 6)
+  - Lane analysis: Dire won top, Radiant won mid and bot
+  - CS verification: Juggernaut 63 LH@10, Nevermore 105 LH@10
+  - Fight highlights: Echo Slam 4 heroes at 46:45, ES double kill, BKB+Blink combos
+
+- **Match 8594217096 (secondary test match)**:
+  - 53 game deaths, first blood Batrider by Pugna at 1:24
+  - 3 Roshan kills, 14 tower kills, 5 courier kills
+  - 36 rotations detected (Juggernaut most active)
+
+---
+
 ## [1.0.9] - 2025-12-12
 
 ### Fixed

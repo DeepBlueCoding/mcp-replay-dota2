@@ -14,6 +14,8 @@ import requests
 from opendota import OpenDota
 from python_manta import CombatLogType, Parser
 
+from src.models.game_context import GameContext
+
 from ..cache.replay_cache import ReplayCache
 from ..models.replay_data import ParsedReplayData, ProgressCallback
 
@@ -314,10 +316,11 @@ class ReplayService:
         # Single-pass parse with all collectors
         logger.info(f"Parsing replay {replay_path}")
 
-        result = parser.parse(
-            header=True,
-            game_info=True,
-            combat_log={
+        # Build parse config - attacks is optional (requires python-manta 1.4.5.4+)
+        parse_config = {
+            "header": True,
+            "game_info": True,
+            "combat_log": {
                 "types": [
                     CombatLogType.DAMAGE.value,
                     CombatLogType.HEAL.value,
@@ -333,21 +336,44 @@ class ReplayService:
                 ],
                 "max_entries": 100000,
             },
-            entities={
+            "entities": {
                 "interval_ticks": 900,  # ~30 second snapshots
                 "max_snapshots": 200,
             },
-            game_events={
+            "game_events": {
                 "max_events": 10000,
             },
-            modifiers={
+            "modifiers": {
                 "max_modifiers": 50000,
             },
-            messages={
+            "messages": {
                 "message_types": ['CDOTAMatchMetadataFile'],
                 "max_messages": 0,  # No limit - need to find metadata at end of file
             },
-        )
+        }
+
+        # Check if attacks collector is available (python-manta 1.4.5.4+)
+        import inspect
+        parse_sig = inspect.signature(parser.parse)
+        if 'attacks' in parse_sig.parameters:
+            parse_config["attacks"] = {
+                "max_events": 50000,  # Capture attacks for neutral aggro/tower pressure
+            }
+            logger.info("Attacks collector enabled")
+        else:
+            logger.info("Attacks collector not available (requires python-manta 1.4.5.4+)")
+
+        # Check if entity_deaths collector is available (python-manta 1.4.5.4+)
+        if 'entity_deaths' in parse_sig.parameters:
+            parse_config["entity_deaths"] = {
+                "creeps_only": True,  # Only track creep deaths for wave detection
+                "max_events": 10000,
+            }
+            logger.info("Entity deaths collector enabled")
+        else:
+            logger.info("Entity deaths collector not available (requires python-manta 1.4.5.4+)")
+
+        result = parser.parse(**parse_config)
 
         if not result.success:
             raise ValueError(f"Parsing failed: {result.error}")
@@ -357,6 +383,10 @@ class ReplayService:
 
         logger.info(f"Parsed {len(result.combat_log.entries) if result.combat_log else 0} combat log entries")
         logger.info(f"Parsed {len(result.entities.snapshots) if result.entities else 0} entity snapshots")
+        if hasattr(result, 'attacks') and result.attacks:
+            logger.info(f"Parsed {len(result.attacks.events)} attack events")
+        if hasattr(result, 'entity_deaths') and result.entity_deaths:
+            logger.info(f"Parsed {len(result.entity_deaths.events)} entity death events")
 
         return ParsedReplayData.from_parse_result(
             match_id=match_id,
@@ -394,3 +424,16 @@ class ReplayService:
 
         # Delete cache
         return self._cache.delete(match_id)
+
+    def get_game_context(self, data: ParsedReplayData) -> GameContext:
+        """Create a GameContext from parsed replay data.
+
+        The context provides version-aware access to map data and constants.
+
+        Args:
+            data: Parsed replay data
+
+        Returns:
+            GameContext with resolved patch version and lazy-loaded versioned data
+        """
+        return GameContext.from_parsed_data(data)

@@ -273,7 +273,10 @@ def register_fight_tools(mcp, services):
                             game_time=d.game_time,
                             game_time_str=d.game_time_str,
                             killer=d.killer,
+                            killer_level=d.killer_level,
                             victim=d.victim,
+                            victim_level=d.victim_level,
+                            level_advantage=d.level_advantage,
                             ability=d.ability,
                         )
                         for d in f.deaths
@@ -346,7 +349,10 @@ def register_fight_tools(mcp, services):
                     game_time_str=d.game_time_str,
                     killer=d.killer,
                     killer_is_hero=d.killer_is_hero,
+                    killer_level=d.killer_level,
                     victim=d.victim,
+                    victim_level=d.victim_level,
+                    level_advantage=d.level_advantage,
                     ability=d.ability,
                     position_x=d.position_x,
                     position_y=d.position_y,

@@ -10,7 +10,7 @@ packages = ["src"]
 
 [project]
 name = "mcp-replay-dota2"
-version = "1.1.0-dev2"
+version = "1.1.0-dev3"
 description = "Model Context Protocol server for Dota 2 match analysis using replay files"
 readme = "README.md"
 license = "MIT"
@@ -32,9 +32,9 @@ classifiers = [
 
 dependencies = [
     "fastmcp>=2.12.3",
-    "python-opendota-sdk>=7.39.5.2",
+    "python-opendota-sdk>=7.40.1",
     "requests>=2.32.5",
-    "python-manta>=1.4.5.2",
+    "python-manta==1.4.7.1.dev1",
     "aiohttp>=3.13.2",
     "diskcache>=5.6.3",
     "anthropic>=0.75.0",
@@ -72,9 +72,14 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
 ]
 
+[tool.uv]
+index-url = "https://pypi.org/simple"
+extra-index-url = ["https://test.pypi.org/simple"]
+index-strategy = "unsafe-best-match"
+
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.1.0-dev2"
+version = "1.1.0-dev3"
 version_files = [
     "pyproject.toml:^version",
 ]

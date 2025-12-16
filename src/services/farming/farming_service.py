@@ -25,6 +25,7 @@ from ..models.farming_data import (
     MapPositionSnapshot,
     MinuteFarmingData,
     MultiCampClear,
+    WaveClear,
 )
 from ..models.replay_data import ParsedReplayData
 
@@ -506,31 +507,54 @@ class FarmingService:
                     area=end_area,
                 )
 
-            # Build ordered camp sequence for this minute
+            # Build ordered camp sequence and wave clears for this minute
             camp_sequence: List[CampClear] = []
-            seen_camps: set = set()  # Track unique camps cleared
-            lane_kills = 0
+            wave_clears: List[WaveClear] = []
+
+            # Group camps by type+time (kills within 5 seconds are same camp)
+            camp_groups: Dict[str, List[CreepKill]] = defaultdict(list)
+            # Group lane creeps by time window (kills within 5 seconds are same wave)
+            lane_groups: Dict[int, List[CreepKill]] = defaultdict(list)
 
             for kill in creep_kills:
                 if minute_start <= kill.game_time < minute_end:
                     if kill.creep_type == "lane":
-                        lane_kills += 1
+                        wave_key = int(kill.game_time // 5)
+                        lane_groups[wave_key].append(kill)
                     elif kill.creep_type == "neutral" and kill.neutral_camp:
-                        tier = self._get_camp_tier(kill.neutral_camp) or "unknown"
-                        area = kill.map_area or "unknown"
-
-                        # Track unique camps (use camp type + approximate time as key)
-                        # Group kills within 5 seconds as same camp clear
                         camp_key = f"{kill.neutral_camp}_{int(kill.game_time // 5)}"
-                        if camp_key not in seen_camps:
-                            seen_camps.add(camp_key)
-                            camp_sequence.append(CampClear(
-                                time_str=kill.game_time_str,
-                                camp=kill.neutral_camp,
-                                tier=tier,
-                                area=area,
-                            ))
-                            all_camps[kill.neutral_camp] += 1
+                        camp_groups[camp_key].append(kill)
+
+            # Build camp clears with position and creep count
+            for camp_key, kills in sorted(camp_groups.items(), key=lambda x: x[1][0].game_time):
+                first_kill = kills[0]
+                camp_type = first_kill.neutral_camp or "unknown"
+                tier = self._get_camp_tier(camp_type) or "unknown"
+                area = first_kill.map_area or "unknown"
+                camp_sequence.append(CampClear(
+                    time_str=first_kill.game_time_str,
+                    camp=camp_type,
+                    tier=tier,
+                    area=area,
+                    position_x=first_kill.position_x,
+                    position_y=first_kill.position_y,
+                    creeps_killed=len(kills),
+                ))
+                all_camps[camp_type] += 1
+
+            # Build wave clears with position and creep count
+            for wave_key, kills in sorted(lane_groups.items(), key=lambda x: x[1][0].game_time):
+                first_kill = kills[0]
+                area = first_kill.map_area or "unknown"
+                wave_clears.append(WaveClear(
+                    time_str=first_kill.game_time_str,
+                    creeps_killed=len(kills),
+                    position_x=first_kill.position_x,
+                    position_y=first_kill.position_y,
+                    area=area,
+                ))
+
+            lane_kills = sum(len(kills) for kills in lane_groups.values())
 
             # Get stats at end of minute
             stats = self._get_stats_at_time(data, hero, minute_end)
@@ -540,6 +564,7 @@ class FarmingService:
                 position_at_start=position_at_start,
                 position_at_end=position_at_end,
                 camp_sequence=camp_sequence,
+                wave_clears=wave_clears,
                 lane_creeps_killed=lane_kills,
                 camps_cleared=len(camp_sequence),
                 gold=stats["gold"],
@@ -547,10 +572,13 @@ class FarmingService:
                 level=stats["level"],
             ))
 
-        # Calculate summary
+        # Calculate summary - sum actual creeps killed, not event counts
         total_lane = sum(m.lane_creeps_killed for m in minute_data)
-        total_camps = sum(m.camps_cleared for m in minute_data)
-        total_creeps = total_lane + total_camps
+        total_neutral = sum(
+            sum(camp.creeps_killed for camp in m.camp_sequence)
+            for m in minute_data
+        )
+        total_creeps = total_lane + total_neutral
 
         # Get gold at start and end for GPM calculation
         start_gold = minute_data[0].gold if minute_data else 0
@@ -568,8 +596,8 @@ class FarmingService:
 
         summary = FarmingSummary(
             total_lane_creeps=total_lane,
-            total_neutral_creeps=total_camps,
-            jungle_percentage=round(total_camps / total_creeps * 100, 1) if total_creeps > 0 else 0.0,
+            total_neutral_creeps=total_neutral,
+            jungle_percentage=round(total_neutral / total_creeps * 100, 1) if total_creeps > 0 else 0.0,
             gpm=gpm,
             cs_per_min=cs_per_min,
             camps_cleared=dict(all_camps),
@@ -590,6 +618,5 @@ class FarmingService:
             minutes=minute_data,
             transitions=transitions,
             summary=summary,
-            creep_kills=creep_kills,
             multi_camp_clears=multi_camp_clears,
         )

@@ -187,6 +187,7 @@ def register_match_tools(mcp, services):
         match_id: int, ctx: Optional[Context] = None
     ) -> MatchDraftResponse:
         """Get the complete draft (picks and bans) for a Dota 2 match with drafting context."""
+        from ..models.match_info import DraftTiming
         from ..utils.match_info_parser import match_info_parser
 
         async def progress_callback(current: int, total: int, message: str) -> None:
@@ -210,6 +211,21 @@ def register_match_tools(mcp, services):
                 success=False, match_id=match_id, error="get_draft returned None (no game_info?)"
             )
 
+        enhanced_info = await match_fetcher.get_enhanced_match_info(match_id)
+        if enhanced_info and enhanced_info.get("draft_timings"):
+            draft.draft_timings = [
+                DraftTiming(
+                    order=dt.get("order", 0),
+                    is_pick=dt.get("pick", False),
+                    active_team=dt.get("active_team", "radiant"),
+                    hero_id=dt.get("hero_id", 0),
+                    player_slot=dt.get("player_slot"),
+                    extra_time=dt.get("extra_time"),
+                    total_time_taken=dt.get("total_time_taken"),
+                )
+                for dt in enhanced_info["draft_timings"]
+            ]
+
         return MatchDraftResponse(success=True, match_id=match_id, draft=draft)
 
     @mcp.tool
@@ -217,6 +233,7 @@ def register_match_tools(mcp, services):
         match_id: int, ctx: Optional[Context] = None
     ) -> MatchInfoResponse:
         """Get match metadata and player information for a Dota 2 match."""
+        from ..models.match_info import LeagueInfo
         from ..utils.match_info_parser import match_info_parser
 
         async def progress_callback(current: int, total: int, message: str) -> None:
@@ -251,6 +268,29 @@ def register_match_tools(mcp, services):
                 if player.steam_id and player.steam_id in pro_names:
                     player.player_name = pro_names[player.steam_id]
 
+        enhanced_info = await match_fetcher.get_enhanced_match_info(match_id)
+        if enhanced_info:
+            if enhanced_info.get("radiant_team"):
+                rt = enhanced_info["radiant_team"]
+                match_info.radiant_team.logo_url = rt.get("logo_url")
+                if rt.get("name") and not match_info.radiant_team.team_name:
+                    match_info.radiant_team.team_name = rt.get("name")
+            if enhanced_info.get("dire_team"):
+                dt = enhanced_info["dire_team"]
+                match_info.dire_team.logo_url = dt.get("logo_url")
+                if dt.get("name") and not match_info.dire_team.team_name:
+                    match_info.dire_team.team_name = dt.get("name")
+            if enhanced_info.get("league"):
+                lg = enhanced_info["league"]
+                match_info.league = LeagueInfo(
+                    league_id=lg.get("leagueid", 0),
+                    name=lg.get("name"),
+                    tier=lg.get("tier"),
+                )
+            match_info.comeback = enhanced_info.get("comeback")
+            match_info.stomp = enhanced_info.get("stomp")
+            match_info.pre_game_duration = enhanced_info.get("pre_game_duration")
+
         return MatchInfoResponse(success=True, match_id=match_id, info=match_info)
 
     @mcp.tool
@@ -267,6 +307,7 @@ def register_match_tools(mcp, services):
                     player_name=h.get("player_name"),
                     pro_name=h.get("pro_name"),
                     position=h.get("position"),
+                    rank_tier=h.get("rank_tier"),
                     kills=h.get("kills", 0),
                     deaths=h.get("deaths", 0),
                     assists=h.get("assists", 0),
@@ -278,12 +319,19 @@ def register_match_tools(mcp, services):
                     hero_damage=h.get("hero_damage", 0),
                     tower_damage=h.get("tower_damage", 0),
                     hero_healing=h.get("hero_healing", 0),
+                    teamfight_participation=h.get("teamfight_participation"),
+                    stuns=h.get("stuns"),
+                    camps_stacked=h.get("camps_stacked"),
+                    obs_placed=h.get("obs_placed"),
+                    sen_placed=h.get("sen_placed"),
                     lane=h.get("lane_name"),
+                    lane_efficiency=h.get("lane_efficiency"),
                     role=h.get("role"),
                     items=constants_fetcher.convert_item_ids_to_names(
                         [h.get(f"item_{i}") for i in range(6)]
                     ),
                     item_neutral=constants_fetcher.get_item_name(h.get("item_neutral")),
+                    item_neutral2=constants_fetcher.get_item_name(h.get("item_neutral2")),
                 )
                 for h in heroes
                 if h.get("team") == "radiant"
@@ -297,6 +345,7 @@ def register_match_tools(mcp, services):
                     player_name=h.get("player_name"),
                     pro_name=h.get("pro_name"),
                     position=h.get("position"),
+                    rank_tier=h.get("rank_tier"),
                     kills=h.get("kills", 0),
                     deaths=h.get("deaths", 0),
                     assists=h.get("assists", 0),
@@ -308,12 +357,19 @@ def register_match_tools(mcp, services):
                     hero_damage=h.get("hero_damage", 0),
                     tower_damage=h.get("tower_damage", 0),
                     hero_healing=h.get("hero_healing", 0),
+                    teamfight_participation=h.get("teamfight_participation"),
+                    stuns=h.get("stuns"),
+                    camps_stacked=h.get("camps_stacked"),
+                    obs_placed=h.get("obs_placed"),
+                    sen_placed=h.get("sen_placed"),
                     lane=h.get("lane_name"),
+                    lane_efficiency=h.get("lane_efficiency"),
                     role=h.get("role"),
                     items=constants_fetcher.convert_item_ids_to_names(
                         [h.get(f"item_{i}") for i in range(6)]
                     ),
                     item_neutral=constants_fetcher.get_item_name(h.get("item_neutral")),
+                    item_neutral2=constants_fetcher.get_item_name(h.get("item_neutral2")),
                 )
                 for h in heroes
                 if h.get("team") == "dire"
@@ -340,6 +396,7 @@ def register_match_tools(mcp, services):
                     player_name=h.get("player_name", ""),
                     pro_name=h.get("pro_name"),
                     account_id=h.get("account_id"),
+                    rank_tier=h.get("rank_tier"),
                     hero_id=h.get("hero_id", 0),
                     hero_name=h.get("hero_name", ""),
                     localized_name=h.get("localized_name", ""),
@@ -353,6 +410,7 @@ def register_match_tools(mcp, services):
                     player_name=h.get("player_name", ""),
                     pro_name=h.get("pro_name"),
                     account_id=h.get("account_id"),
+                    rank_tier=h.get("rank_tier"),
                     hero_id=h.get("hero_id", 0),
                     hero_name=h.get("hero_name", ""),
                     localized_name=h.get("localized_name", ""),

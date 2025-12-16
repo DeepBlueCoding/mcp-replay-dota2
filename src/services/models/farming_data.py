@@ -53,6 +53,19 @@ class CampClear(BaseModel):
     camp: str = Field(description="Camp type (e.g., 'large_troll', 'medium_satyr')")
     tier: str = Field(description="Camp tier: small, medium, large, or ancient")
     area: str = Field(description="Map area where camp was cleared")
+    position_x: Optional[float] = Field(default=None, description="X coordinate")
+    position_y: Optional[float] = Field(default=None, description="Y coordinate")
+    creeps_killed: int = Field(default=1, description="Number of creeps killed in this camp")
+
+
+class WaveClear(BaseModel):
+    """A lane creep wave clear event (grouped lane creeps killed in quick succession)."""
+
+    time_str: str = Field(description="Game time when wave was cleared (M:SS)")
+    creeps_killed: int = Field(description="Number of lane creeps killed in this wave")
+    position_x: Optional[float] = Field(default=None, description="X coordinate")
+    position_y: Optional[float] = Field(default=None, description="Y coordinate")
+    area: str = Field(description="Map area (e.g., 'radiant_safelane', 'mid_lane')")
 
 
 class MultiCampClear(BaseModel):
@@ -78,10 +91,14 @@ class MinuteFarmingData(BaseModel):
         default=None, description="Hero position at the end of this minute (X:59)"
     )
 
-    # Ordered camp sequence - shows farming route
+    # Ordered farming events - shows farming route with positions
     camp_sequence: List[CampClear] = Field(
         default_factory=list,
         description="Ordered sequence of neutral camps cleared during this minute"
+    )
+    wave_clears: List[WaveClear] = Field(
+        default_factory=list,
+        description="Lane wave clear events during this minute"
     )
 
     # Summary counts
@@ -194,10 +211,6 @@ class FarmingPatternResponse(BaseModel):
     summary: FarmingSummary = Field(
         default_factory=FarmingSummary,
         description="Summary statistics"
-    )
-    creep_kills: List[CreepKill] = Field(
-        default_factory=list,
-        description="All creep kills in chronological order"
     )
     multi_camp_clears: List[MultiCampClear] = Field(
         default_factory=list,
