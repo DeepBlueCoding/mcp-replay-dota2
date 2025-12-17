@@ -28,7 +28,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
-          enable-cache: true
+          enable-cache: false
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -40,22 +40,16 @@ jobs:
         run: uv run mypy src/ dota_match_mcp_server.py --ignore-missing-imports
 
       - name: Restore replay cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v4
         with:
           path: ~/dota2/replays
-          key: replays-all-v1
-          restore-keys: |
-            replay-${{ env.TEST_MATCH_ID_1 }}-v2
-            replay-
+          key: replays
 
       - name: Restore parsed cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v4
         with:
           path: ~/.cache/mcp_dota2/parsed_replays_v2
-          key: parsed-all-matches-v2
-          restore-keys: |
-            parsed-${{ env.TEST_MATCH_ID_1 }}-v5
-            parsed-v2
+          key: parsed-manta-1.4.7
 
       - name: Download missing replays
         run: |
@@ -131,8 +125,3 @@ jobs:
       - name: Run tests
         timeout-minutes: 15
         run: uv run pytest tests/ -v
-
-      - name: Save updated caches
-        if: always()
-        run: |
-          echo "Caches will be saved automatically by actions/cache"
