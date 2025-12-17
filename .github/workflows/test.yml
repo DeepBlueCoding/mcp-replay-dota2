@@ -82,24 +82,38 @@ jobs:
       - name: Parse replays
         timeout-minutes: 20
         run: |
-          echo "Parsing replays..."
+          echo "Parsing replays with memory monitoring..."
           uv run python << 'EOF'
           import asyncio
           import sys
-          print("Starting replay parsing...", flush=True)
+          import os
+          import resource
 
-          from src.services.replay.replay_service import ReplayService
-          print("Imported ReplayService", flush=True)
+          def get_memory_mb():
+              """Get current memory usage in MB."""
+              rusage = resource.getrusage(resource.RUSAGE_SELF)
+              return rusage.ru_maxrss / 1024  # Convert KB to MB on Linux
 
-          rs = ReplayService()
-          print("Created ReplayService instance", flush=True)
+          print(f"Initial memory: {get_memory_mb():.1f} MB", flush=True)
 
-          for match_id in [8461956309, 8594217096]:
-              print(f"Parsing match {match_id}...", flush=True)
-              data = asyncio.run(rs.get_parsed_data(match_id))
-              print(f"Parsed {len(data.combat_log_entries)} combat log entries", flush=True)
+          from python_manta import Parser
+          print(f"After importing Parser: {get_memory_mb():.1f} MB", flush=True)
 
-          print("All replays parsed!", flush=True)
+          # Test with just the parser directly
+          replay_path = os.path.expanduser("~/dota2/replays/8461956309.dem")
+          print(f"Replay file exists: {os.path.exists(replay_path)}", flush=True)
+          print(f"Replay size: {os.path.getsize(replay_path) / 1024 / 1024:.1f} MB", flush=True)
+
+          print("Creating Parser instance...", flush=True)
+          parser = Parser(replay_path)
+          print(f"After creating Parser: {get_memory_mb():.1f} MB", flush=True)
+
+          print("Parsing header only...", flush=True)
+          result = parser.parse(header=True)
+          print(f"After parsing header: {get_memory_mb():.1f} MB", flush=True)
+          print(f"Header: build_num={result.header.build_num}, replay_length={result.header.replay_length}", flush=True)
+
+          print("SUCCESS - basic parsing works!", flush=True)
           EOF
 
       - name: Run tests
