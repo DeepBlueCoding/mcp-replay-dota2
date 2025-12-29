@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-from opendota import OpenDota
+from opendota import OpenDota, ReplayNotAvailableError
 from python_manta import CombatLogType, Parser
 
 from ..cache.replay_cache import ReplayCache
@@ -63,21 +63,26 @@ class ReplayService:
         self,
         match_id: int,
         progress: Optional[ProgressCallback] = None,
+        _retry_count: int = 0,
     ) -> ParsedReplayData:
         """Get complete parsed data for a match.
 
         Returns cached data if available, otherwise downloads and parses.
+        Automatically retries once if parsing fails due to corruption.
 
         Args:
             match_id: The match ID
             progress: Optional callback for progress updates
+            _retry_count: Internal counter for retries (do not set manually)
 
         Returns:
             ParsedReplayData with all extracted data
 
         Raises:
-            ValueError: If replay cannot be downloaded or parsed
+            ValueError: If replay cannot be downloaded or parsed after retries
         """
+        max_retries = 1
+
         # Check cache first
         if progress:
             await progress(0, 100, "Checking cache...")
@@ -90,7 +95,8 @@ class ReplayService:
 
         # Download replay
         if progress:
-            await progress(5, 100, "Downloading replay (this may take 30-60s)...")
+            retry_msg = f" (retry {_retry_count}/{max_retries})" if _retry_count > 0 else ""
+            await progress(5, 100, f"Downloading replay{retry_msg} (this may take 30-60s)...")
 
         replay_path = await self._download_replay(match_id, progress)
         if not replay_path:
@@ -103,11 +109,23 @@ class ReplayService:
         try:
             data = self._parse_replay(match_id, replay_path, progress)
         except ValueError as e:
-            # Parsing failed - delete corrupt replay so it can be re-downloaded
-            logger.error(f"Parsing failed for match {match_id}, deleting corrupt replay: {e}")
+            # Parsing failed - delete corrupt replay
+            logger.error(f"Parsing failed for match {match_id}: {e}")
             if replay_path.exists():
                 replay_path.unlink()
-            raise ValueError(f"Replay file corrupt, deleted for re-download: {e}")
+                logger.info(f"Deleted corrupt replay file for match {match_id}")
+
+            # Also clear cache in case there's stale data
+            self._cache.delete(match_id)
+
+            # Retry once
+            if _retry_count < max_retries:
+                logger.info(f"Retrying download/parse for match {match_id} (attempt {_retry_count + 1})")
+                if progress:
+                    await progress(5, 100, "Replay corrupt, retrying download...")
+                return await self.get_parsed_data(match_id, progress, _retry_count + 1)
+
+            raise ValueError(f"Replay parsing failed after {max_retries + 1} attempts: {e}")
 
         # Cache result
         if progress:
@@ -196,11 +214,11 @@ class ReplayService:
             if progress:
                 await progress(10, 100, "Getting replay URL from OpenDota...")
 
-            match = await opendota.get_match(match_id)
-            replay_url = match.get('replay_url')
-
-            if not replay_url:
-                logger.error(f"No replay URL for match {match_id}")
+            try:
+                match = await opendota.get_match(match_id, wait_for_replay_url=True)
+                replay_url = match.get('replay_url')
+            except ReplayNotAvailableError as e:
+                logger.error(f"Replay not available for match {match_id}: {e}")
                 return None
 
             # Download bz2 file
@@ -340,6 +358,7 @@ class ReplayService:
                     CombatLogType.ABILITY_TRIGGER.value,
                     CombatLogType.NEUTRAL_CAMP_STACK.value,
                     CombatLogType.PICKUP_RUNE.value,
+                    CombatLogType.INTERRUPT_CHANNEL.value,
                 ],
                 "max_entries": 100000,
             },
