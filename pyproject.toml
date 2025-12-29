@@ -10,7 +10,7 @@ packages = ["src"]
 
 [project]
 name = "mcp-replay-dota2"
-version = "1.1.0-dev4"
+version = "1.1.0-dev5"
 description = "Model Context Protocol server for Dota 2 match analysis using replay files"
 readme = "README.md"
 license = "MIT"
@@ -84,7 +84,7 @@ index-strategy = "unsafe-best-match"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.1.0-dev4"
+version = "1.1.0-dev5"
 version_files = [
     "pyproject.toml:^version",
 ]
