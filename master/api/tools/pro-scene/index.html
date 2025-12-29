@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -335,6 +335,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../../REPLAY_PARSING_ARCHITECTURE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../../changelog/" class="md-tabs__link">
         
   
@@ -489,6 +508,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
   
 
     
@@ -1455,6 +1502,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#get_tournament_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_tournament_series
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#get_league_matches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1601,6 +1659,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../prompts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../coaching/" class="md-nav__link">
         
   
@@ -1625,6 +1711,33 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../REPLAY_PARSING_ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1775,6 +1888,17 @@
     <span class="md-ellipsis">
       
         get_pro_matches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#get_tournament_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_tournament_series
       
     </span>
   </a>
@@ -1972,7 +2096,7 @@
 <tr>
 <td><code>league_name</code></td>
 <td>string</td>
-<td>Contains match on league name (e.g., "SLAM", "ESL", "DreamLeague")</td>
+<td>Fuzzy match on league name with alias expansion (see below)</td>
 </tr>
 <tr>
 <td><code>days_back</code></td>
@@ -1986,6 +2110,55 @@
 <li><strong>Single team</strong> (<code>team1_name</code> only): Returns all matches involving that team (either radiant or dire)</li>
 <li><strong>Head-to-head</strong> (<code>team1_name</code> + <code>team2_name</code>): Returns only matches where both teams played against each other, regardless of which side (radiant/dire) they were on</li>
 </ul>
+<p><strong>League Name Fuzzy Search:</strong></p>
+<p>The <code>league_name</code> parameter supports fuzzy matching with common abbreviations:</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Matches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"TI 2025"</code></td>
+<td>"The International 2025"</td>
+</tr>
+<tr>
+<td><code>"ESL"</code></td>
+<td>"ESL One Kuala Lumpur", "ESL One Birmingham"</td>
+</tr>
+<tr>
+<td><code>"DPC"</code></td>
+<td>"Dota Pro Circuit" leagues</td>
+</tr>
+<tr>
+<td><code>"blast"</code> or <code>"slam"</code></td>
+<td>"BLAST Slam V"</td>
+</tr>
+<tr>
+<td><code>"dreamleague"</code></td>
+<td>"DreamLeague Season 24"</td>
+</tr>
+<tr>
+<td><code>"PGL"</code></td>
+<td>"PGL Wallachia Season 6"</td>
+</tr>
+<tr>
+<td><code>"wallachia"</code></td>
+<td>"PGL Wallachia Season 6"</td>
+</tr>
+<tr>
+<td><code>"riyadh"</code></td>
+<td>"Riyadh Masters 2025"</td>
+</tr>
+<tr>
+<td><code>"bali"</code></td>
+<td>"Bali Major 2025"</td>
+</tr>
+</tbody>
+</table>
+<p>Partial names also work: <code>"wallachia 6"</code> matches "PGL Wallachia Season 6".</p>
 <p><strong>Data Blending:</strong> When team filters are provided, this tool automatically blends data from two sources:</p>
 <ol>
 <li><strong>Team-specific endpoint</strong> (<code>/teams/{id}/matches</code>) - captures matches that OpenDota's <code>/proMatches</code> often misses (e.g., major tournaments like SLAM)</li>
@@ -2001,14 +2174,17 @@
 <a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Find head-to-head matches between two teams</span>
 <a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">team1_name</span><span class="o">=</span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span> <span class="n">team2_name</span><span class="o">=</span><span class="s2">&quot;OG&quot;</span><span class="p">)</span>
 <a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># Head-to-head at a specific tournament</span>
-<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">team1_name</span><span class="o">=</span><span class="s2">&quot;Spirit&quot;</span><span class="p">,</span> <span class="n">team2_name</span><span class="o">=</span><span class="s2">&quot;OG&quot;</span><span class="p">,</span> <span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;International&quot;</span><span class="p">)</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># Head-to-head at a specific tournament (fuzzy league name)</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">team1_name</span><span class="o">=</span><span class="s2">&quot;Spirit&quot;</span><span class="p">,</span> <span class="n">team2_name</span><span class="o">=</span><span class="s2">&quot;OG&quot;</span><span class="p">,</span> <span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;TI 2025&quot;</span><span class="p">)</span>
 <a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>
-<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># Find matches in a specific tournament</span>
-<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;SLAM&quot;</span><span class="p">)</span>
-<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>
-<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="c1"># Combine filters: team matches at premium tournaments</span>
-<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">tier</span><span class="o">=</span><span class="s2">&quot;premium&quot;</span><span class="p">,</span> <span class="n">team1_name</span><span class="o">=</span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span> <span class="n">days_back</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># Find matches using abbreviations</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;TI 2025&quot;</span><span class="p">)</span>      <span class="c1"># The International 2025</span>
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;PGL&quot;</span><span class="p">)</span>          <span class="c1"># PGL tournaments</span>
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;wallachia 6&quot;</span><span class="p">)</span>  <span class="c1"># PGL Wallachia Season 6</span>
+<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;ESL&quot;</span><span class="p">)</span>          <span class="c1"># ESL One tournaments</span>
+<a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>
+<a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="c1"># Combine filters: team matches at premium tournaments</span>
+<a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a><span class="n">get_pro_matches</span><span class="p">(</span><span class="n">tier</span><span class="o">=</span><span class="s2">&quot;premium&quot;</span><span class="p">,</span> <span class="n">team1_name</span><span class="o">=</span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span> <span class="n">days_back</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Returns:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
@@ -2030,19 +2206,146 @@
 <a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a><span class="p">}</span>
 </code></pre></div></p>
 <hr />
-<h2 id="get_league_matches">get_league_matches<a class="headerlink" href="#get_league_matches" title="Permanent link">&para;</a></h2>
-<p>Get matches from a specific league with series grouping.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">get_league_matches</span><span class="p">(</span><span class="n">league_id</span><span class="o">=</span><span class="mi">15728</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<h2 id="get_tournament_series">get_tournament_series<a class="headerlink" href="#get_tournament_series" title="Permanent link">&para;</a></h2>
+<p>Get tournament series with bracket/game details. Use for tournament progression analysis: series results, Bo3/Bo5 outcomes, team advancement.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>league_name</code></td>
+<td>string</td>
+<td>Filter by league/tournament name (fuzzy match with alias expansion)</td>
+</tr>
+<tr>
+<td><code>league_id</code></td>
+<td>int</td>
+<td>Filter by specific league ID</td>
+</tr>
+<tr>
+<td><code>team_name</code></td>
+<td>string</td>
+<td>Filter series involving this team (fuzzy match)</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>int</td>
+<td>Maximum series to return (default: 20)</td>
+</tr>
+<tr>
+<td><code>days_back</code></td>
+<td>int</td>
+<td>Only return series from the last N days</td>
+</tr>
+</tbody>
+</table>
+<p><strong>League Name Fuzzy Search:</strong></p>
+<p>Same alias expansion as <code>get_pro_matches</code> - "TI" matches "The International", "ESL" matches ESL tournaments, etc.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Get recent series from a tournament</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">get_tournament_series</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;TI 2025&quot;</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Get all series involving a specific team</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="n">get_tournament_series</span><span class="p">(</span><span class="n">team_name</span><span class="o">=</span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span> <span class="n">days_back</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Get series from a specific league ID</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="n">get_tournament_series</span><span class="p">(</span><span class="n">league_id</span><span class="o">=</span><span class="mi">15728</span><span class="p">)</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="c1"># Combine filters: team at a specific tournament</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="n">get_tournament_series</span><span class="p">(</span><span class="n">league_name</span><span class="o">=</span><span class="s2">&quot;ESL One&quot;</span><span class="p">,</span> <span class="n">team_name</span><span class="o">=</span><span class="s2">&quot;Tundra&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Returns:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{</span>
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">&quot;league_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15728</span><span class="p">,</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="nt">&quot;league_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;The International 2023&quot;</span><span class="p">,</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="nt">&quot;total_matches&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="nt">&quot;series&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span><span class="nt">&quot;matches&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="p">}</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">&quot;total_series&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="nt">&quot;series&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">      </span><span class="nt">&quot;series_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12345</span><span class="p">,</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">      </span><span class="nt">&quot;series_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;bo3&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">      </span><span class="nt">&quot;radiant_team_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8599101</span><span class="p">,</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">      </span><span class="nt">&quot;radiant_team_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">      </span><span class="nt">&quot;dire_team_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7391077</span><span class="p">,</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="w">      </span><span class="nt">&quot;dire_team_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Tundra Esports&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">      </span><span class="nt">&quot;radiant_wins&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">      </span><span class="nt">&quot;dire_wins&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="w">      </span><span class="nt">&quot;winner_team_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8599101</span><span class="p">,</span>
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="w">      </span><span class="nt">&quot;winner_team_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Team Spirit&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a><span class="w">      </span><span class="nt">&quot;league_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15728</span><span class="p">,</span>
+<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a><span class="w">      </span><span class="nt">&quot;league_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;The International 2024&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a><span class="w">      </span><span class="nt">&quot;games&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a><span class="w">          </span><span class="nt">&quot;match_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8461956309</span><span class="p">,</span>
+<a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a><span class="w">          </span><span class="nt">&quot;game_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a><span class="w">          </span><span class="nt">&quot;radiant_win&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-17-23" name="__codelineno-17-23" href="#__codelineno-17-23"></a><span class="w">          </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2847</span>
+<a id="__codelineno-17-24" name="__codelineno-17-24" href="#__codelineno-17-24"></a><span class="w">        </span><span class="p">},</span>
+<a id="__codelineno-17-25" name="__codelineno-17-25" href="#__codelineno-17-25"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-17-26" name="__codelineno-17-26" href="#__codelineno-17-26"></a><span class="w">          </span><span class="nt">&quot;match_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8461956310</span><span class="p">,</span>
+<a id="__codelineno-17-27" name="__codelineno-17-27" href="#__codelineno-17-27"></a><span class="w">          </span><span class="nt">&quot;game_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-17-28" name="__codelineno-17-28" href="#__codelineno-17-28"></a><span class="w">          </span><span class="nt">&quot;radiant_win&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-17-29" name="__codelineno-17-29" href="#__codelineno-17-29"></a><span class="w">          </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3102</span>
+<a id="__codelineno-17-30" name="__codelineno-17-30" href="#__codelineno-17-30"></a><span class="w">        </span><span class="p">},</span>
+<a id="__codelineno-17-31" name="__codelineno-17-31" href="#__codelineno-17-31"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-17-32" name="__codelineno-17-32" href="#__codelineno-17-32"></a><span class="w">          </span><span class="nt">&quot;match_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8461956311</span><span class="p">,</span>
+<a id="__codelineno-17-33" name="__codelineno-17-33" href="#__codelineno-17-33"></a><span class="w">          </span><span class="nt">&quot;game_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-17-34" name="__codelineno-17-34" href="#__codelineno-17-34"></a><span class="w">          </span><span class="nt">&quot;radiant_win&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-17-35" name="__codelineno-17-35" href="#__codelineno-17-35"></a><span class="w">          </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2456</span>
+<a id="__codelineno-17-36" name="__codelineno-17-36" href="#__codelineno-17-36"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-17-37" name="__codelineno-17-37" href="#__codelineno-17-37"></a><span class="w">      </span><span class="p">]</span>
+<a id="__codelineno-17-38" name="__codelineno-17-38" href="#__codelineno-17-38"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-17-39" name="__codelineno-17-39" href="#__codelineno-17-39"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-17-40" name="__codelineno-17-40" href="#__codelineno-17-40"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Key Fields:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>series_type</code></td>
+<td><code>"bo1"</code>, <code>"bo3"</code>, or <code>"bo5"</code></td>
+</tr>
+<tr>
+<td><code>radiant_wins</code> / <code>dire_wins</code></td>
+<td>Games won by each team in the series</td>
+</tr>
+<tr>
+<td><code>winner_team_id</code></td>
+<td>Team that won the series</td>
+</tr>
+<tr>
+<td><code>games</code></td>
+<td>Array of individual matches with results</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Series vs Matches</p>
+<p>Use <code>get_tournament_series</code> for bracket analysis (who advanced, series scores). Use <code>get_pro_matches</code> for individual match details.</p>
+</div>
+<hr />
+<h2 id="get_league_matches">get_league_matches<a class="headerlink" href="#get_league_matches" title="Permanent link">&para;</a></h2>
+<p>Get matches from a specific league with series grouping.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">get_league_matches</span><span class="p">(</span><span class="n">league_id</span><span class="o">=</span><span class="mi">15728</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Returns:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nt">&quot;league_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15728</span><span class="p">,</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="nt">&quot;league_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;The International 2023&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nt">&quot;total_matches&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="nt">&quot;series&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">  </span><span class="nt">&quot;matches&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="p">}</span>
 </code></pre></div></p>
 
 
@@ -2099,10 +2402,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

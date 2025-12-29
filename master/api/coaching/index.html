@@ -13,17 +13,17 @@
         <link rel="canonical" href="https://deepbluecoding.github.io/mcp-replay-dota2/master/api/coaching/">
       
       
-        <link rel="prev" href="../resources/">
+        <link rel="prev" href="../prompts/">
       
       
-        <link rel="next" href="../../changelog/">
+        <link rel="next" href="../../REPLAY_PARSING_ARCHITECTURE/">
       
       
         
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -335,6 +335,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../REPLAY_PARSING_ARCHITECTURE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../changelog/" class="md-tabs__link">
         
   
@@ -489,6 +508,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
   
 
     
@@ -1441,6 +1488,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../prompts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1588,10 +1663,54 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#position-specific-expectations" class="md-nav__link">
+  <a href="#coaching-persona" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Position-Specific Expectations
+        Coaching Persona
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-specific-frameworks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position-Specific Frameworks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-1-carry-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position 1 (Carry) Framework
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#basic-role-expectations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Role Expectations
       
     </span>
   </a>
@@ -1610,10 +1729,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#csgpm-benchmarks" class="md-nav__link">
+  <a href="#lane-recovery-framework" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CS/GPM Benchmarks
+        Lane Recovery Framework
       
     </span>
   </a>
@@ -1621,10 +1740,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fight-analysis" class="md-nav__link">
+  <a href="#fight-analysis-beforeduringafter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fight Analysis
+        Fight Analysis (Before/During/After)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#late-game-framework-30-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Late Game Framework (30+ minutes)
       
     </span>
   </a>
@@ -1709,6 +1839,33 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REPLAY_PARSING_ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1851,10 +2008,54 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#position-specific-expectations" class="md-nav__link">
+  <a href="#coaching-persona" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Position-Specific Expectations
+        Coaching Persona
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-specific-frameworks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position-Specific Frameworks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-1-carry-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position 1 (Carry) Framework
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#basic-role-expectations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Role Expectations
       
     </span>
   </a>
@@ -1873,10 +2074,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#csgpm-benchmarks" class="md-nav__link">
+  <a href="#lane-recovery-framework" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CS/GPM Benchmarks
+        Lane Recovery Framework
       
     </span>
   </a>
@@ -1884,10 +2085,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fight-analysis" class="md-nav__link">
+  <a href="#fight-analysis-beforeduringafter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fight Analysis
+        Fight Analysis (Before/During/After)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#late-game-framework-30-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Late Game Framework (30+ minutes)
       
     </span>
   </a>
@@ -2140,104 +2352,261 @@
 </code></pre></div>
 <p>When <code>coaching_analysis</code> is <code>null</code>, the client's LLM can still interpret the raw data, but won't have access to the specialized Dota 2 coaching prompts embedded in the server.</p>
 <h2 id="coaching-knowledge-base">Coaching Knowledge Base<a class="headerlink" href="#coaching-knowledge-base" title="Permanent link">&para;</a></h2>
-<p>The server includes comprehensive Dota 2 coaching knowledge:</p>
-<h3 id="position-specific-expectations">Position-Specific Expectations<a class="headerlink" href="#position-specific-expectations" title="Permanent link">&para;</a></h3>
-<p>Each position (1-5) has different success metrics:</p>
+<p>The server includes comprehensive Dota 2 coaching knowledge loaded from persona files in <code>data/personas/</code>.</p>
+<h3 id="coaching-persona">Coaching Persona<a class="headerlink" href="#coaching-persona" title="Permanent link">&para;</a></h3>
+<p>The AI adopts the perspective of a senior Dota 2 analyst with professional play experience (TI qualifiers, 11k peak MMR). The persona is defined in <code>data/personas/coaching_persona.md</code>.</p>
+<p><strong>Analysis Principles:</strong></p>
+<ul>
+<li><strong>Lead with Insight, Support with Data</strong> - Don't just report numbers, interpret what they mean</li>
+<li><strong>Identify the Core Issue</strong> - Surface the fundamental problem, not symptoms</li>
+<li><strong>Actionable Takeaways</strong> - Specific, implementable changes (2-3 maximum)</li>
+</ul>
+<p><strong>Communication Style:</strong></p>
+<ul>
+<li>Direct and specific - timestamps, hero names, ability names</li>
+<li>Focus on the "why" not just the "what"</li>
+<li>Never blame teammates - focus on what the player could control</li>
+<li>Distinguish execution errors from decision errors</li>
+</ul>
+<h3 id="analysis-workflow">Analysis Workflow<a class="headerlink" href="#analysis-workflow" title="Permanent link">&para;</a></h3>
+<p>Every analysis follows this framework:</p>
+<ol>
+<li><strong>Win Condition</strong> - What does each draft want to do? Timing advantage?</li>
+<li><strong>Execution Check</strong> - Did they play their draft or deviate?</li>
+<li><strong>Inflection Point</strong> - THE moment the game turned (there's always one)</li>
+<li><strong>The "Why"</strong> - Explain why events mattered, not just describe them</li>
+<li><strong>Counterfactual</strong> - What could the losing side have done differently?</li>
+</ol>
+<h3 id="position-specific-frameworks">Position-Specific Frameworks<a class="headerlink" href="#position-specific-frameworks" title="Permanent link">&para;</a></h3>
+<p>Position-specific analysis frameworks are loaded from <code>data/personas/</code> when available. These provide detailed phase-by-phase guidance for each role.</p>
 <table>
 <thead>
 <tr>
 <th>Position</th>
-<th>Primary Metrics</th>
-<th>Acceptable Deaths</th>
+<th>Framework File</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><strong>Pos 1 (Carry)</strong></td>
-<td>CS@10 (65-80), Item timings</td>
-<td>0-1 before 10:00</td>
+<td><code>pos1_carry.md</code></td>
+<td>✅ Available</td>
 </tr>
 <tr>
 <td><strong>Pos 2 (Mid)</strong></td>
-<td>CS@10 (60-75), Rune control</td>
-<td>0-2 before 10:00</td>
+<td><code>pos2_mid.md</code></td>
+<td>🔜 Planned</td>
 </tr>
 <tr>
 <td><strong>Pos 3 (Offlane)</strong></td>
-<td>Enemy carry CS disruption</td>
-<td>2-3 acceptable if creating space</td>
+<td><code>pos3_offlane.md</code></td>
+<td>🔜 Planned</td>
 </tr>
 <tr>
 <td><strong>Pos 4 (Soft Support)</strong></td>
-<td>Kill participation, Rotations</td>
-<td>Context-dependent</td>
+<td><code>pos4_soft_support.md</code></td>
+<td>🔜 Planned</td>
 </tr>
 <tr>
 <td><strong>Pos 5 (Hard Support)</strong></td>
-<td>Vision uptime, Save usage</td>
-<td>Acceptable if saving cores</td>
+<td><code>pos5_hard_support.md</code></td>
+<td>🔜 Planned</td>
+</tr>
+</tbody>
+</table>
+<h3 id="position-1-carry-framework">Position 1 (Carry) Framework<a class="headerlink" href="#position-1-carry-framework" title="Permanent link">&para;</a></h3>
+<p>The carry framework (<code>data/personas/pos1_carry.md</code>) provides comprehensive phase-by-phase analysis:</p>
+<p><strong>Laning (0-10 min):</strong></p>
+<ul>
+<li>Lane equilibrium management (creep aggro, wave positioning)</li>
+<li>Lane dynamics assessment (2v1, 1v2, etc.)</li>
+<li>Recognizing when laning phase ends (offlaner level 6)</li>
+</ul>
+<p><strong>Farming (7-25 min):</strong></p>
+<ul>
+<li>Farming pattern: Wave → Jungle → Wave → Jungle</li>
+<li>Timer awareness (stack at :40-:45, XP shrines at 14/21 min)</li>
+<li>Item timing benchmarks:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Good Timing</th>
+<th>Struggling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Maelstrom</td>
+<td>11-13 min</td>
+<td>16+ min</td>
+</tr>
+<tr>
+<td>Battlefury</td>
+<td>12-14 min</td>
+<td>18+ min</td>
+</tr>
+<tr>
+<td>BKB</td>
+<td>18-20 min</td>
+<td>24+ min</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Transition (20-35 min):</strong></p>
+<ul>
+<li>Active vs Passive farming (the #1 carry mistake)</li>
+<li>Pre-BKB: Only join convenient cleanup kills</li>
+<li>Post-BKB: Farm near team, 60%+ kill participation target</li>
+<li>20-30 second rule before TPing back</li>
+</ul>
+<p><strong>Closing (25-45 min):</strong></p>
+<ul>
+<li>"Aegis is a timer, not insurance" - push immediately</li>
+<li>No-throw mentality: end with 2-3 deaths, not 7-8</li>
+<li>Second Aegis = game should end</li>
+</ul>
+<h3 id="basic-role-expectations">Basic Role Expectations<a class="headerlink" href="#basic-role-expectations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Position</th>
+<th>Primary Focus</th>
+<th>Key Metrics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pos 1 (Carry)</strong></td>
+<td>Maximize farm efficiency, minimize deaths</td>
+<td>Item timings, kill participation post-BKB</td>
+</tr>
+<tr>
+<td><strong>Pos 2 (Mid)</strong></td>
+<td>Win CS, control power runes</td>
+<td>Rotate only WITH good runes (haste/DD/invis)</td>
+</tr>
+<tr>
+<td><strong>Pos 3 (Offlane)</strong></td>
+<td>Disrupt enemy carry's farm</td>
+<td>Deaths acceptable if they drew resources</td>
+</tr>
+<tr>
+<td><strong>Pos 4 (Soft Support)</strong></td>
+<td>Secure offlane levels 1-3, then rotate</td>
+<td>Stack camps, set up kills, aggressive vision</td>
+</tr>
+<tr>
+<td><strong>Pos 5 (Hard Support)</strong></td>
+<td>Keep carry alive, zone offlaner</td>
+<td>Lowest net worth expected, die to save cores</td>
 </tr>
 </tbody>
 </table>
 <h3 id="death-analysis-framework">Death Analysis Framework<a class="headerlink" href="#death-analysis-framework" title="Permanent link">&para;</a></h3>
-<p>The coaching analyzes deaths using a 5-question framework:</p>
+<p>For each death, the coaching asks:</p>
 <ol>
-<li><strong>Was vision available?</strong> - Ward coverage, minimap awareness</li>
-<li><strong>Power spike window?</strong> - Pre-6, pre-BKB vulnerability</li>
-<li><strong>Did it trade for objectives?</strong> - Roshan, towers, space creation</li>
-<li><strong>Buyback usage?</strong> - Correct/incorrect buyback decisions</li>
-<li><strong>Item timing impact?</strong> - How much did death delay key items</li>
+<li><strong>Vision</strong> - Ward coverage? Smoke gank (excusable)?</li>
+<li><strong>Timing</strong> - Before key level/item? Ult on cooldown?</li>
+<li><strong>Trade</strong> - Got objective? Created space? Or died for nothing?</li>
+<li><strong>Buyback</strong> - Available? Used correctly?</li>
+<li><strong>Impact</strong> - How much did this delay key items?</li>
 </ol>
-<h3 id="csgpm-benchmarks">CS/GPM Benchmarks<a class="headerlink" href="#csgpm-benchmarks" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Position 1 (Carry) CS Targets:
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>┌────────┬──────┬────────────┬──────┬───────────┐
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>│ Minute │ Poor │ Acceptable │ Good │ Excellent │
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├────────┼──────┼────────────┼──────┼───────────┤
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│ 5      │ &lt;30  │ 30-40      │ 40-50│ 50+       │
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│ 10     │ &lt;50  │ 50-65      │ 65-80│ 80+       │
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│ 15     │ &lt;80  │ 80-110     │110-140│ 140+     │
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│ 20     │ &lt;120 │ 120-160    │160-200│ 200+     │
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>└────────┴──────┴────────────┴──────┴───────────┘
-</code></pre></div>
-<h3 id="fight-analysis">Fight Analysis<a class="headerlink" href="#fight-analysis" title="Permanent link">&para;</a></h3>
-<p>Teamfights are evaluated on:</p>
+<p><strong>Death Categories:</strong></p>
 <ul>
-<li><strong>Initiation quality</strong> - Planned vs reactive, ability readiness</li>
-<li><strong>Target priority</strong> - Were high-value targets focused?</li>
-<li><strong>Ability usage</strong> - Key ultimates, CC chaining, save items</li>
-<li><strong>Trade value</strong> - What did each team gain/lose?</li>
+<li><strong>Unavoidable</strong>: Smoke gank, enemy snowballing</li>
+<li><strong>Preventable</strong>: Bad positioning, no vision, greedy farming</li>
+<li><strong>Acceptable</strong>: Space creation (pos 3), trading for objectives</li>
+<li><strong>Throw</strong>: Dying with Aegis, solo death while winning, no buyback late</li>
 </ul>
+<h3 id="lane-recovery-framework">Lane Recovery Framework<a class="headerlink" href="#lane-recovery-framework" title="Permanent link">&para;</a></h3>
+<p>When a lane is lost, the coaching evaluates the response:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Expected Response</th>
+<th>Red Flag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Carry</strong></td>
+<td>Jungle transition at level 5-6</td>
+<td>Staying in lane dying repeatedly</td>
+</tr>
+<tr>
+<td><strong>Mid</strong></td>
+<td>Stack-farming, rune control</td>
+<td>Forcing fights without advantage</td>
+</tr>
+<tr>
+<td><strong>Offlane</strong></td>
+<td>Secure levels, pressure when possible</td>
+<td>Feeding without creating any pressure</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fight-analysis-beforeduringafter">Fight Analysis (Before/During/After)<a class="headerlink" href="#fight-analysis-beforeduringafter" title="Permanent link">&para;</a></h3>
+<p><strong>Before the Fight:</strong>
+- Setup (smoke, vision advantage, key cooldowns ready)
+- Numbers (5v5 or someone missing?)
+- Resources (Aegis, buybacks, key items)</p>
+<p><strong>During the Fight:</strong>
+- Initiation (who started, chained disables)
+- Ability timing (key ults used well)
+- Focus fire (right target or spread damage)
+- Saves/counters (defensive saves used)</p>
+<p><strong>After the Fight:</strong>
+- Objective trade (Roshan/tower/barracks taken)
+- Death timers (push opportunity)
+- Buyback status (who used, was it necessary)</p>
+<p><strong>Key Question:</strong> Was this fight NECESSARY?</p>
+<h3 id="late-game-framework-30-minutes">Late Game Framework (30+ minutes)<a class="headerlink" href="#late-game-framework-30-minutes" title="Permanent link">&para;</a></h3>
+<p><strong>Buyback Discipline:</strong>
+- Core heroes: NEVER die without buyback available after 35 minutes
+- Team fight with buybacks ready = acceptable risk</p>
+<p><strong>Risk Assessment:</strong>
+- <strong>Ahead</strong>: Only take fights you NEED (Roshan, high ground, defending)
+- <strong>Behind</strong>: Must take calculated risks to comeback
+- <strong>Even</strong>: Map control and Roshan become deciding factors</p>
+<p><strong>Common Late Game Throws:</strong>
+- Solo pickoff on carry without buyback
+- Fighting without key ultimate
+- Pushing high ground without Aegis when ahead</p>
 <h2 id="implementing-sampling-in-custom-clients">Implementing Sampling in Custom Clients<a class="headerlink" href="#implementing-sampling-in-custom-clients" title="Permanent link">&para;</a></h2>
 <p>If building a custom MCP client, implement the sampling handler:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClientSession</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_sampling_request</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle server&#39;s request to sample from client&#39;s LLM.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">prompt</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">content</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="c1"># Send to your LLM</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">your_llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="n">prompt</span><span class="o">=</span><span class="n">prompt</span><span class="p">,</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="n">max_tokens</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">max_tokens</span> <span class="ow">or</span> <span class="mi">600</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="p">)</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="k">return</span> <span class="n">SamplingResult</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># Register handler</span>
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">session</span><span class="o">.</span><span class="n">on_sampling_request</span> <span class="o">=</span> <span class="n">handle_sampling_request</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClientSession</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_sampling_request</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle server&#39;s request to sample from client&#39;s LLM.&quot;&quot;&quot;</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">prompt</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">content</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="c1"># Send to your LLM</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">your_llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="n">prompt</span><span class="o">=</span><span class="n">prompt</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="n">max_tokens</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">max_tokens</span> <span class="ow">or</span> <span class="mi">600</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="p">)</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="k">return</span> <span class="n">SamplingResult</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="c1"># Register handler</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="n">session</span><span class="o">.</span><span class="n">on_sampling_request</span> <span class="o">=</span> <span class="n">handle_sampling_request</span>
 </code></pre></div>
 <h2 id="fallback-behavior">Fallback Behavior<a class="headerlink" href="#fallback-behavior" title="Permanent link">&para;</a></h2>
 <p>The server gracefully handles clients without sampling:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Server-side logic (simplified)</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_hero_performance</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="c1"># Always compute raw data</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">compute_performance_data</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="c1"># Try sampling if available</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">coaching</span> <span class="o">=</span> <span class="k">await</span> <span class="n">try_coaching_analysis</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">prompt</span><span class="p">)</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">response</span><span class="o">.</span><span class="n">coaching_analysis</span> <span class="o">=</span> <span class="n">coaching</span>  <span class="c1"># None if sampling unavailable</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">return</span> <span class="n">response</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Server-side logic (simplified)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_hero_performance</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="c1"># Always compute raw data</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">compute_performance_data</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="c1"># Try sampling if available</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">coaching</span> <span class="o">=</span> <span class="k">await</span> <span class="n">try_coaching_analysis</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">prompt</span><span class="p">)</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">response</span><span class="o">.</span><span class="n">coaching_analysis</span> <span class="o">=</span> <span class="n">coaching</span>  <span class="c1"># None if sampling unavailable</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="k">return</span> <span class="n">response</span>
 </code></pre></div>
 <ul>
 <li><strong>No exceptions</strong> thrown if sampling unavailable</li>
@@ -2313,10 +2682,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
