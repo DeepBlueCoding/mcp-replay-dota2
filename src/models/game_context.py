@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 if TYPE_CHECKING:
     from src.models.map_data import MapData
     from src.services.models.replay_data import ParsedReplayData
+    from src.utils.position_tracker import PositionClassifier
 
 
 @dataclass
@@ -28,6 +29,7 @@ class GameContext:
     # Lazily loaded version-specific data
     _map_data: Optional["MapData"] = field(default=None, repr=False)
     _neutral_item_tiers: Optional[Dict[str, int]] = field(default=None, repr=False)
+    _position_classifier: Optional["PositionClassifier"] = field(default=None, repr=False)
 
     @property
     def map_data(self) -> "MapData":
@@ -70,6 +72,19 @@ class GameContext:
             Tier number (1-5) or None if not a neutral item
         """
         return self.neutral_item_tiers.get(item_name)
+
+    @property
+    def position_classifier(self) -> "PositionClassifier":
+        """
+        Get a PositionClassifier for this patch version.
+
+        Lazily creates classifier using versioned map data.
+        """
+        if self._position_classifier is None:
+            from src.utils.position_tracker import PositionClassifier
+
+            self._position_classifier = PositionClassifier(self.map_data)
+        return self._position_classifier
 
     @classmethod
     def from_parsed_data(cls, data: "ParsedReplayData") -> "GameContext":

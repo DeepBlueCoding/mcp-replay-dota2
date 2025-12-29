@@ -16,7 +16,7 @@ from src.services.models.combat_data import (
 FIRST_BLOOD_TIME = 288.0
 FIRST_BLOOD_VICTIM = "earthshaker"
 FIRST_BLOOD_KILLER = "disruptor"
-FIRST_BLOOD_ABILITY = "disruptor_thunder_strike"
+FIRST_BLOOD_ABILITY = "Thunder Strike"
 
 
 class TestHeroDeaths:
@@ -246,14 +246,14 @@ class TestAbilityHitDetection:
             assert e.hit in (True, False, None)
 
     def test_self_buff_abilities_detected(self, combat_log_280_300_earthshaker_ability):
-        totem_events = [e for e in combat_log_280_300_earthshaker_ability if e.ability == "earthshaker_enchant_totem"]
+        totem_events = [e for e in combat_log_280_300_earthshaker_ability if e.ability == "Enchant Totem"]
         # Match 8461956309 has 1 enchant totem event in 280-300s
         assert len(totem_events) == 1
         for e in totem_events:
             assert e.hit in (True, False, None)
 
     def test_ensnare_that_hit_shows_as_true(self, combat_log_280_282_naga_ability):
-        ensnare_events = [e for e in combat_log_280_282_naga_ability if e.ability == "naga_siren_ensnare"]
+        ensnare_events = [e for e in combat_log_280_282_naga_ability if e.ability == "Ensnare"]
         # Match 8461956309 has 1 ensnare event in 280-282s that hit
         assert len(ensnare_events) == 1
         assert ensnare_events[0].hit is True
@@ -290,7 +290,7 @@ class TestAbilityTrigger:
 
         first = lotus_events[0]
         assert first.attacker == "naga_siren"
-        assert first.ability == "item_lotus_orb"
+        assert first.ability == "Lotus Orb"
         assert hasattr(first, "target")
 
     def test_ability_trigger_in_combat_log(self, combat_log_360_370):

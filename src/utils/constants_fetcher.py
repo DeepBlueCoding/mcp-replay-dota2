@@ -408,6 +408,44 @@ class ConstantsFetcher:
         """
         return [self.get_item_name(item_id) or "" for item_id in item_ids]
 
+    def get_display_name(self, internal_name: Optional[str]) -> Optional[str]:
+        """
+        Convert internal item/ability name to human-readable display name.
+
+        Handles:
+        - Item names: "item_bfury" -> "Battle Fury"
+        - Ability names: "nevermore_shadowraze1" -> "Shadowraze"
+        - Special cases: "dota_unknown" -> "attack", None -> None
+
+        Args:
+            internal_name: Internal name from combat log (e.g., "item_bfury", "nevermore_shadowraze1")
+
+        Returns:
+            Human-readable display name, or original name if no translation found
+        """
+        if not internal_name:
+            return None
+
+        if internal_name == "dota_unknown":
+            return "attack"
+
+        # Handle item names (item_<name>)
+        if internal_name.startswith("item_"):
+            item_key = internal_name[5:]  # Remove "item_" prefix
+            items = self.get_items_constants()
+            if items and item_key in items:
+                return items[item_key].get("dname", internal_name)
+            return internal_name
+
+        # Handle ability names
+        abilities = self.get_abilities_constants()
+        if abilities and internal_name in abilities:
+            dname = abilities[internal_name].get("dname")
+            if dname:
+                return dname
+
+        return internal_name
+
 
 # Create a singleton instance
 constants_fetcher = ConstantsFetcher()

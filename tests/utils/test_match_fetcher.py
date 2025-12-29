@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.models.match_info import DraftAction, HeroMatchupInfo
+from src.models.match_info import DraftAction
 from src.models.tool_responses import HeroStats, MatchPlayerInfo
 from src.utils.match_fetcher import MatchFetcher, get_lane_name
 
@@ -336,13 +336,35 @@ class TestAssignPositionsWithRealData:
 
         assert max_support_gpm < min_core_gpm
 
-    def test_pos4_has_higher_gpm_than_pos5(self, match_players):
-        """Position 4 support has higher GPM than position 5."""
+    def test_pos4_is_offlane_support(self, match_players):
+        """Position 4 support is from offlane (lane_role=3)."""
         radiant = [p for p in match_players if p["team"] == "radiant"]
         pos4 = next(p for p in radiant if p["position"] == 4)
-        pos5 = next(p for p in radiant if p["position"] == 5)
+        # XinQ (Shadow Demon) is offlane support
+        assert pos4["lane_role"] == 3
 
-        assert pos4["gold_per_min"] > pos5["gold_per_min"]
+    def test_pos5_is_safelane_support(self, match_players):
+        """Position 5 support is from safelane (lane_role=1)."""
+        radiant = [p for p in match_players if p["team"] == "radiant"]
+        pos5 = next(p for p in radiant if p["position"] == 5)
+        # xNova (Pugna) is safelane support
+        assert pos5["lane_role"] == 1
+
+    def test_dire_naga_is_pos5_safelane_support(self, match_players):
+        """Naga Siren (Sneyking) is pos 5 - safelane support despite high GPM."""
+        dire = [p for p in match_players if p["team"] == "dire"]
+        # Naga Siren = hero_id 89
+        naga = next(p for p in dire if p["hero_id"] == 89)
+        assert naga["position"] == 5
+        assert naga["lane_role"] == 1  # Safelane
+
+    def test_dire_disruptor_is_pos4_offlane_support(self, match_players):
+        """Disruptor (Cr1t-) is pos 4 - offlane support."""
+        dire = [p for p in match_players if p["team"] == "dire"]
+        # Disruptor = hero_id 87
+        disruptor = next(p for p in dire if p["hero_id"] == 87)
+        assert disruptor["position"] == 4
+        assert disruptor["lane_role"] == 3  # Offlane
 
 
 class TestPositionFieldInModelsWithRealData:
@@ -479,32 +501,114 @@ class TestDraftActionWithRealData:
         assert action.is_pick is False
         assert action.position is None
 
-    def test_draft_action_with_matchup_context(self):
-        """DraftAction with counters/good_against for Juggernaut."""
-        counters = [
-            HeroMatchupInfo(hero_id=94, localized_name="Medusa", reason="Split Shot farms faster"),
-        ]
-        good_against = [
-            HeroMatchupInfo(hero_id=89, localized_name="Naga Siren", reason="Blade Fury dispels Net"),
-        ]
+
+class TestDraftActionLaneField:
+    """Tests for DraftAction lane field derived from position.
+
+    Lane derivation rules:
+    - Position 1 (Carry) + Position 5 (Hard Support) → safelane
+    - Position 2 (Mid) → mid
+    - Position 3 (Offlane) + Position 4 (Soft Support) → offlane
+    """
+
+    def test_position_1_carry_goes_safelane(self, match_players):
+        """Position 1 (Carry) should be assigned to safelane."""
+        ame = next(p for p in match_players if p.get("pro_name") == "Ame")
         action = DraftAction(
             order=10,
             is_pick=True,
             team="radiant",
-            hero_id=8,
+            hero_id=ame["hero_id"],
             hero_name="juggernaut",
             localized_name="Juggernaut",
             position=1,
-            counters=counters,
-            good_against=good_against,
+            lane="safelane",
         )
-        assert len(action.counters) == 1
-        assert action.counters[0].hero_id == 94
-        assert len(action.good_against) == 1
-        assert action.good_against[0].hero_id == 89
+        assert action.position == 1
+        assert action.lane == "safelane"
 
-    def test_draft_action_defaults_empty_lists(self):
-        """DraftAction defaults counters/good_against to empty lists."""
+    def test_position_2_mid_goes_mid(self, match_players):
+        """Position 2 (Mid) should be assigned to mid."""
+        xm = next(p for p in match_players if p.get("pro_name") == "Xm")
+        action = DraftAction(
+            order=8,
+            is_pick=True,
+            team="radiant",
+            hero_id=xm["hero_id"],
+            hero_name="shadow_fiend",
+            localized_name="Shadow Fiend",
+            position=2,
+            lane="mid",
+        )
+        assert action.position == 2
+        assert action.lane == "mid"
+
+    def test_position_3_offlane_goes_offlane(self, match_players):
+        """Position 3 (Offlane) should be assigned to offlane."""
+        xxs = next(p for p in match_players if p.get("pro_name") == "Xxs")
+        action = DraftAction(
+            order=6,
+            is_pick=True,
+            team="radiant",
+            hero_id=xxs["hero_id"],
+            hero_name="earthshaker",
+            localized_name="Earthshaker",
+            position=3,
+            lane="offlane",
+        )
+        assert action.position == 3
+        assert action.lane == "offlane"
+
+    def test_position_4_soft_support_goes_offlane(self, match_players):
+        """Position 4 (Soft Support) should be assigned to offlane with pos 3."""
+        xinq = next(p for p in match_players if p.get("pro_name") == "XinQ")
+        action = DraftAction(
+            order=4,
+            is_pick=True,
+            team="radiant",
+            hero_id=xinq["hero_id"],
+            hero_name="shadow_demon",
+            localized_name="Shadow Demon",
+            position=4,
+            lane="offlane",
+        )
+        assert action.position == 4
+        assert action.lane == "offlane"
+
+    def test_position_5_hard_support_goes_safelane(self, match_players):
+        """Position 5 (Hard Support) should be assigned to safelane with pos 1."""
+        xnova = next(p for p in match_players if p.get("pro_name") == "xNova")
+        action = DraftAction(
+            order=2,
+            is_pick=True,
+            team="radiant",
+            hero_id=xnova["hero_id"],
+            hero_name="pugna",
+            localized_name="Pugna",
+            position=5,
+            lane="safelane",
+        )
+        assert action.position == 5
+        assert action.lane == "safelane"
+
+    def test_ban_has_no_lane(self):
+        """Bans should have no lane assigned."""
+        action = DraftAction(
+            order=1,
+            is_pick=False,
+            team="dire",
+            hero_id=23,
+            hero_name="kunkka",
+            localized_name="Kunkka",
+            position=None,
+            lane=None,
+        )
+        assert action.is_pick is False
+        assert action.position is None
+        assert action.lane is None
+
+    def test_lane_defaults_to_none(self):
+        """Lane field should default to None when not provided."""
         action = DraftAction(
             order=1,
             is_pick=True,
@@ -513,31 +617,150 @@ class TestDraftActionWithRealData:
             hero_name="juggernaut",
             localized_name="Juggernaut",
         )
-        assert action.counters == []
-        assert action.good_against == []
-        assert action.when_to_pick == []
+        assert action.lane is None
 
 
-class TestHeroMatchupInfoWithRealData:
-    """Tests for HeroMatchupInfo using real match context."""
+class TestGetLaneFromPosition:
+    """Tests for _get_lane_from_position helper in MatchInfoParser."""
 
-    def test_medusa_vs_juggernaut_matchup(self):
-        """HeroMatchupInfo for Medusa vs Juggernaut (match 8461956309 matchup)."""
-        matchup = HeroMatchupInfo(
-            hero_id=94,
-            localized_name="Medusa",
-            reason="Split Shot clears Healing Ward, Stone Gaze counters Omnislash",
+    @pytest.fixture
+    def parser(self):
+        """Create MatchInfoParser instance."""
+        from src.utils.match_info_parser import MatchInfoParser
+        return MatchInfoParser()
+
+    def test_position_1_returns_safelane(self, parser):
+        """Position 1 (Carry) should return safelane."""
+        assert parser._get_lane_from_position(1) == "safelane"
+
+    def test_position_2_returns_mid(self, parser):
+        """Position 2 (Mid) should return mid."""
+        assert parser._get_lane_from_position(2) == "mid"
+
+    def test_position_3_returns_offlane(self, parser):
+        """Position 3 (Offlane) should return offlane."""
+        assert parser._get_lane_from_position(3) == "offlane"
+
+    def test_position_4_returns_offlane(self, parser):
+        """Position 4 (Soft Support) should return offlane."""
+        assert parser._get_lane_from_position(4) == "offlane"
+
+    def test_position_5_returns_safelane(self, parser):
+        """Position 5 (Hard Support) should return safelane."""
+        assert parser._get_lane_from_position(5) == "safelane"
+
+    def test_none_position_returns_none(self, parser):
+        """None position should return None."""
+        assert parser._get_lane_from_position(None) is None
+
+    def test_invalid_position_returns_none(self, parser):
+        """Invalid positions (0, 6+) should return None."""
+        assert parser._get_lane_from_position(0) is None
+        assert parser._get_lane_from_position(6) is None
+        assert parser._get_lane_from_position(99) is None
+
+
+class TestHeroStatsExpectedLane:
+    """Tests for expected_lane field in HeroStats model."""
+
+    def test_expected_lane_from_position_1(self):
+        """Position 1 (Carry) should have expected_lane=safelane."""
+        from src.models.tool_responses import HeroStats
+
+        stats = HeroStats(
+            hero_id=8,
+            hero_name="juggernaut",
+            localized_name="Juggernaut",
+            team="radiant",
+            position=1,
+            kills=0,
+            deaths=0,
+            assists=0,
+            last_hits=0,
+            denies=0,
+            gpm=0,
+            xpm=0,
+            net_worth=0,
+            hero_damage=0,
+            tower_damage=0,
+            hero_healing=0,
+            expected_lane="safelane",
         )
-        assert matchup.hero_id == 94
-        assert matchup.localized_name == "Medusa"
-        assert "Omnislash" in matchup.reason
+        assert stats.expected_lane == "safelane"
 
-    def test_naga_siren_counter_matchup(self):
-        """HeroMatchupInfo for Naga Siren (match 8461956309 hero)."""
-        matchup = HeroMatchupInfo(
+    def test_expected_lane_from_position_4(self):
+        """Position 4 (Soft Support) should have expected_lane=offlane."""
+        from src.models.tool_responses import HeroStats
+
+        stats = HeroStats(
             hero_id=89,
+            hero_name="naga_siren",
             localized_name="Naga Siren",
-            reason="Song of the Siren provides team reset",
+            team="dire",
+            position=4,
+            kills=0,
+            deaths=0,
+            assists=0,
+            last_hits=0,
+            denies=0,
+            gpm=0,
+            xpm=0,
+            net_worth=0,
+            hero_damage=0,
+            tower_damage=0,
+            hero_healing=0,
+            expected_lane="offlane",
         )
-        assert matchup.hero_id == 89
-        assert "Song" in matchup.reason
+        assert stats.expected_lane == "offlane"
+
+    def test_expected_lane_defaults_to_none(self):
+        """expected_lane should default to None when not provided."""
+        from src.models.tool_responses import HeroStats
+
+        stats = HeroStats(
+            hero_id=8,
+            hero_name="juggernaut",
+            localized_name="Juggernaut",
+            team="radiant",
+            kills=0,
+            deaths=0,
+            assists=0,
+            last_hits=0,
+            denies=0,
+            gpm=0,
+            xpm=0,
+            net_worth=0,
+            hero_damage=0,
+            tower_damage=0,
+            hero_healing=0,
+        )
+        assert stats.expected_lane is None
+
+    def test_lane_vs_expected_lane_can_differ(self):
+        """Actual lane and expected_lane can be different (e.g., trilane situation)."""
+        from src.models.tool_responses import HeroStats
+
+        # Naga pos 4 should be offlane, but actually played safelane (trilane)
+        stats = HeroStats(
+            hero_id=89,
+            hero_name="naga_siren",
+            localized_name="Naga Siren",
+            team="dire",
+            position=4,
+            kills=0,
+            deaths=0,
+            assists=0,
+            last_hits=0,
+            denies=0,
+            gpm=0,
+            xpm=0,
+            net_worth=0,
+            hero_damage=0,
+            tower_damage=0,
+            hero_healing=0,
+            lane="safe_lane",  # Actual: trilane in safelane
+            expected_lane="offlane",  # Expected: offlane with pos 3
+        )
+        assert stats.lane == "safe_lane"
+        assert stats.expected_lane == "offlane"
+

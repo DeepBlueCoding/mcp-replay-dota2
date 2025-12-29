@@ -32,6 +32,47 @@ If already cached:
 }
 ```
 
+!!! note "Automatic Retry"
+    If a replay is corrupted during download or parsing, the server automatically deletes the corrupt file and retries once. If it still fails, use `delete_replay` to manually clear the cache before trying again.
+
+---
+
+## delete_replay
+
+Delete cached replay file and parsed data for a match. Use this when:
+
+- A replay appears to be corrupted and needs to be re-downloaded
+- You want to force a fresh download of a replay
+- Cached parsed data seems incorrect or outdated
+
+After deletion, the next analysis request for this match will trigger a fresh download and parse.
+
+```python
+delete_replay(match_id=8461956309)
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "match_id": 8461956309,
+  "file_deleted": true,
+  "cache_deleted": true,
+  "message": "Deleted replay file and parsed cache for match 8461956309"
+}
+```
+
+If no cached data exists:
+```json
+{
+  "success": true,
+  "match_id": 8461956309,
+  "file_deleted": false,
+  "cache_deleted": false,
+  "message": "No cached data found for match 8461956309"
+}
+```
+
 ---
 
 ## get_hero_deaths
@@ -616,7 +657,7 @@ get_rune_pickups(match_id=8461956309)
 
 ## get_match_draft
 
-Complete draft with bans and picks in order (for Captains Mode matches). Includes **position assignment**, **drafting context** (counters, good matchups, when to pick), and **draft timing data** for each hero.
+Complete draft with bans and picks in order (for Captains Mode matches). Includes **position assignment** (1-5), **lane assignment** (safelane/mid/offlane), and **draft timing data** for each hero.
 
 ```python
 get_match_draft(match_id=8461956309)
@@ -628,7 +669,29 @@ get_match_draft(match_id=8461956309)
   "match_id": 8461956309,
   "game_mode": 2,
   "game_mode_name": "Captains Mode",
-  "actions": [
+  "radiant_picks": [
+    {
+      "order": 10,
+      "is_pick": true,
+      "team": "radiant",
+      "hero_id": 8,
+      "hero_name": "juggernaut",
+      "localized_name": "Juggernaut",
+      "position": 1,
+      "lane": "safelane"
+    },
+    {
+      "order": 8,
+      "is_pick": true,
+      "team": "radiant",
+      "hero_id": 11,
+      "hero_name": "nevermore",
+      "localized_name": "Shadow Fiend",
+      "position": 2,
+      "lane": "mid"
+    }
+  ],
+  "radiant_bans": [
     {
       "order": 1,
       "is_pick": false,
@@ -637,25 +700,9 @@ get_match_draft(match_id=8461956309)
       "hero_name": "kunkka",
       "localized_name": "Kunkka",
       "position": null,
-      "counters": [{"hero_id": 6, "localized_name": "Doom", "reason": "Doom disables all abilities..."}],
-      "good_against": [{"hero_id": 32, "localized_name": "Riki", "reason": "Torrent and X reveal invis..."}],
-      "when_to_pick": ["Team needs stun setup", "Against melee cores"]
-    },
-    {
-      "order": 8,
-      "is_pick": true,
-      "team": "dire",
-      "hero_id": 89,
-      "hero_name": "naga_siren",
-      "localized_name": "Naga Siren",
-      "position": 1,
-      "counters": [...],
-      "good_against": [...],
-      "when_to_pick": [...]
+      "lane": null
     }
   ],
-  "radiant_picks": [...],
-  "radiant_bans": [...],
   "dire_picks": [...],
   "dire_bans": [...],
   "draft_timings": [
@@ -672,15 +719,22 @@ get_match_draft(match_id=8461956309)
 }
 ```
 
-**Position Field:**
+**Position and Lane Fields:**
 
-- `position` is `1-5` for picks (determined from OpenDota lane data and GPM):
-  - **1** = Carry (safelane core)
-  - **2** = Mid
-  - **3** = Offlane
-  - **4** = Soft support
-  - **5** = Hard support
-- `position` is `null` for bans (hero wasn't picked)
+| Field | Description |
+|-------|-------------|
+| `position` | Player role (1-5) for picks, `null` for bans |
+| `lane` | Expected lane based on position, `null` for bans |
+
+**Position to Lane Mapping:**
+
+| Position | Role | Lane |
+|----------|------|------|
+| 1 | Carry | `safelane` |
+| 2 | Mid | `mid` |
+| 3 | Offlane | `offlane` |
+| 4 | Soft support | `offlane` (with pos 3) |
+| 5 | Hard support | `safelane` (with pos 1) |
 
 **Draft Timings Fields (OpenDota SDK 7.40.1+):**
 
@@ -694,8 +748,17 @@ get_match_draft(match_id=8461956309)
 | `extra_time` | Extra time remaining after this selection (seconds) |
 | `total_time_taken` | Time spent on this selection (seconds) |
 
-!!! tip "Draft Analysis"
-    Use `counters`, `good_against`, and `when_to_pick` fields to analyze draft decisions. The `position` field tells you which role the hero was played in. Use `draft_timings` to analyze time pressure and decision-making speed.
+!!! tip "Lane Matchup Analysis"
+    Use the `lane` field to construct lane matchups. For Radiant: safelane = bottom lane, offlane = top lane. For Dire: safelane = top lane, offlane = bottom lane.
+
+    Example matchups from position data:
+
+    - **Radiant Safelane (bot)**: Pos 1 + Pos 5 vs enemy Pos 3 + Pos 4
+    - **Mid**: Pos 2 vs enemy Pos 2
+    - **Radiant Offlane (top)**: Pos 3 + Pos 4 vs enemy Pos 1 + Pos 5
+
+!!! note "Counter Picks Data"
+    For hero counter picks and matchup analysis, use the `dota2://heroes/all` resource which contains `counters`, `good_against`, and `when_to_pick` for all 126 heroes.
 
 ---
 
@@ -884,3 +947,42 @@ get_match_players(match_id=8461956309)
 | 60-65 | Ancient |
 | 70-75 | Divine |
 | 80+ | Immortal |
+
+---
+
+# Diagnostic Tools
+
+## get_client_capabilities
+
+Check what MCP capabilities the connected client supports. Use this to verify if features like sampling are available.
+
+```python
+get_client_capabilities()
+```
+
+**Returns:**
+```json
+{
+  "sampling_supported": true,
+  "roots_supported": true,
+  "client_info": {
+    "name": "claude-code",
+    "version": "1.0.50"
+  },
+  "raw_capabilities": "ClientCapabilities(sampling=SamplingCapability(), roots=...)"
+}
+```
+
+**Key Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `sampling_supported` | `true` if client supports LLM sampling via `ctx.sample()` |
+| `roots_supported` | `true` if client supports workspace roots |
+| `client_info` | Client name and version from initialization |
+| `raw_capabilities` | Raw capabilities object for debugging |
+
+!!! tip "Sampling Support"
+    If `sampling_supported` is `true`, the server can use `ctx.sample()` to request LLM completions from the client. This enables automatic coaching analysis in tool responses.
+
+    If `false`, tools will return data without AI-generated coaching insights.

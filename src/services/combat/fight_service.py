@@ -138,7 +138,7 @@ class FightService:
             data: ParsedReplayData from ReplayService
 
         Returns:
-            Dictionary with fight statistics
+            Dictionary with fight statistics and full fight data
         """
         result = self.get_all_fights(data)
 
@@ -150,10 +150,24 @@ class FightService:
             "fights": [
                 {
                     "fight_id": f.fight_id,
-                    "start_time": f.start_time_str,
-                    "deaths": f.total_deaths,
+                    "start_time": f.start_time,
+                    "start_time_str": f.start_time_str,
+                    "end_time": f.end_time,
+                    "end_time_str": f.end_time_str,
+                    "duration_seconds": round(f.duration, 1),
+                    "total_deaths": f.total_deaths,
                     "participants": f.participants,
                     "is_teamfight": f.is_teamfight,
+                    "deaths": [
+                        {
+                            "game_time": d.game_time,
+                            "game_time_str": d.game_time_str,
+                            "killer": d.killer,
+                            "victim": d.victim,
+                            "ability": d.ability,
+                        }
+                        for d in f.deaths
+                    ],
                 }
                 for f in result.fights
             ],

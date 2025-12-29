@@ -319,6 +319,16 @@ class DownloadReplayResponse(BaseModel):
     error: Optional[str] = Field(default=None)
 
 
+class DeleteReplayResponse(BaseModel):
+    """Response for delete_replay tool."""
+
+    success: bool
+    match_id: int
+    file_deleted: bool = Field(default=False, description="Whether the replay file was deleted")
+    cache_deleted: bool = Field(default=False, description="Whether the parsed cache was deleted")
+    message: str = Field(description="Human-readable result message")
+
+
 class RunePickup(BaseModel):
     """A power rune pickup event."""
 

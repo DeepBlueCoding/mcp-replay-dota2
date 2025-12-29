@@ -30,7 +30,7 @@ Tools are functions the LLM can call. All match analysis tools take `match_id` a
 
 | Category | Description | Tools |
 |----------|-------------|-------|
-| [Match Analysis](match-analysis.md) | Query match events, deaths, items, timeline | 14 tools |
+| [Match Analysis](match-analysis.md) | Query match events, deaths, items, timeline | 15 tools |
 | [Pro Scene](pro-scene.md) | Search players, teams, leagues, pro matches | 10 tools |
 | [Game State](game-state.md) | High-resolution positions, snapshots, fights | 11 tools |
 | [Farming & Rotation](farming-rotation.md) | Farming patterns and rotation analysis | 2 tools |

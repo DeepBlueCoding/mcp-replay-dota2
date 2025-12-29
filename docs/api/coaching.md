@@ -94,52 +94,154 @@ When `coaching_analysis` is `null`, the client's LLM can still interpret the raw
 
 ## Coaching Knowledge Base
 
-The server includes comprehensive Dota 2 coaching knowledge:
+The server includes comprehensive Dota 2 coaching knowledge loaded from persona files in `data/personas/`.
 
-### Position-Specific Expectations
+### Coaching Persona
 
-Each position (1-5) has different success metrics:
+The AI adopts the perspective of a senior Dota 2 analyst with professional play experience (TI qualifiers, 11k peak MMR). The persona is defined in `data/personas/coaching_persona.md`.
 
-| Position | Primary Metrics | Acceptable Deaths |
-|----------|-----------------|-------------------|
-| **Pos 1 (Carry)** | CS@10 (65-80), Item timings | 0-1 before 10:00 |
-| **Pos 2 (Mid)** | CS@10 (60-75), Rune control | 0-2 before 10:00 |
-| **Pos 3 (Offlane)** | Enemy carry CS disruption | 2-3 acceptable if creating space |
-| **Pos 4 (Soft Support)** | Kill participation, Rotations | Context-dependent |
-| **Pos 5 (Hard Support)** | Vision uptime, Save usage | Acceptable if saving cores |
+**Analysis Principles:**
+
+- **Lead with Insight, Support with Data** - Don't just report numbers, interpret what they mean
+- **Identify the Core Issue** - Surface the fundamental problem, not symptoms
+- **Actionable Takeaways** - Specific, implementable changes (2-3 maximum)
+
+**Communication Style:**
+
+- Direct and specific - timestamps, hero names, ability names
+- Focus on the "why" not just the "what"
+- Never blame teammates - focus on what the player could control
+- Distinguish execution errors from decision errors
+
+### Analysis Workflow
+
+Every analysis follows this framework:
+
+1. **Win Condition** - What does each draft want to do? Timing advantage?
+2. **Execution Check** - Did they play their draft or deviate?
+3. **Inflection Point** - THE moment the game turned (there's always one)
+4. **The "Why"** - Explain why events mattered, not just describe them
+5. **Counterfactual** - What could the losing side have done differently?
+
+### Position-Specific Frameworks
+
+Position-specific analysis frameworks are loaded from `data/personas/` when available. These provide detailed phase-by-phase guidance for each role.
+
+| Position | Framework File | Status |
+|----------|----------------|--------|
+| **Pos 1 (Carry)** | `pos1_carry.md` | ✅ Available |
+| **Pos 2 (Mid)** | `pos2_mid.md` | 🔜 Planned |
+| **Pos 3 (Offlane)** | `pos3_offlane.md` | 🔜 Planned |
+| **Pos 4 (Soft Support)** | `pos4_soft_support.md` | 🔜 Planned |
+| **Pos 5 (Hard Support)** | `pos5_hard_support.md` | 🔜 Planned |
+
+### Position 1 (Carry) Framework
+
+The carry framework (`data/personas/pos1_carry.md`) provides comprehensive phase-by-phase analysis:
+
+**Laning (0-10 min):**
+
+- Lane equilibrium management (creep aggro, wave positioning)
+- Lane dynamics assessment (2v1, 1v2, etc.)
+- Recognizing when laning phase ends (offlaner level 6)
+
+**Farming (7-25 min):**
+
+- Farming pattern: Wave → Jungle → Wave → Jungle
+- Timer awareness (stack at :40-:45, XP shrines at 14/21 min)
+- Item timing benchmarks:
+
+| Item | Good Timing | Struggling |
+|------|-------------|------------|
+| Maelstrom | 11-13 min | 16+ min |
+| Battlefury | 12-14 min | 18+ min |
+| BKB | 18-20 min | 24+ min |
+
+**Transition (20-35 min):**
+
+- Active vs Passive farming (the #1 carry mistake)
+- Pre-BKB: Only join convenient cleanup kills
+- Post-BKB: Farm near team, 60%+ kill participation target
+- 20-30 second rule before TPing back
+
+**Closing (25-45 min):**
+
+- "Aegis is a timer, not insurance" - push immediately
+- No-throw mentality: end with 2-3 deaths, not 7-8
+- Second Aegis = game should end
+
+### Basic Role Expectations
+
+| Position | Primary Focus | Key Metrics |
+|----------|---------------|-------------|
+| **Pos 1 (Carry)** | Maximize farm efficiency, minimize deaths | Item timings, kill participation post-BKB |
+| **Pos 2 (Mid)** | Win CS, control power runes | Rotate only WITH good runes (haste/DD/invis) |
+| **Pos 3 (Offlane)** | Disrupt enemy carry's farm | Deaths acceptable if they drew resources |
+| **Pos 4 (Soft Support)** | Secure offlane levels 1-3, then rotate | Stack camps, set up kills, aggressive vision |
+| **Pos 5 (Hard Support)** | Keep carry alive, zone offlaner | Lowest net worth expected, die to save cores |
 
 ### Death Analysis Framework
 
-The coaching analyzes deaths using a 5-question framework:
+For each death, the coaching asks:
 
-1. **Was vision available?** - Ward coverage, minimap awareness
-2. **Power spike window?** - Pre-6, pre-BKB vulnerability
-3. **Did it trade for objectives?** - Roshan, towers, space creation
-4. **Buyback usage?** - Correct/incorrect buyback decisions
-5. **Item timing impact?** - How much did death delay key items
+1. **Vision** - Ward coverage? Smoke gank (excusable)?
+2. **Timing** - Before key level/item? Ult on cooldown?
+3. **Trade** - Got objective? Created space? Or died for nothing?
+4. **Buyback** - Available? Used correctly?
+5. **Impact** - How much did this delay key items?
 
-### CS/GPM Benchmarks
+**Death Categories:**
 
-```
-Position 1 (Carry) CS Targets:
-┌────────┬──────┬────────────┬──────┬───────────┐
-│ Minute │ Poor │ Acceptable │ Good │ Excellent │
-├────────┼──────┼────────────┼──────┼───────────┤
-│ 5      │ <30  │ 30-40      │ 40-50│ 50+       │
-│ 10     │ <50  │ 50-65      │ 65-80│ 80+       │
-│ 15     │ <80  │ 80-110     │110-140│ 140+     │
-│ 20     │ <120 │ 120-160    │160-200│ 200+     │
-└────────┴──────┴────────────┴──────┴───────────┘
-```
+- **Unavoidable**: Smoke gank, enemy snowballing
+- **Preventable**: Bad positioning, no vision, greedy farming
+- **Acceptable**: Space creation (pos 3), trading for objectives
+- **Throw**: Dying with Aegis, solo death while winning, no buyback late
 
-### Fight Analysis
+### Lane Recovery Framework
 
-Teamfights are evaluated on:
+When a lane is lost, the coaching evaluates the response:
 
-- **Initiation quality** - Planned vs reactive, ability readiness
-- **Target priority** - Were high-value targets focused?
-- **Ability usage** - Key ultimates, CC chaining, save items
-- **Trade value** - What did each team gain/lose?
+| Role | Expected Response | Red Flag |
+|------|-------------------|----------|
+| **Carry** | Jungle transition at level 5-6 | Staying in lane dying repeatedly |
+| **Mid** | Stack-farming, rune control | Forcing fights without advantage |
+| **Offlane** | Secure levels, pressure when possible | Feeding without creating any pressure |
+
+### Fight Analysis (Before/During/After)
+
+**Before the Fight:**
+- Setup (smoke, vision advantage, key cooldowns ready)
+- Numbers (5v5 or someone missing?)
+- Resources (Aegis, buybacks, key items)
+
+**During the Fight:**
+- Initiation (who started, chained disables)
+- Ability timing (key ults used well)
+- Focus fire (right target or spread damage)
+- Saves/counters (defensive saves used)
+
+**After the Fight:**
+- Objective trade (Roshan/tower/barracks taken)
+- Death timers (push opportunity)
+- Buyback status (who used, was it necessary)
+
+**Key Question:** Was this fight NECESSARY?
+
+### Late Game Framework (30+ minutes)
+
+**Buyback Discipline:**
+- Core heroes: NEVER die without buyback available after 35 minutes
+- Team fight with buybacks ready = acceptable risk
+
+**Risk Assessment:**
+- **Ahead**: Only take fights you NEED (Roshan, high ground, defending)
+- **Behind**: Must take calculated risks to comeback
+- **Even**: Map control and Roshan become deciding factors
+
+**Common Late Game Throws:**
+- Solo pickoff on carry without buyback
+- Fighting without key ultimate
+- Pushing high ground without Aegis when ahead
 
 ## Implementing Sampling in Custom Clients
 

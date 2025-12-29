@@ -9,11 +9,11 @@ NO MCP DEPENDENCIES.
 
 import logging
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from python_manta import CombatLogType, NeutralCampType
 
-from ...utils.position_tracker import classify_map_position
+from ...utils.position_tracker import PositionClassifier, classify_map_position
 from ..models.farming_data import (
     CampClear,
     CreepKill,
@@ -28,6 +28,9 @@ from ..models.farming_data import (
     WaveClear,
 )
 from ..models.replay_data import ParsedReplayData
+
+if TYPE_CHECKING:
+    from src.models.game_context import GameContext
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +171,7 @@ class FarmingService:
         hero: str,
         start_time: float,
         end_time: float,
+        classifier: Optional[PositionClassifier] = None,
     ) -> List[CreepKill]:
         """
         Get all creep kills by a hero in a time range.
@@ -177,6 +181,7 @@ class FarmingService:
             hero: Hero name (cleaned, e.g., 'terrorblade')
             start_time: Start time in seconds
             end_time: End time in seconds
+            classifier: Optional PositionClassifier for version-aware classification
 
         Returns:
             List of CreepKill events sorted by game time
@@ -212,7 +217,7 @@ class FarmingService:
                 camp_tier = NEUTRAL_CAMP_TYPE_TO_TIER.get(entry.neutral_camp_type)
 
             # Get hero position at kill time
-            x, y, map_area = self._get_position_at_time(data, hero, entry.game_time)
+            x, y, map_area = self._get_position_at_time(data, hero, entry.game_time, classifier)
 
             kills.append(CreepKill(
                 game_time=round(entry.game_time, 1),
@@ -233,9 +238,16 @@ class FarmingService:
         data: ParsedReplayData,
         hero: str,
         target_time: float,
+        classifier: Optional[PositionClassifier] = None,
     ) -> Tuple[Optional[float], Optional[float], Optional[str]]:
         """
         Get hero position at a specific time.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            hero: Hero name to find
+            target_time: Game time to find position at
+            classifier: Optional PositionClassifier for version-aware classification
 
         Returns:
             Tuple of (x, y, map_area) or (None, None, None) if not found
@@ -256,7 +268,10 @@ class FarmingService:
         for hero_snap in best_snapshot.heroes:
             player_hero = self._clean_hero_name(hero_snap.hero_name)
             if hero_lower in player_hero.lower():
-                pos = classify_map_position(hero_snap.x, hero_snap.y)
+                if classifier:
+                    pos = classifier.classify(hero_snap.x, hero_snap.y)
+                else:
+                    pos = classify_map_position(hero_snap.x, hero_snap.y)
                 return (hero_snap.x, hero_snap.y, pos.region)
 
         return (None, None, None)
@@ -452,6 +467,7 @@ class FarmingService:
         start_minute: int = 0,
         end_minute: int = 10,
         item_timings: Optional[List[ItemTiming]] = None,
+        game_context: Optional["GameContext"] = None,
     ) -> FarmingPatternResponse:
         """
         Analyze a hero's farming pattern.
@@ -462,6 +478,7 @@ class FarmingService:
             start_minute: Start of analysis range (default: 0)
             end_minute: End of analysis range (default: 10)
             item_timings: Optional list of item purchase timings from OpenDota
+            game_context: Optional GameContext for version-aware position classification
 
         Returns:
             FarmingPatternResponse with complete farming analysis
@@ -469,8 +486,11 @@ class FarmingService:
         start_time = start_minute * 60.0
         end_time = end_minute * 60.0
 
+        # Get classifier from context if available
+        classifier = game_context.position_classifier if game_context else None
+
         # Get all creep kills in time range
-        creep_kills = self._get_creep_kills(data, hero, start_time, end_time)
+        creep_kills = self._get_creep_kills(data, hero, start_time, end_time, classifier)
 
         # Get level timings
         level_timings = self._get_level_timings(data, hero, start_time, end_time)
@@ -485,10 +505,10 @@ class FarmingService:
 
             # Get position at start and end of minute
             start_x, start_y, start_area = self._get_position_at_time(
-                data, hero, minute_start
+                data, hero, minute_start, classifier
             )
             end_x, end_y, end_area = self._get_position_at_time(
-                data, hero, minute_end - 1  # X:59
+                data, hero, minute_end - 1, classifier  # X:59
             )
 
             position_at_start = None

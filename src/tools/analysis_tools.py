@@ -5,6 +5,7 @@ from typing import List, Optional
 from fastmcp import Context
 
 from ..coaching import get_lane_analysis_prompt, try_coaching_analysis
+from ..models.game_context import GameContext
 from ..models.tool_responses import (
     CampStack,
     CampStacksResponse,
@@ -111,7 +112,8 @@ def register_analysis_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            summary = lane_service.get_lane_summary(data)
+            game_context = GameContext.from_parsed_data(data)
+            summary = lane_service.get_lane_summary(data, game_context=game_context)
 
             opendota_players = await match_fetcher.get_players(match_id)
             opendota_lanes = {}
@@ -306,6 +308,7 @@ def register_analysis_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
+            game_context = GameContext.from_parsed_data(data)
             match_heroes = await heroes_resource.get_match_heroes(match_id)
             hero_lower = hero.lower()
             hero_id = None
@@ -337,6 +340,7 @@ def register_analysis_tools(mcp, services):
                 start_minute=start_minute,
                 end_minute=end_minute,
                 item_timings=item_timings_list,
+                game_context=game_context,
             )
             return result
         except ValueError as e:
@@ -368,7 +372,7 @@ def register_analysis_tools(mcp, services):
         """
         Analyze hero rotations - movement patterns between lanes and outcomes.
 
-        **NOT FOR HERO PERFORMANCE QUESTIONS** → Use get_hero_performance instead.
+        Returns rotation events, gank attempts, and their success rates.
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -376,10 +380,12 @@ def register_analysis_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
+            game_context = GameContext.from_parsed_data(data)
             result = rotation_service.get_rotation_analysis(
                 data=data,
                 start_minute=start_minute,
                 end_minute=end_minute,
+                game_context=game_context,
             )
             return result
         except ValueError as e:

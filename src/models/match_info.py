@@ -5,14 +5,6 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class HeroMatchupInfo(BaseModel):
-    """Simplified matchup info for draft context."""
-
-    hero_id: int = Field(description="Hero ID")
-    localized_name: str = Field(description="Hero display name")
-    reason: str = Field(description="Explanation of the matchup")
-
-
 class DraftTiming(BaseModel):
     """Timing information for a single draft pick/ban."""
 
@@ -35,9 +27,10 @@ class DraftAction(BaseModel):
     hero_name: str = Field(description="Hero internal name (e.g., 'juggernaut')")
     localized_name: str = Field(description="Hero display name (e.g., 'Juggernaut')")
     position: Optional[int] = Field(default=None, description="Position 1-5 if known")
-    counters: List[HeroMatchupInfo] = Field(default_factory=list, description="Bad matchups")
-    good_against: List[HeroMatchupInfo] = Field(default_factory=list, description="Good matchups")
-    when_to_pick: List[str] = Field(default_factory=list, description="When this hero is strong")
+    lane: Optional[Literal["safelane", "mid", "offlane"]] = Field(
+        default=None,
+        description="Expected lane based on position (pos1/5=safelane, pos2=mid, pos3/4=offlane)"
+    )
 
 
 class DraftResult(BaseModel):
@@ -46,7 +39,6 @@ class DraftResult(BaseModel):
     match_id: int = Field(description="Match ID")
     game_mode: int = Field(description="Game mode ID (2 = Captains Mode)")
     game_mode_name: str = Field(description="Game mode name")
-    actions: List[DraftAction] = Field(description="All draft actions in order")
     radiant_picks: List[DraftAction] = Field(description="Radiant's picked heroes")
     radiant_bans: List[DraftAction] = Field(description="Radiant's banned heroes")
     dire_picks: List[DraftAction] = Field(description="Dire's picked heroes")

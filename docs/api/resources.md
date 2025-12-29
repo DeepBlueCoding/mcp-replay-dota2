@@ -2,7 +2,7 @@
 
 ??? info "AI Summary"
 
-    Static reference data via URI. **Core**: `dota2://heroes/all` (126 heroes with aliases, **counter picks**, when_to_pick conditions), `dota2://map` (towers, camps, runes, landmarks). **Pro scene**: `dota2://pro/players`, `dota2://pro/teams`. Resources are for static data the user attaches to context. For match-specific data, use tools like `get_match_heroes` and `get_match_players`.
+    Static reference data via URI. **Core**: `dota2://heroes/all` (126 heroes with aliases, **counter picks**, when_to_pick conditions), `dota2://map` (towers, camps, runes, landmarks, **lane_boundaries** - version-aware for patches 7.33-7.39). **Pro scene**: `dota2://pro/players`, `dota2://pro/teams`. Resources are for static data the user attaches to context. For match-specific data, use tools like `get_match_heroes` and `get_match_players`.
 
 Resources are static reference data that users can attach to their context before a conversation. Access via URI.
 
@@ -72,7 +72,12 @@ Use for: Hero name resolution, attribute lookups, **draft analysis**, counter-pi
 
 ## dota2://map
 
-Full map geometry - towers, camps, runes, landmarks.
+Full map geometry - towers, camps, runes, landmarks, and lane boundaries.
+
+!!! info "Version-aware map data"
+    Map data is versioned by patch. The server automatically uses patch-specific data when analyzing replays, falling back to the latest known version (7.39) for unknown patches.
+
+    Supported patches: 7.33, 7.37, 7.38, 7.39
 
 ```json
 {
@@ -93,6 +98,11 @@ Full map geometry - towers, camps, runes, landmarks.
   "landmarks": [
     {"name": "roshan_pit", "x": -2432, "y": 2016},
     {"name": "radiant_ancient", "x": -6144, "y": -6016}
+  ],
+  "lane_boundaries": [
+    {"name": "top", "x_min": -8000, "x_max": 0, "y_min": 2000, "y_max": 8000},
+    {"name": "mid", "x_min": -3500, "x_max": 3500, "y_min": -3500, "y_max": 3500},
+    {"name": "bot", "x_min": 0, "x_max": 8000, "y_min": -8000, "y_max": -2000}
   ]
 }
 ```
@@ -103,7 +113,16 @@ Full map geometry - towers, camps, runes, landmarks.
 - Dire base = top-right (positive X, positive Y)
 - Range: roughly -8000 to +8000
 
-Use for: Understanding death positions, analyzing rotations, tower/rax context.
+**Lane boundaries:**
+Lane boundaries define rectangular regions for classifying hero positions:
+
+- `top`: Upper-left quadrant (Radiant offlane / Dire safelane)
+- `mid`: Center diagonal corridor
+- `bot`: Lower-right quadrant (Radiant safelane / Dire offlane)
+
+Used internally by `get_lane_summary`, `get_rotation_analysis`, and `get_farming_pattern` tools.
+
+Use for: Understanding death positions, analyzing rotations, tower/rax context, lane classification.
 
 ---
 

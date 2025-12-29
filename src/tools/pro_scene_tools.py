@@ -11,6 +11,7 @@ from ..models.pro_scene import (
     TeamMatchesResponse,
     TeamResponse,
     TeamSearchResponse,
+    TournamentSeriesResponse,
 )
 
 
@@ -60,17 +61,20 @@ def register_pro_scene_tools(mcp, services):
 
     @mcp.tool
     async def get_pro_matches(
-        limit: int = 100,
+        limit: int = 50,
         tier: Optional[str] = None,
         team1_name: Optional[str] = None,
         team2_name: Optional[str] = None,
         league_name: Optional[str] = None,
         days_back: Optional[int] = None,
     ) -> ProMatchesResponse:
-        """Get recent professional Dota 2 matches with series grouping.
+        """Get recent professional Dota 2 matches as a flat list.
+
+        Returns individual matches without series grouping. Use get_tournament_series
+        for bracket/series analysis.
 
         Args:
-            limit: Maximum matches to return (default 100)
+            limit: Maximum matches to return (default 50)
             tier: Filter by league tier (premium, professional, amateur)
             team1_name: Filter by first team (fuzzy match). Alone: all matches for team.
             team2_name: Filter by second team (fuzzy match). With team1: head-to-head matches.
@@ -83,6 +87,34 @@ def register_pro_scene_tools(mcp, services):
             team1_name=team1_name,
             team2_name=team2_name,
             league_name=league_name,
+            days_back=days_back,
+        )
+
+    @mcp.tool
+    async def get_tournament_series(
+        league_name: Optional[str] = None,
+        league_id: Optional[int] = None,
+        team_name: Optional[str] = None,
+        limit: int = 20,
+        days_back: Optional[int] = None,
+    ) -> TournamentSeriesResponse:
+        """Get tournament series with bracket/game details.
+
+        Use this for tournament progression analysis: series results, Bo3/Bo5 outcomes,
+        team advancement through brackets.
+
+        Args:
+            league_name: Filter by league/tournament name (fuzzy match)
+            league_id: Filter by specific league ID
+            team_name: Filter series involving this team
+            limit: Maximum series to return (default 20)
+            days_back: Only series from last N days
+        """
+        return await pro_scene_resource.get_tournament_series(
+            league_name=league_name,
+            league_id=league_id,
+            team_name=team_name,
+            limit=limit,
             days_back=days_back,
         )
 

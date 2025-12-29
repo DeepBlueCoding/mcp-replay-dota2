@@ -19,6 +19,7 @@ from ..models.combat_log import (
     ObjectiveKillsResponse,
     RunePickupsResponse,
 )
+from ..models.game_context import GameContext
 
 
 def register_combat_tools(mcp, services):
@@ -31,18 +32,8 @@ def register_combat_tools(mcp, services):
         """
         Get chronological list of ALL hero deaths in a match.
 
-        **DO NOT USE IF:**
-        - You already called get_hero_performance → It includes deaths per hero
-        - Asking about specific hero's deaths → Use get_hero_performance instead
-        - Asking about ability effectiveness → Use get_hero_performance instead
-
-        **USE FOR:**
-        - "Show me all deaths in the game" (global death timeline)
-        - "Who died the most?" (need to count across all heroes)
-        - "What was first blood?" (earliest death)
-        - Death pattern analysis across entire match
-
-        Returns: List of all deaths with killer, victim, time, ability used.
+        Returns all deaths with killer, victim, time, and ability used.
+        Use for global death timeline, first blood, or death pattern analysis.
 
         Args:
             match_id: The Dota 2 match ID
@@ -53,7 +44,10 @@ def register_combat_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            response = combat_service.get_hero_deaths_response(data, match_id)
+            game_context = GameContext.from_parsed_data(data)
+            response = combat_service.get_hero_deaths_response(
+                data, match_id, game_context=game_context
+            )
 
             if response.success and len(response.deaths) >= 3:
                 hero_positions = {}
@@ -91,25 +85,10 @@ def register_combat_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> CombatLogResponse:
         """
-        Get raw combat events for a SPECIFIC TIME WINDOW (advanced use).
+        Get raw combat events for a specific time window.
 
-        **DO NOT USE FOR:**
-        - Hero/ability performance → Use get_hero_performance instead
-        - Fight summaries → Use list_fights or get_teamfights instead
-
-        **USE WHEN:**
-        - Need raw events in a specific time range (not fight-based)
-        - Analyzing non-fight moments (e.g., "What happened at Roshan at 18:00?")
-
-        **PARAMETERS:**
-        - start_time/end_time: Time window in seconds (max 3 min recommended)
-        - hero_filter: Only events involving this hero (e.g., "batrider")
-        - ability_filter: Only events with this ability (e.g., "flaming_lasso")
-        - detail_level:
-          - "narrative": Deaths, abilities, purchases only
-          - "tactical": Adds hero-to-hero damage
-          - "full": All events (very verbose)
-        - max_events: Cap on returned events (default 200)
+        Use for analyzing non-fight moments (e.g., Roshan attempts, specific plays).
+        detail_level: "narrative" (deaths/abilities), "tactical" (+damage), "full" (all).
 
         Args:
             match_id: The Dota 2 match ID
@@ -200,7 +179,10 @@ def register_combat_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            return combat_service.get_courier_kills_response(data, match_id)
+            game_context = GameContext.from_parsed_data(data)
+            return combat_service.get_courier_kills_response(
+                data, match_id, game_context=game_context
+            )
         except ValueError as e:
             return CourierKillsResponse(success=False, match_id=match_id, error=str(e))
 
@@ -285,27 +267,10 @@ def register_combat_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> HeroCombatAnalysisResponse:
         """
-        **THE PRIMARY TOOL FOR HERO/ABILITY ANALYSIS** - Use this FIRST and ONLY.
+        Get comprehensive performance data for a hero.
 
-        Returns COMPLETE performance data - DO NOT call other tools after this.
-
-        **USE FOR:**
-        - "How did X hero perform?" / "How many kills did X get?"
-        - "How many Chronospheres landed?" / "Analyze Lasso effectiveness"
-        - "Show me fight participation" / "What was X's impact?"
-
-        **RESPONSE INCLUDES (no need for additional tools):**
-        - total_kills, total_deaths, total_assists (aggregated)
-        - ability_summary: casts, hero_hits, hit_rate per ability
-        - fights[]: per-fight breakdown with kills/deaths/abilities used
-
-        **DO NOT CHAIN TO OTHER TOOLS AFTER THIS:**
-        - ❌ Don't call get_fight_combat_log - fights[] already has per-fight data
-        - ❌ Don't call get_hero_deaths - total_deaths already included
-        - ❌ Don't call list_fights - fights[] already lists all fights
-
-        **ABILITY QUESTIONS:** Use ability_filter param (e.g., "flaming_lasso", "chronosphere").
-        The response shows: casts, hits on heroes, and kills in fights where ability was used.
+        Returns kills, deaths, assists, ability stats (casts, hit rate), and
+        per-fight breakdowns. Use ability_filter for specific ability analysis.
 
         Args:
             match_id: The Dota 2 match ID

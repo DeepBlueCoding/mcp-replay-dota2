@@ -200,17 +200,19 @@ class TestMatch8594217096Players:
         assert player_33["hero_id"] == 96  # Centaur
         assert player_33["role"] == "core"
 
-    def test_whitemon_is_position_4(self, match_players_2):
-        """Whitemon plays position 4 (Jakiro)."""
+    def test_whitemon_is_position_5(self, match_players_2):
+        """Whitemon plays position 5 (Jakiro) - safelane support."""
         whitemon = next(p for p in match_players_2 if p.get("pro_name") == "Whitemon")
-        assert whitemon["position"] == 4
+        assert whitemon["position"] == 5
+        assert whitemon["lane_role"] == 1  # Safelane
         assert whitemon["hero_id"] == 64  # Jakiro
         assert whitemon["role"] == "support"
 
-    def test_ari_is_position_5(self, match_players_2):
-        """Ari plays position 5 (Batrider)."""
+    def test_ari_is_position_4(self, match_players_2):
+        """Ari plays position 4 (Batrider) - offlane support."""
         ari = next(p for p in match_players_2 if p.get("pro_name") == "Ari")
-        assert ari["position"] == 5
+        assert ari["position"] == 4
+        assert ari["lane_role"] == 3  # Offlane
         assert ari["hero_id"] == 65  # Batrider
         assert ari["role"] == "support"
 

@@ -53,32 +53,16 @@ def register_fight_tools(mcp, services):
         ctx: Optional[Context] = None,
     ) -> FightCombatLogResponse:
         """
-        Get detailed event-by-event combat log for ONE SPECIFIC fight.
+        Get detailed event-by-event combat log for a specific fight.
 
-        **USE WHEN user asks for deep fight analysis:**
-        - "What exactly happened in the fight at 25:30?"
-        - "Break down the teamfight where we lost"
-        - "Show me the sequence of events in that fight"
-
-        **DO NOT USE IF:**
-        - You already called get_hero_performance → It has fight summaries
-        - Asking about hero/ability stats → Use get_hero_performance instead
-        - Want to see all fights → Use list_fights or get_teamfights
-
-        **PARAMETERS:**
-        - reference_time: Game time in seconds (fight auto-detected around this time)
-        - hero: Filter to anchor fight detection on specific hero
-        - detail_level:
-          - "narrative" (default): Deaths, abilities, key moments (~2k tokens)
-          - "tactical": Adds damage events (~5k tokens)
-          - "full": All events including creeps (~14k tokens) - debugging only
-        - max_events: Limit events returned (default 200)
+        Automatically detects the fight around reference_time and returns
+        the sequence of deaths, abilities, and key moments.
 
         Args:
             match_id: The Dota 2 match ID
             reference_time: Game time in seconds (e.g., 1530 for 25:30)
-            hero: Optional hero to filter/anchor detection
-            detail_level: "narrative" (recommended), "tactical", or "full"
+            hero: Optional hero to anchor fight detection
+            detail_level: "narrative" (default), "tactical", or "full"
             max_events: Maximum events to return
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
@@ -178,13 +162,7 @@ def register_fight_tools(mcp, services):
         """
         List all fights/skirmishes in a match with death summaries.
 
-        **DO NOT USE IF:**
-        - You already called get_hero_performance → It includes fights[] array
-        - Asking about specific hero → Use get_hero_performance instead
-
-        **USE FOR:**
-        - "How many fights happened?" / "List all teamfights"
-        - "When were the major fights?" (overview, not hero-specific)
+        Returns fight count, timing, participants, and deaths for each fight.
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             await ctx.report_progress(current, total)
@@ -241,13 +219,7 @@ def register_fight_tools(mcp, services):
         """
         Get major teamfights (3+ deaths) with coaching analysis.
 
-        **DO NOT USE IF:**
-        - You already called get_hero_performance → It includes teamfight participation
-        - Asking about specific hero → Use get_hero_performance instead
-
-        **USE FOR:**
-        - "What were the big teamfights?" / "Analyze the teamfights"
-        - General teamfight overview (not hero-specific)
+        Returns teamfight timing, participants, death sequences, and analysis.
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:

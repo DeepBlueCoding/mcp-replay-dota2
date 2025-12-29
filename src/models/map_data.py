@@ -109,6 +109,16 @@ class MapLane(BaseModel):
     dire_name: str = Field(description="Dire perspective name (e.g., 'safelane')")
 
 
+class LaneBoundary(BaseModel):
+    """Bounding box for lane position classification."""
+
+    name: str = Field(description="Lane name: top, mid, or bot")
+    x_min: float = Field(description="Minimum X coordinate")
+    x_max: float = Field(description="Maximum X coordinate")
+    y_min: float = Field(description="Minimum Y coordinate")
+    y_max: float = Field(description="Maximum Y coordinate")
+
+
 class MapData(BaseModel):
     """Complete Dota 2 map data."""
 
@@ -123,3 +133,6 @@ class MapData(BaseModel):
     shops: List[Shop] = Field(description="All shops")
     landmarks: List[Landmark] = Field(description="Notable landmarks")
     lanes: List[MapLane] = Field(description="Lane information")
+    lane_boundaries: List[LaneBoundary] = Field(
+        default_factory=list, description="Lane position classification boundaries"
+    )

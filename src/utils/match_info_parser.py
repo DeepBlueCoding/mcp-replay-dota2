@@ -4,18 +4,14 @@ Match info parser for extracting match metadata and draft from Dota 2 replays.
 Uses v2 ParsedReplayData which contains game_info from python-manta.
 """
 
-import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Literal, Optional
 
 from python_manta import Team
 
-from src.models.hero_counters import HeroCounters, HeroCountersDatabase
 from src.models.match_info import (
     DraftAction,
     DraftResult,
-    HeroMatchupInfo,
     MatchInfoResult,
     PlayerInfo,
     TeamInfo,
@@ -58,62 +54,9 @@ GAME_MODES = {
 class MatchInfoParser:
     """Parses match info and draft data from Dota 2 replays."""
 
-    def __init__(self):
-        self._hero_counters: Optional[HeroCountersDatabase] = None
-
-    def _load_hero_counters(self) -> Optional[HeroCountersDatabase]:
-        """Load hero counters database from JSON file."""
-        if self._hero_counters is not None:
-            return self._hero_counters
-
-        counters_path = Path(__file__).parent.parent.parent / "data" / "constants" / "hero_counters.json"
-        if not counters_path.exists():
-            logger.warning(f"Hero counters file not found: {counters_path}")
-            return None
-
-        with open(counters_path) as f:
-            data = json.load(f)
-            self._hero_counters = HeroCountersDatabase(**data)
-
-        return self._hero_counters
-
-    def _get_hero_counters(self, hero_id: int) -> Optional[HeroCounters]:
-        """Get counter data for a specific hero."""
-        counters_db = self._load_hero_counters()
-        if not counters_db:
-            return None
-        return counters_db.heroes.get(str(hero_id))
-
-    def _build_matchup_info(
-        self, counters: Optional[HeroCounters]
-    ) -> tuple[List[HeroMatchupInfo], List[HeroMatchupInfo], List[str]]:
-        """Build matchup info lists from hero counters data."""
-        if not counters:
-            return [], [], []
-
-        counter_list = [
-            HeroMatchupInfo(
-                hero_id=c.hero_id,
-                localized_name=c.localized_name,
-                reason=c.reason
-            )
-            for c in counters.counters
-        ]
-
-        good_against_list = [
-            HeroMatchupInfo(
-                hero_id=g.hero_id,
-                localized_name=g.localized_name,
-                reason=g.reason
-            )
-            for g in counters.good_against
-        ]
-
-        return counter_list, good_against_list, counters.when_to_pick
-
     def _get_hero_info(self, hero_id: int) -> tuple[str, str]:
         """Get hero internal name and localized name from hero_id."""
-        heroes = constants_fetcher.get_heroes_constants()
+        heroes = constants_fetcher.get_heroes_constants() or {}
         hero_data = heroes.get(str(hero_id), {})
 
         name = hero_data.get("name", f"npc_dota_hero_{hero_id}")
@@ -130,6 +73,25 @@ class MatchInfoParser:
         minutes = int(seconds // 60)
         secs = int(seconds % 60)
         return f"{minutes}:{secs:02d}"
+
+    def _get_lane_from_position(
+        self, position: Optional[int]
+    ) -> Optional[Literal["safelane", "mid", "offlane"]]:
+        """Derive expected lane from position (1-5).
+
+        Position 1 (Carry) + Position 5 (Hard Support) → safelane
+        Position 2 (Mid) → mid
+        Position 3 (Offlane) + Position 4 (Soft Support) → offlane
+        """
+        if position is None:
+            return None
+        if position in (1, 5):
+            return "safelane"
+        if position == 2:
+            return "mid"
+        if position in (3, 4):
+            return "offlane"
+        return None
 
     def get_draft(
         self,
@@ -153,7 +115,6 @@ class MatchInfoParser:
                 return None
 
             hero_positions = hero_positions or {}
-            actions = []
             radiant_picks = []
             radiant_bans = []
             dire_picks = []
@@ -162,10 +123,7 @@ class MatchInfoParser:
             for i, pb in enumerate(game_info.picks_bans):
                 team = "radiant" if pb.team == Team.RADIANT.value else "dire"
                 hero_name, hero_localized = self._get_hero_info(pb.hero_id)
-
-                counters, good_against, when_to_pick = self._build_matchup_info(
-                    self._get_hero_counters(pb.hero_id)
-                )
+                position = hero_positions.get(pb.hero_id) if pb.is_pick else None
 
                 action = DraftAction(
                     order=i + 1,
@@ -174,12 +132,9 @@ class MatchInfoParser:
                     hero_id=pb.hero_id,
                     hero_name=hero_name,
                     localized_name=hero_localized,
-                    position=hero_positions.get(pb.hero_id) if pb.is_pick else None,
-                    counters=counters,
-                    good_against=good_against,
-                    when_to_pick=when_to_pick,
+                    position=position,
+                    lane=self._get_lane_from_position(position),
                 )
-                actions.append(action)
 
                 if pb.is_pick:
                     if team == "radiant":
@@ -196,7 +151,6 @@ class MatchInfoParser:
                 match_id=game_info.match_id,
                 game_mode=game_info.game_mode,
                 game_mode_name=GAME_MODES.get(game_info.game_mode, f"Unknown ({game_info.game_mode})"),
-                actions=actions,
                 radiant_picks=radiant_picks,
                 radiant_bans=radiant_bans,
                 dire_picks=dire_picks,
@@ -249,7 +203,7 @@ class MatchInfoParser:
                     hero_internal = hero_name
 
                 _, hero_localized = self._get_hero_info(0)
-                heroes = constants_fetcher.get_heroes_constants()
+                heroes = constants_fetcher.get_heroes_constants() or {}
                 for hid, hdata in heroes.items():
                     if hdata.get("name") == p.hero_name:
                         hero_localized = hdata.get("localized_name", hero_internal.replace("_", " ").title())

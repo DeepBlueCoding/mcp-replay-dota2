@@ -121,3 +121,10 @@ data/temp/
 data/pro_scene/pro_players.json
 data/pro_scene/teams.json
 data/pro_scene/leagues.json
+
+# YouTube transcriptions (local coaching content)
+data/transcripts/
+
+# Transcription scripts (not part of core MCP server)
+scripts/transcribe_*.py
+scripts/requirements-transcribe.txt

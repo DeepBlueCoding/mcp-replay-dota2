@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 class PlayerFuzzySearch:
     """Fuzzy search for pro players using OpenDota data and manual aliases."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._players: List[Dict[str, Any]] = []
         self._aliases: Dict[str, List[str]] = {}
-        self._initialized = False
+        self._initialized: bool = False
 
     def initialize(
         self, players: List[Dict[str, Any]], aliases: Dict[str, List[str]]

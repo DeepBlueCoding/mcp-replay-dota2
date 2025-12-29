@@ -186,15 +186,23 @@ class LeaguesResponse(BaseModel):
 
 
 class ProMatchesResponse(BaseModel):
-    """Response for get_pro_matches tool."""
+    """Response for get_pro_matches tool - flat list of matches."""
 
     success: bool
     total_matches: int = Field(default=0)
-    total_series: int = Field(default=0)
     matches: List[ProMatchSummary] = Field(default_factory=list)
+    error: Optional[str] = Field(default=None)
+
+
+class TournamentSeriesResponse(BaseModel):
+    """Response for get_tournament_series tool - series with nested games."""
+
+    success: bool
+    league_id: Optional[int] = Field(default=None)
+    league_name: Optional[str] = Field(default=None)
+    total_series: int = Field(default=0)
     series: List[SeriesSummary] = Field(default_factory=list)
     error: Optional[str] = Field(default=None)
-    message: Optional[str] = Field(default=None)
 
 
 class LeagueMatchesResponse(BaseModel):

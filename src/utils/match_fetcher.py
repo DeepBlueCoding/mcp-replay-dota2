@@ -38,10 +38,11 @@ def assign_positions(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     - Pos 1 (carry): safelane core (lane_role=1, higher GPM in lane)
     - Pos 2 (mid): mid lane (lane_role=2)
     - Pos 3 (offlane): offlane core (lane_role=3, higher GPM in lane)
-    - Pos 4 (soft support): support with higher GPM
-    - Pos 5 (hard support): support with lowest GPM
+    - Pos 4 (soft support): offlane support (lane_role=3, lower GPM in lane)
+    - Pos 5 (hard support): safelane support (lane_role=1, lower GPM in lane)
 
     Each lane has 2 players - higher GPM is core, lower is support.
+    Support position is determined by lane: safelane support = pos 5, offlane support = pos 4.
     """
     radiant = [p for p in players if p.get("player_slot", 0) < 128]
     dire = [p for p in players if p.get("player_slot", 0) >= 128]
@@ -54,7 +55,8 @@ def assign_positions(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 lanes[lane_role] = []
             lanes[lane_role].append(player)
 
-        supports: List[Dict[str, Any]] = []
+        # Track supports without assigned positions (roamers/jungle)
+        unassigned_supports: List[Dict[str, Any]] = []
 
         for lane_role, lane_players in lanes.items():
             sorted_by_gpm = sorted(
@@ -64,35 +66,43 @@ def assign_positions(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             )
 
             if lane_role == 2:
+                # Mid lane - all are pos 2
                 for p in sorted_by_gpm:
                     p["position"] = 2
                     p["role"] = "core"
             elif lane_role == 1:
+                # Safelane - highest GPM is pos 1, rest are pos 5
                 if sorted_by_gpm:
                     sorted_by_gpm[0]["position"] = 1
                     sorted_by_gpm[0]["role"] = "core"
                 for p in sorted_by_gpm[1:]:
+                    p["position"] = 5  # Safelane support = pos 5
                     p["role"] = "support"
-                    supports.append(p)
             elif lane_role == 3:
+                # Offlane - highest GPM is pos 3, rest are pos 4
                 if sorted_by_gpm:
                     sorted_by_gpm[0]["position"] = 3
                     sorted_by_gpm[0]["role"] = "core"
                 for p in sorted_by_gpm[1:]:
+                    p["position"] = 4  # Offlane support = pos 4
                     p["role"] = "support"
-                    supports.append(p)
             else:
+                # Jungle/roaming - mark as support, assign pos later
                 for p in sorted_by_gpm:
                     p["role"] = "support"
-                    supports.append(p)
+                    unassigned_supports.append(p)
 
-        supports_sorted = sorted(
-            supports,
-            key=lambda p: p.get("gold_per_min", 0),
-            reverse=True
-        )
-        for i, p in enumerate(supports_sorted):
-            p["position"] = 4 if i == 0 else 5
+        # Assign positions to roaming/jungle supports based on GPM
+        # Higher GPM roamer = pos 4, lower = pos 5
+        if unassigned_supports:
+            unassigned_sorted = sorted(
+                unassigned_supports,
+                key=lambda p: p.get("gold_per_min", 0),
+                reverse=True
+            )
+            for i, p in enumerate(unassigned_sorted):
+                if p.get("position") is None:
+                    p["position"] = 4 if i == 0 else 5
 
     process_team(radiant)
     process_team(dire)

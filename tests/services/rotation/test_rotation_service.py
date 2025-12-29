@@ -7,7 +7,7 @@ All tests verify actual rotation detection results from test matches.
 import pytest
 
 from src.services.rotation.rotation_service import (
-    LANE_BOUNDARIES,
+    DEFAULT_LANE_BOUNDARIES,
     MIN_ROTATION_DURATION,
     POWER_RUNE_FIRST_SPAWN,
     POWER_RUNE_INTERVAL,
@@ -74,9 +74,9 @@ class TestRotationServiceConstants:
 
     def test_lane_boundaries_defined(self):
         """Lane boundaries are defined for top, mid, and bot."""
-        assert "top" in LANE_BOUNDARIES
-        assert "mid" in LANE_BOUNDARIES
-        assert "bot" in LANE_BOUNDARIES
+        assert "top" in DEFAULT_LANE_BOUNDARIES
+        assert "mid" in DEFAULT_LANE_BOUNDARIES
+        assert "bot" in DEFAULT_LANE_BOUNDARIES
 
 
 class TestMatch8461956309Rotations:

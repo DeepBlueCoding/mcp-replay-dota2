@@ -1,6 +1,6 @@
 """Match-related MCP tools: match info, timeline, stats, draft, players."""
 
-from typing import Dict, Optional
+from typing import Dict, Literal, Optional
 
 from fastmcp import Context
 
@@ -53,6 +53,25 @@ def register_match_tools(mcp, services):
         except Exception:
             pass
         return pro_names
+
+    def _get_expected_lane_from_position(
+        position: Optional[int],
+    ) -> Optional[Literal["safelane", "mid", "offlane"]]:
+        """Derive expected lane from position (1-5) for draft analysis.
+
+        Position 1 (Carry) + Position 5 (Hard Support) → safelane
+        Position 2 (Mid) → mid
+        Position 3 (Offlane) + Position 4 (Soft Support) → offlane
+        """
+        if position is None:
+            return None
+        if position in (1, 5):
+            return "safelane"
+        if position == 2:
+            return "mid"
+        if position in (3, 4):
+            return "offlane"
+        return None
 
     @mcp.tool
     async def get_match_timeline(
@@ -325,6 +344,7 @@ def register_match_tools(mcp, services):
                     obs_placed=h.get("obs_placed"),
                     sen_placed=h.get("sen_placed"),
                     lane=h.get("lane_name"),
+                    expected_lane=_get_expected_lane_from_position(h.get("position")),
                     lane_efficiency=h.get("lane_efficiency"),
                     role=h.get("role"),
                     items=constants_fetcher.convert_item_ids_to_names(
@@ -363,6 +383,7 @@ def register_match_tools(mcp, services):
                     obs_placed=h.get("obs_placed"),
                     sen_placed=h.get("sen_placed"),
                     lane=h.get("lane_name"),
+                    expected_lane=_get_expected_lane_from_position(h.get("position")),
                     lane_efficiency=h.get("lane_efficiency"),
                     role=h.get("role"),
                     items=constants_fetcher.convert_item_ids_to_names(

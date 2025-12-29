@@ -47,6 +47,7 @@ nav:
   - Home: index.md
   - Getting Started:
       - Installation: getting-started/installation.md
+      - Docker: getting-started/docker.md
       - Development: getting-started/development.md
   - Integrations:
       - Overview: integrations/index.md
@@ -73,5 +74,7 @@ nav:
           - Farming & Rotation: api/tools/farming-rotation.md
           - Lane Analysis: api/tools/lane-analysis.md
       - Resources: api/resources.md
+      - Prompts: api/prompts.md
       - AI Coaching: api/coaching.md
+  - Architecture: REPLAY_PARSING_ARCHITECTURE.md
   - Changelog: changelog.md

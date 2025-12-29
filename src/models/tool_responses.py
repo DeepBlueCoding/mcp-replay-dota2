@@ -128,7 +128,11 @@ class HeroStats(BaseModel):
     camps_stacked: Optional[CoercedInt] = Field(default=None, description="Neutral camps stacked")
     obs_placed: Optional[CoercedInt] = Field(default=None, description="Observer wards placed")
     sen_placed: Optional[CoercedInt] = Field(default=None, description="Sentry wards placed")
-    lane: Optional[str] = Field(default=None, description="Lane assignment")
+    lane: Optional[str] = Field(default=None, description="Actual lane played (from OpenDota)")
+    expected_lane: Optional[Literal["safelane", "mid", "offlane"]] = Field(
+        default=None,
+        description="Expected lane based on position (pos1/5=safelane, pos2=mid, pos3/4=offlane)"
+    )
     lane_efficiency: Optional[float] = Field(default=None, description="Lane efficiency (0.0-1.0)")
     role: Optional[str] = Field(default=None, description="Role (core/support)")
     items: List[str] = Field(default_factory=list, description="Final items")

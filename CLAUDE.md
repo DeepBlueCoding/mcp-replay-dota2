@@ -227,12 +227,37 @@ Multi-camp detection example:
 
 ## When Making Changes
 
+### MANDATORY: Tests + Docs for Every Change
+
+**After EVERY feature addition or bug fix, you MUST:**
+
+1. **Add/update tests** - Test with REAL VALUES from actual match data, not type checks
+2. **Update mkdocs** - Document new tools/features in `docs/api/tools/`
+3. **Update changelog** - Add entry to `docs/changelog.md`
+
+**Tests must verify REAL VALUES:**
+```python
+# GOOD - Tests actual data from match 8461956309
+def test_first_blood_death(self, parsed_replay_data):
+    deaths = service.get_hero_deaths(parsed_replay_data)
+    assert deaths[0].victim == "earthshaker"
+    assert deaths[0].killer == "disruptor"
+    assert deaths[0].game_time_str == "4:48"
+
+# BAD - Useless type/existence checks
+def test_deaths_structure(self, parsed_replay_data):
+    deaths = service.get_hero_deaths(parsed_replay_data)
+    assert isinstance(deaths, list)  # USELESS
+    assert len(deaths) > 0           # USELESS
+    assert "victim" in deaths[0]     # USELESS
+```
+
 ### Testing Workflow (CRITICAL)
 
 **Follow this order - do NOT skip steps:**
 
 1. **FIRST: Write tests for new code**
-   - New feature/bug fix = new test FIRST
+   - New feature/bug fix = new test with REAL expected values
    - Add tests to appropriate test file in `tests/`
    - If no tests needed (pure refactor with existing coverage), skip to step 3
 

@@ -5,7 +5,7 @@ NO MCP DEPENDENCIES - can be used from any interface.
 """
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from python_manta import CombatLogType, Team
 
@@ -31,12 +31,16 @@ from ...models.combat_log import (
     TormentorKill,
     TowerKill,
 )
-from ...utils.position_tracker import classify_map_position
+from ...utils.constants_fetcher import constants_fetcher
+from ...utils.position_tracker import PositionClassifier, classify_map_position
 from ..models.combat_data import (
     DamageEvent,
     ObjectiveKill,
 )
 from ..models.replay_data import ParsedReplayData
+
+if TYPE_CHECKING:
+    from src.models.game_context import GameContext
 
 DEFAULT_MAX_EVENTS = 200
 MAX_EVENTS_CAP = 500
@@ -76,9 +80,16 @@ class CombatService:
         data: ParsedReplayData,
         hero: str,
         target_time: float,
+        classifier: Optional[PositionClassifier] = None,
     ) -> Tuple[Optional[float], Optional[float], Optional[str]]:
         """
         Get hero position at a specific time from entity snapshots.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            hero: Hero name to find
+            target_time: Game time to find position at
+            classifier: Optional PositionClassifier for version-aware classification
 
         Returns:
             Tuple of (x, y, location_description) or (None, None, None)
@@ -104,7 +115,10 @@ class CombatService:
                 clean_name = hero_name
 
             if hero_lower in clean_name.lower():
-                pos = classify_map_position(hero_snap.x, hero_snap.y)
+                if classifier:
+                    pos = classifier.classify(hero_snap.x, hero_snap.y)
+                else:
+                    pos = classify_map_position(hero_snap.x, hero_snap.y)
                 return (hero_snap.x, hero_snap.y, pos.region)
 
         return (None, None, None)
@@ -121,13 +135,16 @@ class CombatService:
         """
         Normalize ability name for display.
 
-        Converts "dota_unknown" to "attack" for hero autoattacks.
+        Converts internal names to display names:
+        - "dota_unknown" -> "attack" for hero autoattacks
+        - "item_bfury" -> "Battle Fury"
+        - "nevermore_shadowraze1" -> "Shadowraze"
         """
         if not inflictor_name:
             return "attack" if attacker_is_hero else None
         if inflictor_name == "dota_unknown" and attacker_is_hero:
             return "attack"
-        return inflictor_name
+        return constants_fetcher.get_display_name(inflictor_name)
 
     def _is_hero(self, name: str) -> bool:
         """Check if a name represents a hero."""
@@ -171,6 +188,7 @@ class CombatService:
         hero_filter: Optional[str] = None,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
+        game_context: Optional["GameContext"] = None,
     ) -> List[HeroDeath]:
         """
         Get all hero death events from parsed data.
@@ -180,11 +198,15 @@ class CombatService:
             hero_filter: Only include deaths involving this hero (as killer or victim)
             start_time: Filter deaths after this game time
             end_time: Filter deaths before this game time
+            game_context: Optional GameContext for version-aware position classification
 
         Returns:
             List of HeroDeath events sorted by game time
         """
         deaths = []
+
+        # Get classifier from context if available
+        classifier = game_context.position_classifier if game_context else None
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -210,7 +232,7 @@ class CombatService:
 
             # Get victim position from entity snapshots
             pos_x, pos_y, location_desc = self._get_hero_position_at_time(
-                data, victim, game_time
+                data, victim, game_time, classifier
             )
 
             # Extract hero levels from combat log entry
@@ -547,9 +569,22 @@ class CombatService:
 
         return kills
 
-    def get_courier_kills(self, data: ParsedReplayData) -> List[CourierKill]:
-        """Get courier kill events."""
+    def get_courier_kills(
+        self,
+        data: ParsedReplayData,
+        game_context: Optional["GameContext"] = None,
+    ) -> List[CourierKill]:
+        """
+        Get courier kill events.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            game_context: Optional GameContext for version-aware position classification
+        """
         kills = []
+
+        # Get classifier from context if available
+        classifier = game_context.position_classifier if game_context else None
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -579,7 +614,10 @@ class CombatService:
             position = None
             if hasattr(entry, 'location_x') and entry.location_x is not None:
                 from ...models.combat_log import MapLocation
-                pos_info = classify_map_position(entry.location_x, entry.location_y)
+                if classifier:
+                    pos_info = classifier.classify(entry.location_x, entry.location_y)
+                else:
+                    pos_info = classify_map_position(entry.location_x, entry.location_y)
                 position = MapLocation(
                     x=entry.location_x,
                     y=entry.location_y,
@@ -614,6 +652,7 @@ class CombatService:
             CombatLogType.ITEM.value: "ITEM",
             CombatLogType.PURCHASE.value: "PURCHASE",
             CombatLogType.BUYBACK.value: "BUYBACK",
+            CombatLogType.INTERRUPT_CHANNEL.value: "INTERRUPT_CHANNEL",
         }
         return type_map.get(entry_type, f"UNKNOWN_{entry_type}")
 
@@ -627,7 +666,7 @@ class CombatService:
         """
         Check if an event passes the detail level filter.
 
-        NARRATIVE: Deaths (hero), Abilities (hero caster), Items, Purchases, Buybacks
+        NARRATIVE: Deaths (hero), Abilities (hero caster), Items, Purchases, Buybacks, Interrupts
         TACTICAL: + Hero-to-hero Damage, Modifiers applied to heroes
         FULL: Everything
         """
@@ -643,6 +682,8 @@ class CombatService:
                 return is_attacker_hero
             if entry_type in (CombatLogType.PURCHASE.value, CombatLogType.BUYBACK.value):
                 return True
+            if entry_type == CombatLogType.INTERRUPT_CHANNEL.value:
+                return is_target_hero
             return False
 
         if detail_level == DetailLevel.TACTICAL:
@@ -657,6 +698,8 @@ class CombatService:
             if entry_type == CombatLogType.DAMAGE.value:
                 return is_attacker_hero and is_target_hero
             if entry_type == CombatLogType.MODIFIER_ADD.value:
+                return is_target_hero
+            if entry_type == CombatLogType.INTERRUPT_CHANNEL.value:
                 return is_target_hero
             return False
 
@@ -784,9 +827,12 @@ class CombatService:
         hero_filter: Optional[str] = None,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
+        game_context: Optional["GameContext"] = None,
     ) -> HeroDeathsResponse:
         """Get hero deaths and return API response model."""
-        deaths = self.get_hero_deaths(data, hero_filter, start_time, end_time)
+        deaths = self.get_hero_deaths(
+            data, hero_filter, start_time, end_time, game_context
+        )
         return HeroDeathsResponse(
             success=True,
             match_id=match_id,
@@ -869,9 +915,10 @@ class CombatService:
         self,
         data: ParsedReplayData,
         match_id: int,
+        game_context: Optional["GameContext"] = None,
     ) -> CourierKillsResponse:
         """Get courier kills and return API response model."""
-        kills = self.get_courier_kills(data)
+        kills = self.get_courier_kills(data, game_context)
         return CourierKillsResponse(
             success=True,
             match_id=match_id,

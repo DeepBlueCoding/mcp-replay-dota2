@@ -7,7 +7,7 @@ NO MCP DEPENDENCIES.
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from python_manta import CombatLogType
 
@@ -26,15 +26,19 @@ from ..models.lane_data import (
 )
 from ..models.replay_data import ParsedReplayData
 
+if TYPE_CHECKING:
+    from src.models.game_context import GameContext
+
 # Type alias for contested CS data
 ContestedCS = Dict[str, Any]
 
 logger = logging.getLogger(__name__)
 
-LANE_BOUNDARIES = {
-    "top": {"x_min": -7000, "x_max": 0, "y_min": 2000, "y_max": 8000},
-    "mid": {"x_min": -3000, "x_max": 3000, "y_min": -3000, "y_max": 3000},
-    "bot": {"x_min": 0, "x_max": 7000, "y_min": -8000, "y_max": -2000},
+# Default lane boundaries (fallback when no GameContext provided)
+DEFAULT_LANE_BOUNDARIES: Dict[str, Dict[str, float]] = {
+    "top": {"x_min": -8000.0, "x_max": 0.0, "y_min": 2000.0, "y_max": 8000.0},
+    "mid": {"x_min": -3500.0, "x_max": 3500.0, "y_min": -3500.0, "y_max": 3500.0},
+    "bot": {"x_min": 0.0, "x_max": 8000.0, "y_min": -8000.0, "y_max": -2000.0},
 }
 
 LANING_PHASE_END = 600  # 10 minutes
@@ -64,9 +68,34 @@ class LaneService:
             return name[14:]
         return name or ""
 
-    def _classify_lane(self, x: float, y: float) -> str:
+    def _get_lane_boundaries(
+        self,
+        game_context: Optional["GameContext"] = None,
+    ) -> Dict[str, Dict[str, float]]:
+        """Get lane boundaries from GameContext or use defaults."""
+        if game_context is None:
+            return DEFAULT_LANE_BOUNDARIES
+
+        # Extract boundaries from MapData
+        boundaries = {}
+        for boundary in game_context.map_data.lane_boundaries:
+            boundaries[boundary.name] = {
+                "x_min": boundary.x_min,
+                "x_max": boundary.x_max,
+                "y_min": boundary.y_min,
+                "y_max": boundary.y_max,
+            }
+        return boundaries if boundaries else DEFAULT_LANE_BOUNDARIES
+
+    def _classify_lane(
+        self,
+        x: float,
+        y: float,
+        lane_boundaries: Optional[Dict[str, Dict[str, float]]] = None,
+    ) -> str:
         """Classify position to a lane."""
-        for lane, bounds in LANE_BOUNDARIES.items():
+        boundaries = lane_boundaries or DEFAULT_LANE_BOUNDARIES
+        for lane, bounds in boundaries.items():
             if (bounds["x_min"] <= x <= bounds["x_max"] and
                 bounds["y_min"] <= y <= bounds["y_max"]):
                 return lane
@@ -77,6 +106,7 @@ class LaneService:
         data: ParsedReplayData,
         hero: str,
         target_time: float,
+        lane_boundaries: Optional[Dict[str, Dict[str, float]]] = None,
     ) -> Tuple[Optional[float], Optional[float], str]:
         """Get hero position at a specific time."""
         hero_lower = hero.lower()
@@ -95,7 +125,7 @@ class LaneService:
         for hero_snap in best_snapshot.heroes:
             hero_name = self._clean_hero_name(hero_snap.hero_name)
             if hero_lower in hero_name.lower():
-                lane = self._classify_lane(hero_snap.x, hero_snap.y)
+                lane = self._classify_lane(hero_snap.x, hero_snap.y, lane_boundaries)
                 return (hero_snap.x, hero_snap.y, lane)
 
         return (None, None, "unknown")
@@ -120,6 +150,7 @@ class LaneService:
         data: ParsedReplayData,
         hero_filter: Optional[str] = None,
         end_time: float = LANING_PHASE_END,
+        game_context: Optional["GameContext"] = None,
     ) -> List[LaneLastHit]:
         """
         Get all last hit and deny events during laning phase.
@@ -128,12 +159,14 @@ class LaneService:
             data: ParsedReplayData from ReplayService
             hero_filter: Only include CS by this hero
             end_time: End of laning phase (default 10:00)
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             List of LaneLastHit events sorted by game time
         """
         last_hits = []
         hero_filter_lower = hero_filter.lower() if hero_filter else None
+        lane_boundaries = self._get_lane_boundaries(game_context)
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -153,7 +186,9 @@ class LaneService:
             if hero_filter_lower and hero_filter_lower not in hero.lower():
                 continue
 
-            pos_x, pos_y, lane = self._get_hero_position_at_time(data, hero, entry.game_time)
+            pos_x, pos_y, lane = self._get_hero_position_at_time(
+                data, hero, entry.game_time, lane_boundaries
+            )
             is_deny = self._is_deny(entry.attacker_team, entry.target_name)
 
             last_hits.append(LaneLastHit(
@@ -174,6 +209,7 @@ class LaneService:
         data: ParsedReplayData,
         hero_filter: Optional[str] = None,
         end_time: float = LANING_PHASE_END,
+        game_context: Optional["GameContext"] = None,
     ) -> List[LaneHarass]:
         """
         Get hero-to-hero damage events during laning phase.
@@ -182,12 +218,14 @@ class LaneService:
             data: ParsedReplayData from ReplayService
             hero_filter: Only include harass involving this hero
             end_time: End of laning phase (default 10:00)
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             List of LaneHarass events sorted by game time
         """
         harass_events = []
         hero_filter_lower = hero_filter.lower() if hero_filter else None
+        lane_boundaries = self._get_lane_boundaries(game_context)
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -207,7 +245,9 @@ class LaneService:
                 if hero_filter_lower not in attacker.lower() and hero_filter_lower not in target.lower():
                     continue
 
-            pos_x, pos_y, lane = self._get_hero_position_at_time(data, attacker, entry.game_time)
+            pos_x, pos_y, lane = self._get_hero_position_at_time(
+                data, attacker, entry.game_time, lane_boundaries
+            )
 
             ability = entry.inflictor_name
             if ability == "dota_unknown":
@@ -288,6 +328,7 @@ class LaneService:
         end_time: float = LANING_PHASE_END,
         min_creeps_hit: int = 2,
         time_window: float = 1.0,
+        game_context: Optional["GameContext"] = None,
     ) -> List[WaveNuke]:
         """
         Detect when heroes use abilities to damage multiple lane creeps.
@@ -300,6 +341,7 @@ class LaneService:
             end_time: End of laning phase (default 10:00)
             min_creeps_hit: Minimum creeps to count as wave nuke (default 2)
             time_window: Seconds to group damage events (default 1.0)
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             List of WaveNuke events sorted by game time
@@ -307,6 +349,7 @@ class LaneService:
         # Collect all ability damage to lane creeps
         ability_damage: Dict[str, List[dict]] = defaultdict(list)
         hero_filter_lower = hero_filter.lower() if hero_filter else None
+        lane_boundaries = self._get_lane_boundaries(game_context)
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -352,7 +395,9 @@ class LaneService:
             if creeps_hit < min_creeps_hit:
                 continue
 
-            pos_x, pos_y, lane = self._get_hero_position_at_time(data, first["hero"], first["game_time"])
+            pos_x, pos_y, lane = self._get_hero_position_at_time(
+                data, first["hero"], first["game_time"], lane_boundaries
+            )
 
             wave_nukes.append(WaveNuke(
                 game_time=first["game_time"],
@@ -371,6 +416,7 @@ class LaneService:
         data: ParsedReplayData,
         hero_filter: Optional[str] = None,
         end_time: float = LANING_PHASE_END,
+        game_context: Optional["GameContext"] = None,
     ) -> List[LaneRotation]:
         """
         Detect rotation events: smoke breaks, TP scrolls, twin gate usage.
@@ -379,12 +425,14 @@ class LaneService:
             data: ParsedReplayData from ReplayService
             hero_filter: Only include rotations by this hero
             end_time: End of laning phase (default 10:00)
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             List of LaneRotation events sorted by game time
         """
         rotations = []
         hero_filter_lower = hero_filter.lower() if hero_filter else None
+        lane_boundaries = self._get_lane_boundaries(game_context)
 
         # Track modifiers that indicate rotation
         rotation_modifiers = {
@@ -407,7 +455,9 @@ class LaneService:
                     if hero_filter_lower and hero_filter_lower not in hero.lower():
                         continue
 
-                    pos_x, pos_y, lane = self._get_hero_position_at_time(data, hero, entry.game_time)
+                    pos_x, pos_y, lane = self._get_hero_position_at_time(
+                        data, hero, entry.game_time, lane_boundaries
+                    )
 
                     rotations.append(LaneRotation(
                         game_time=entry.game_time,
@@ -432,7 +482,9 @@ class LaneService:
                         if hero_filter_lower and hero_filter_lower not in hero.lower():
                             continue
 
-                        pos_x, pos_y, _ = self._get_hero_position_at_time(data, hero, entry.game_time)
+                        pos_x, pos_y, _ = self._get_hero_position_at_time(
+                            data, hero, entry.game_time, lane_boundaries
+                        )
 
                         rotations.append(LaneRotation(
                             game_time=entry.game_time,
@@ -498,6 +550,7 @@ class LaneService:
         data: ParsedReplayData,
         hero_filter: Optional[str] = None,
         end_time: float = LANING_PHASE_END,
+        game_context: Optional["GameContext"] = None,
     ) -> List[NeutralAggro]:
         """
         Get hero attacks on neutral creeps during laning phase.
@@ -508,12 +561,14 @@ class LaneService:
             data: ParsedReplayData from ReplayService
             hero_filter: Only include attacks by this hero
             end_time: End of laning phase (default 10:00)
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             List of NeutralAggro events sorted by game time
         """
         aggro_events = []
         hero_filter_lower = hero_filter.lower() if hero_filter else None
+        lane_boundaries = self._get_lane_boundaries(game_context)
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -533,7 +588,9 @@ class LaneService:
             if hero_filter_lower and hero_filter_lower not in hero.lower():
                 continue
 
-            pos_x, pos_y, _ = self._get_hero_position_at_time(data, hero, entry.game_time)
+            pos_x, pos_y, _ = self._get_hero_position_at_time(
+                data, hero, entry.game_time, lane_boundaries
+            )
             near_lane = self._get_nearest_lane(pos_x, pos_y)
             camp_type = self._get_neutral_camp_type(
                 getattr(entry, 'neutral_camp_type', None)
@@ -686,6 +743,7 @@ class LaneService:
         self,
         data: ParsedReplayData,
         match_id: int = 0,
+        game_context: Optional["GameContext"] = None,
     ) -> LaneSummaryResponse:
         """
         Get complete laning phase summary with all tracked events.
@@ -693,26 +751,29 @@ class LaneService:
         Args:
             data: ParsedReplayData from ReplayService
             match_id: Match ID for response
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             LaneSummaryResponse with comprehensive lane data
         """
+        lane_boundaries = self._get_lane_boundaries(game_context)
+
         cs_5min = self.get_cs_at_minute(data, 5)
         cs_10min = self.get_cs_at_minute(data, 10)
         positions_5min = self.get_hero_positions_at_minute(data, 5)
 
-        all_last_hits = self.get_lane_last_hits(data)
-        all_harass = self.get_lane_harass(data)
+        all_last_hits = self.get_lane_last_hits(data, game_context=game_context)
+        all_harass = self.get_lane_harass(data, game_context=game_context)
         tower_events = self.get_tower_proximity_timeline(data)
-        wave_nukes = self.get_wave_nukes(data)
-        rotations = self.get_lane_rotations(data)
-        all_neutral_aggro = self.get_neutral_aggro(data)
+        wave_nukes = self.get_wave_nukes(data, game_context=game_context)
+        rotations = self.get_lane_rotations(data, game_context=game_context)
+        all_neutral_aggro = self.get_neutral_aggro(data, game_context=game_context)
         all_tower_pressure = self.get_tower_pressure(data)
 
         # Build hero stats
         hero_stats = []
         for pos in positions_5min:
-            lane = self._classify_lane(pos.x, pos.y)
+            lane = self._classify_lane(pos.x, pos.y, lane_boundaries)
             if lane == "jungle":
                 lane = "roaming"
 

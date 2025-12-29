@@ -6,6 +6,166 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0-dev7] - 2025-12-28
+
+### Added
+
+- **Position-Specific Analysis Frameworks** - Comprehensive coaching personas loaded from `data/personas/`:
+  - **`coaching_persona.md`** - Senior analyst persona with TI qualifier/11k MMR background
+  - **`pos1_carry.md`** - Complete Position 1 Carry analysis framework:
+    - Laning phase: equilibrium management, lane dynamics, exit timing
+    - Farming phase: wave-camp cycling, timer awareness, item benchmarks
+    - Transition: active vs passive farming, fight selection, grouping
+    - Closing: Aegis usage, no-throw mentality, objective priority
+  - Framework extensible for positions 2-5
+
+- **`src/coaching/personas.py`** - Persona loader module:
+  - `get_coaching_persona()` - Loads main coaching persona
+  - `get_position_framework(position)` - Loads position-specific framework
+  - `lru_cache` for efficient file loading
+  - Graceful fallback for missing files
+
+- **Professional Coaching Framework** - Comprehensive coaching prompts overhaul:
+  - **LANE_RECOVERY** - Framework for analyzing recovery when lanes are lost
+  - **LATE_GAME_FRAMEWORK** - Framework for 30+ minute analysis
+  - **Expanded COMMON_MISTAKES** - Added strategic mistakes and late game categories
+
+### Changed
+
+- **Coaching prompts refactored** - Now load personas from files instead of inline constants
+- **`get_hero_performance_prompt`** - Includes position-specific framework when available
+- **FIGHT_ANALYSIS restructured** - Now uses before/during/after framework
+- **Sampling prompts updated** - All functions use loaded personas
+
+### Docs
+
+- **Updated coaching.md** - Documents persona system, position frameworks, carry-specific analysis
+
+---
+
+## [1.1.0-dev6] - 2025-12-28
+
+### Added
+
+- **`delete_replay` tool** - New tool for manual cache management:
+  - Deletes both replay file and parsed cache for a match
+  - Use when automatic retry fails or cached data appears incorrect
+  - Returns status indicating what was deleted (`file_deleted`, `cache_deleted`)
+
+### Fixed
+
+- **Automatic retry for corrupt replays** - `download_replay` now handles corruption gracefully:
+  - When parsing fails, automatically deletes corrupt file and clears cache
+  - Retries download and parse once before failing
+  - Clear error messages on permanent failure
+
+## [1.1.0-dev5] - 2025-12-27
+
+### Added
+
+- **Draft lane assignment** - Added `lane` field to `DraftAction` for correct lane matchup analysis:
+  - `lane` field derived from `position`: pos 1/5 → `safelane`, pos 2 → `mid`, pos 3/4 → `offlane`
+  - Enables LLMs to correctly construct lane matchups (e.g., carry+hard support vs offlane+soft support)
+  - Bans have `lane: null` (no lane assignment for banned heroes)
+
+- **HeroStats expected_lane** - Added `expected_lane` field to distinguish theoretical vs actual lanes:
+  - `lane`: Actual lane played (from OpenDota laning detection)
+  - `expected_lane`: Theoretical lane based on position (pos1/5=safelane, pos2=mid, pos3/4=offlane)
+  - Helps LLMs detect trilanes and unusual lane setups (e.g., Naga pos4 expected offlane but played safelane trilane)
+
+- **League fuzzy search** - Added fuzzy matching for `league_name` filter in `get_pro_matches`:
+  - "TI 2025" now matches "The International 2025"
+  - "ESL" matches "ESL One Kuala Lumpur"
+  - "DPC" matches "Dota Pro Circuit"
+  - "blast" matches "BLAST Slam V"
+  - Common abbreviations: TI, ESL, DPC, dreamleague, blast, slam, riyadh, bali
+
+### Fixed
+
+- **Position assignment uses lane, not GPM** - Fixed pos 4/5 assignment:
+  - OLD (wrong): Higher GPM support = pos 4, lower = pos 5
+  - NEW (correct): Offlane support (lane_role=3) = pos 4, Safelane support (lane_role=1) = pos 5
+  - Fixes Naga pos 5 (safelane support) being wrongly assigned pos 4 due to high late-game GPM
+  - Fixes Disruptor pos 4 (offlane brawler) being wrongly assigned pos 5 due to low GPM
+- **Prompt scope discipline** - `analyze_draft` prompt now focuses only on draft analysis:
+  - Covers: lane matchups, synergies, counters, weaknesses, ban analysis, grade
+  - Explicitly excludes: teamfight combos, item timings, game predictions
+  - Clear instruction: "Do NOT analyze teamfight execution, item builds, or make game predictions"
+- **Constants loading defensive check** - Prevents NoneType errors when constants fail to load
+
+### Test
+
+- **New tests for lane field**:
+  - `TestDraftActionLaneField`: 7 tests for lane field derivation from position
+  - `TestGetLaneFromPosition`: 7 tests for `_get_lane_from_position` helper
+  - `TestHeroStatsExpectedLane`: 4 tests for expected_lane field in HeroStats
+- **Updated position assignment tests**:
+  - `test_pos4_is_offlane_support`: Verifies pos 4 has lane_role=3 (offlane)
+  - `test_pos5_is_safelane_support`: Verifies pos 5 has lane_role=1 (safelane)
+  - `test_dire_naga_is_pos5_safelane_support`: Naga (high GPM) correctly assigned pos 5
+  - `test_dire_disruptor_is_pos4_offlane_support`: Disruptor correctly assigned pos 4
+- **New tests for prompts** (`tests/prompts/test_mcp_prompts.py`):
+  - `TestAnalyzeDraftPrompt`: 11 tests verifying draft-only focus, excludes teamfight/items
+  - `TestReviewHeroPerformancePrompt`: 3 tests for coaching sections
+  - `TestAnalyzeDeathsPrompt`: 2 tests for 5-question framework
+  - `TestAnalyzeTeamfightPrompt`: 2 tests for teamfight analysis sections
+  - `TestPromptRegistration`: 2 tests verifying all 7 prompts registered
+- **New tests for league fuzzy search** (`tests/utils/test_league_fuzzy_search.py`):
+  - `TestLeagueAliasExpansion`: 4 tests for alias expansion (TI, ESL, DPC, blast)
+  - `TestLeagueMatchesFilter`: 10 tests for fuzzy matching logic
+  - `TestPGLWallachiaMatching`: 7 tests for PGL Wallachia tournament matching
+  - `TestLeagueSearch`: 4 tests for initialized search functionality
+
+### Docs
+
+- **New prompts documentation** (`docs/api/prompts.md`):
+  - Full reference for all 7 prompts with parameter tables
+  - Analysis sections each prompt covers
+  - Usage examples with Claude Code and MCP SDK
+- **Added `get_tournament_series` to pro-scene docs** - Tournament bracket/series analysis tool
+- **Added `get_client_capabilities` diagnostic tool** - Check MCP client sampling support
+- **Added Prompts to mkdocs nav** - Prompts reference now accessible from sidebar
+
+---
+
+## [1.1.0-dev4] - 2025-12-18
+
+### Added
+
+- **Version-aware map data** - GameContext refactor for patch-specific analysis:
+  - `GameContext` dataclass encapsulates version-specific data from parsed replays
+  - `GameContext.from_parsed_data()` factory method creates context from replay data
+  - `PositionClassifier` class uses `MapData` for version-aware position classification
+  - `LaneBoundary` model defines lane regions (x_min, x_max, y_min, y_max)
+  - Lane boundaries added to `map_data.json` for patches 7.33, 7.37, 7.38, 7.39
+  - Fallback to `DEFAULT_LANE_BOUNDARIES` when no GameContext provided
+
+- **Versioned map data files**:
+  - `data/versions/patches/{version}/map_data.json` for each supported patch
+  - `VersionedMapData` provider with fallback to latest known version
+  - All patches include `lane_boundaries` for lane classification
+
+### Changed
+
+- **Services updated to accept GameContext**:
+  - `CombatService.get_hero_deaths()` - Position classification uses version-aware boundaries
+  - `CombatService.get_courier_kills()` - Position classification uses version-aware boundaries
+  - `FarmingService.get_farming_pattern()` - Lane classification uses GameContext
+  - `LaneService` - All methods accept `game_context` parameter
+  - `RotationService.get_rotation_analysis()` - Lane assignments use version-aware boundaries
+
+- **MCP tools create GameContext from replays**:
+  - `get_hero_deaths`, `get_courier_kills`, `get_lane_summary`, `get_rotation_analysis`, `get_farming_pattern`
+  - Context is created via `GameContext.from_parsed_data(data)` after replay parsing
+
+### Technical
+
+- Renamed `LANE_BOUNDARIES` to `DEFAULT_LANE_BOUNDARIES` in LaneService and RotationService
+- Added `_get_lane_boundaries()` helper pattern to services for boundary extraction
+- `TYPE_CHECKING` import pattern used for GameContext to avoid circular imports
+
+---
+
 ## [1.1.0-dev3] - 2025-12-16
 
 ### Added
