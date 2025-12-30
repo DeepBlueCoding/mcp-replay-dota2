@@ -2,11 +2,207 @@
 
 ??? info "🤖 AI Summary"
 
-    Project changelog following Keep a Changelog format. v1.0.0 release includes: MCP resources (heroes, map, pro scene), 30+ MCP tools for match analysis, replay parsing with python-manta, fight detection with highlights, farming pattern analysis, rotation tracking, pro scene integration with fuzzy search.
+    Project changelog following Keep a Changelog format. v1.2.0 release includes: MCP prompts for coaching analysis, DockerHub + PyPI distribution, versioned documentation, unified filter system with 37 map regions, position-specific coaching frameworks, enhanced OpenDota SDK integration, and major performance improvements.
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.2.0] - 2025-12-31
+
+Major release with MCP prompts, Docker distribution, and comprehensive filtering system.
+
+### Installation
+
+```bash
+# PyPI (recommended)
+pip install mcp-replay-dota2
+
+# Docker
+docker pull dbcjuanma/mcp_replay_dota2
+docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
+```
+
+### Added
+
+#### Distribution
+- **PyPI package** - Install via `pip install mcp-replay-dota2` or `uv add mcp-replay-dota2`
+- **DockerHub images** - Multi-platform builds (`linux/amd64` + `linux/arm64`) at `dbcjuanma/mcp_replay_dota2`
+- **Versioned documentation** - Version selector with mike, social links to GitHub/PyPI/DockerHub
+
+#### MCP Prompts (7 coaching prompts)
+- `analyze_draft` - Draft analysis with lane matchups, synergies, counters
+- `review_hero_performance` - Hero performance review with position-specific framework
+- `analyze_deaths` - Death pattern analysis with 5-question framework
+- `analyze_teamfight` - Teamfight breakdown with before/during/after analysis
+- `analyze_laning` - Laning phase analysis
+- `analyze_farming` - Farming efficiency analysis
+- `full_match_review` - Complete match review
+
+#### Filtering System
+- **Unified filter models** (`src/models/filters.py`) - `EventFilters`, `CombatFilters`, `FightFilters`, `DeathFilters`
+- **37 map regions** - Tower fights, landmarks (roshan_pit, tormentors), farming areas (triangles, ancients)
+- **Multi-filter support** - killer, victim, location, ability, start_time, end_time across tools
+- **Time filtering for `get_hero_performance`** - Filter stats to specific game phases
+
+#### Coaching Framework
+- **Position-specific personas** - Carry analysis framework in `data/personas/pos1_carry.md`
+- **Coaching persona** - Senior analyst with TI/11k background in `data/personas/coaching_persona.md`
+- **Recovery frameworks** - Lane recovery, late game analysis
+
+#### Tools
+- **`delete_replay`** - Manual cache management for corrupt replays
+- **`get_tournament_series`** - Tournament bracket/series analysis
+- **League fuzzy search** - "TI 2025" matches "The International 2025"
+
+#### Data
+- **Draft lane assignment** - `lane` field for correct lane matchups
+- **HeroStats expected_lane** - Detect trilanes and unusual setups
+- **OpenDota SDK 7.40 fields** - rank_tier, teamfight_participation, lane_efficiency, draft_timings
+
+### Fixed
+
+- **550x performance improvement** - `get_combat_log` from 493s → 0.89s (in-memory caching)
+- **Position assignment** - Uses lane_role not GPM for pos 4/5
+- **Dire triangle region** - Correct map coordinates
+- **`get_match_timeline` team_graphs** - Fixed null response
+- **Expired replay messages** - Clear "Valve returned 502" errors
+
+### Changed
+
+- **python-opendota-sdk** upgraded to 7.40.3 with `wait_for_replay` support
+- **python-manta** upgraded to 1.4.7.3 with attack collector
+- **Test suite** - 788 tests with real match data validation
+- **Removed Sampling column** from MCP client table (not widely supported)
+
+---
+
+## [1.0.9] - 2025-12-12
+
+### Fixed
+
+- **get_match_info and get_match_draft** returning generic "Could not parse" errors
+- Exception handling now propagates actual error messages instead of swallowing with generic messages
+- **get_pro_matches league_name filter** now uses bidirectional matching (e.g., "Blast Slam V" finds "SLAM V")
+
+## [1.2.0] - 2025-12-11
+
+### Added
+
+- **Position (1-5) assignment** for all match tools:
+  - `get_match_heroes`, `get_match_players`, `get_match_draft` now include `position` field
+  - Position determined from OpenDota lane data (`lane_role`) and GPM:
+    - **Pos 1** = Safelane core (lane_role=1, highest GPM)
+    - **Pos 2** = Mid (lane_role=2)
+    - **Pos 3** = Offlane core (lane_role=3, highest GPM)
+    - **Pos 4** = Soft support (higher GPM support)
+    - **Pos 5** = Hard support (lowest GPM support)
+  - Fixes LLM incorrectly guessing positions (e.g., Axe as pos5 instead of pos3)
+
+- **Draft context data** in `get_match_draft` picks:
+  - `counters`: Heroes that counter this pick (bad matchups)
+  - `good_against`: Heroes this pick counters (favorable matchups)
+  - `when_to_pick`: Conditions when this hero is strong
+  - Helps LLM understand draft decisions and counter-picking
+
+### Changed
+
+- `assign_roles()` renamed to `assign_positions()` in match_fetcher.py
+- `DraftAction` model now includes `position`, `counters`, `good_against`, `when_to_pick` fields
+- `HeroStats` and `MatchPlayerInfo` models now include `position` field
+
+---
+
+## [1.1.4] - 2025-12-11
+
+### Changed
+
+- **`get_pro_matches` tool** - Enhanced team filtering with head-to-head support:
+  - Renamed `team_name` parameter to `team1_name`
+  - Added `team2_name` parameter for head-to-head filtering
+  - **Single team filter** (`team1_name` only): Returns all matches involving that team
+  - **Head-to-head filter** (`team1_name` + `team2_name`): Returns only matches where both teams played against each other, regardless of radiant/dire side
+  - Combine with `league_name`, `tier`, and `days_back` for deep filtering (e.g., Spirit vs OG at The International)
+
+---
+
+## [1.1.3] - 2025-12-10
+
+### Added
+
+- **`ability_filter` parameter** for focused ability analysis:
+  - `get_raw_combat_events`: Filter combat log by specific ability (e.g., "ice_path", "chronosphere")
+  - `get_hero_performance`: Filter ability summary and per-fight abilities by name
+  - Case-insensitive partial matching (e.g., "fissure" matches "earthshaker_fissure")
+
+### Changed
+
+- **Tool renames for clarity** (LLM routing improvement):
+  - `get_combat_log` → `get_raw_combat_events` (emphasizes raw event debugging)
+  - `get_hero_combat_analysis` → `get_hero_performance` (clearer purpose)
+
+- **Added routing hints** to competing tools:
+  - `get_hero_deaths`, `list_fights`, `get_teamfights`, `get_rotation_analysis` now include "NOT FOR HERO PERFORMANCE QUESTIONS → Use get_hero_performance instead" in docstrings
+
+### Fixed
+
+- **Ability counting now covers entire match** - Previously only counted abilities used during detected fights; now counts ALL ability usage across the entire match with per-fight breakdown preserved
+
+---
+
+## [1.1.2] - 2025-12-09
+
+### Added
+
+- **`detail_level` parameter** for combat log tools - Controls token usage (~98% reduction with `narrative`):
+  - `narrative` (default): Deaths, abilities, items, purchases, buybacks (~500-2,000 tokens)
+  - `tactical`: Adds hero-to-hero damage and debuffs (~2,000-5,000 tokens)
+  - `full`: All events including creeps (~50,000+ tokens, debugging only)
+  - Applied to `get_combat_log` and `get_fight_combat_log` tools
+  - `max_events` parameter added (default 500, max 2000) to prevent overflow
+  - `truncated` field in response indicates if results were capped
+
+### Changed
+
+- **Removed `significant_only` parameter** - Replaced by `detail_level` enum for finer control
+- Default behavior now uses `narrative` detail level (was equivalent to `significant_only=True`)
+
+---
+
+## [1.1.1] - 2025-12-08
+
+### Added
+
+- **`get_hero_combat_analysis` tool** - Per-hero combat performance analysis across all fights:
+  - Tracks kills, deaths, assists per fight
+  - Ability usage with hit rates (total casts vs hero hits)
+  - Damage dealt and received per fight
+  - Teamfight vs skirmish classification
+  - **Ground-targeted ability tracking**: Ice Path, Fissure, etc. track hits via MODIFIER_ADD events (stun debuffs applied)
+  - Hit rate can exceed 100% for AoE abilities hitting multiple heroes per cast
+  - Aggregate stats across all fights for the hero
+
+---
+
+## [1.1.0] - 2025-12-08
+
+### Changed
+
+- **Major refactor: Tools split into domain-specific modules** (92% code reduction in main entry point)
+  - `dota_match_mcp_server.py`: 2606 → 206 lines
+  - New `src/tools/` directory with modular tool registration:
+    - `replay_tools.py` - Replay download tool
+    - `combat_tools.py` - Deaths, combat log, objectives, runes, couriers
+    - `fight_tools.py` - Fight detection, teamfights, fight replay
+    - `match_tools.py` - Match info, timeline, draft, heroes, positions
+    - `pro_scene_tools.py` - Pro players, teams, leagues, matches
+    - `analysis_tools.py` - Jungle, lane, farming patterns, rotations
+  - Service injection pattern via `register_all_tools(mcp, services)` coordinator
+  - No functional changes - all 30+ tools work identically
+
+### Technical
+
+- Clean separation of concerns: each tool module handles one domain
+- Services dictionary pattern for dependency injection
+- Easier maintenance and testing of individual tool groups
 
 ---
 

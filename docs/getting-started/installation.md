@@ -1,29 +1,64 @@
 # Installation
 
-??? info "🤖 AI Summary"
+??? info "AI Summary"
 
-    Requires Python 3.12 and `uv`. Install: `git clone` repo, `uv sync`. Verify: `uv run python dota_match_mcp_server.py`. Then connect to your LLM client (Claude Desktop, Claude Code, etc.).
+    Install from **PyPI** (`uv add mcp-replay-dota2`) or **DockerHub** (`docker pull dbcjuanma/mcp_replay_dota2`). Git clone only needed for contributors.
 
-## Requirements
+## Option 1: PyPI (Recommended)
 
-- Python 3.12
-- [uv](https://docs.astral.sh/uv/) package manager
-
-## Install
+Install the package directly from PyPI:
 
 ```bash
-git clone https://github.com/DeepBlueCoding/mcp_replay_dota2.git
-cd mcp_replay_dota2
-uv sync
+# Using uv (recommended)
+uv add mcp-replay-dota2
+
+# Or using pip
+pip install mcp-replay-dota2
 ```
 
-## Verify
+Run the server:
 
 ```bash
+# Using uv
+uv run mcp-replay-dota2
+
+# Or directly if installed with pip
+mcp-replay-dota2
+```
+
+## Option 2: Docker
+
+Pull the image from DockerHub:
+
+```bash
+docker pull dbcjuanma/mcp_replay_dota2
+```
+
+Run with SSE transport (recommended for Docker):
+
+```bash
+docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
+```
+
+See [Docker Guide](docker.md) for persistent cache, STDIO mode, and compose examples.
+
+## Option 3: From Source (Contributors)
+
+Only needed if you want to contribute to the project:
+
+```bash
+git clone https://github.com/DeepBlueCoding/mcp-replay-dota2.git
+cd mcp-replay-dota2
+uv sync
 uv run python dota_match_mcp_server.py
 ```
 
-You should see:
+See [Development Guide](development.md) for testing and contributing.
+
+## Verify Installation
+
+You should see output like:
+
 ```
 Dota 2 Match MCP Server starting...
 Resources: dota2://heroes/all, dota2://map, ...

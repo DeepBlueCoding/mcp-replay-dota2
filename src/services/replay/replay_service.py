@@ -5,13 +5,16 @@ Uses python-manta v2 for single-pass parsing with progress callbacks.
 NO MCP DEPENDENCIES - progress is reported via callback protocol.
 """
 
+import asyncio
 import bz2
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
 import requests
-from opendota import OpenDota
+from opendota import OpenDota, ReplayNotAvailableError
+from opendota.models.parse_job import ParseStatus
 from python_manta import CombatLogType, Parser
 
 from ..cache.replay_cache import ReplayCache
@@ -19,7 +22,15 @@ from ..models.replay_data import ParsedReplayData, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPLAY_DIR = Path.home() / "dota2" / "replays"
+
+def _get_default_replay_dir() -> Path:
+    """Get replay directory, checking DOTA_REPLAY_CACHE env var first."""
+    if env_cache := os.environ.get("DOTA_REPLAY_CACHE"):
+        return Path(env_cache).expanduser()
+    return Path.home() / "dota2" / "replays"
+
+
+DEFAULT_REPLAY_DIR = _get_default_replay_dir()
 
 
 class ReplayService:
@@ -54,21 +65,26 @@ class ReplayService:
         self,
         match_id: int,
         progress: Optional[ProgressCallback] = None,
+        _retry_count: int = 0,
     ) -> ParsedReplayData:
         """Get complete parsed data for a match.
 
         Returns cached data if available, otherwise downloads and parses.
+        Automatically retries once if parsing fails due to corruption.
 
         Args:
             match_id: The match ID
             progress: Optional callback for progress updates
+            _retry_count: Internal counter for retries (do not set manually)
 
         Returns:
             ParsedReplayData with all extracted data
 
         Raises:
-            ValueError: If replay cannot be downloaded or parsed
+            ValueError: If replay cannot be downloaded or parsed after retries
         """
+        max_retries = 1
+
         # Check cache first
         if progress:
             await progress(0, 100, "Checking cache...")
@@ -81,7 +97,8 @@ class ReplayService:
 
         # Download replay
         if progress:
-            await progress(5, 100, "Downloading replay (this may take 30-60s)...")
+            retry_msg = f" (retry {_retry_count}/{max_retries})" if _retry_count > 0 else ""
+            await progress(5, 100, f"Downloading replay{retry_msg} (this may take 30-60s)...")
 
         replay_path = await self._download_replay(match_id, progress)
         if not replay_path:
@@ -94,11 +111,23 @@ class ReplayService:
         try:
             data = self._parse_replay(match_id, replay_path, progress)
         except ValueError as e:
-            # Parsing failed - delete corrupt replay so it can be re-downloaded
-            logger.error(f"Parsing failed for match {match_id}, deleting corrupt replay: {e}")
+            # Parsing failed - delete corrupt replay
+            logger.error(f"Parsing failed for match {match_id}: {e}")
             if replay_path.exists():
                 replay_path.unlink()
-            raise ValueError(f"Replay file corrupt, deleted for re-download: {e}")
+                logger.info(f"Deleted corrupt replay file for match {match_id}")
+
+            # Also clear cache in case there's stale data
+            self._cache.delete(match_id)
+
+            # Retry once
+            if _retry_count < max_retries:
+                logger.info(f"Retrying download/parse for match {match_id} (attempt {_retry_count + 1})")
+                if progress:
+                    await progress(5, 100, "Replay corrupt, retrying download...")
+                return await self.get_parsed_data(match_id, progress, _retry_count + 1)
+
+            raise ValueError(f"Replay parsing failed after {max_retries + 1} attempts: {e}")
 
         # Cache result
         if progress:
@@ -172,8 +201,15 @@ class ReplayService:
         self,
         match_id: int,
         progress: Optional[ProgressCallback] = None,
+        wait_timeout: float = 3600.0,
     ) -> Optional[Path]:
-        """Download and extract replay file."""
+        """Download and extract replay file.
+
+        Args:
+            match_id: The match ID to download
+            progress: Optional callback for progress updates
+            wait_timeout: Max seconds to wait for OpenDota to parse replay (default 1 hour)
+        """
         dem_file = self._replay_dir / f"{match_id}.dem"
 
         # Check if already exists
@@ -187,11 +223,60 @@ class ReplayService:
             if progress:
                 await progress(10, 100, "Getting replay URL from OpenDota...")
 
-            match = await opendota.get_match(match_id)
-            replay_url = match.get('replay_url')
+            try:
+                # First check if replay_url already exists
+                match_data = await opendota.get(f"matches/{match_id}")
+                replay_url = match_data.get('replay_url')
 
-            if not replay_url:
-                logger.error(f"No replay URL for match {match_id}")
+                if not replay_url:
+                    # Need to request parse and wait
+                    if progress:
+                        await progress(10, 100, "Requesting replay parse from OpenDota...")
+
+                    # Use new ParseTask API for waiting with progress updates
+                    parse_task = opendota.get_match(match_id, wait_for_replay=True, interval=30.0)
+
+                    try:
+                        async with asyncio.timeout(wait_timeout):
+                            async for status in parse_task:
+                                if isinstance(status, ParseStatus):
+                                    elapsed_min = status.elapsed / 60
+                                    if progress:
+                                        await progress(
+                                            10, 100,
+                                            f"Waiting for OpenDota parse... "
+                                            f"{elapsed_min:.1f}min, attempt {status.attempts}"
+                                        )
+                                    logger.info(
+                                        f"Parse status for {match_id}: "
+                                        f"elapsed={elapsed_min:.1f}min, attempts={status.attempts}"
+                                    )
+
+                            # Parse completed, get replay_url from the match
+                            if parse_task.match:
+                                replay_url = parse_task.match.replay_url
+                            else:
+                                # Shouldn't happen, but check again
+                                match_data = await opendota.get(f"matches/{match_id}", force=True)
+                                replay_url = match_data.get('replay_url')
+
+                    except TimeoutError:
+                        logger.warning(
+                            f"Timed out waiting for OpenDota to parse match {match_id} "
+                            f"after {wait_timeout}s. Parse may still be in progress."
+                        )
+                        raise ReplayNotAvailableError(
+                            match_id,
+                            f"OpenDota parse in progress. Timed out after {wait_timeout/60:.0f} minutes. "
+                            "Try again later."
+                        )
+
+                if not replay_url:
+                    logger.error(f"No replay_url for match {match_id} after waiting")
+                    raise ReplayNotAvailableError(match_id, "No replay_url available after parse")
+
+            except ReplayNotAvailableError as e:
+                logger.error(f"Replay not available for match {match_id}: {e}")
                 return None
 
             # Download bz2 file
@@ -262,8 +347,20 @@ class ReplayService:
             logger.info(f"Downloaded replay to {bz2_file} ({downloaded} bytes)")
             return bz2_file
 
+        except requests.HTTPError as e:
+            status_code = e.response.status_code if e.response is not None else None
+            if status_code in (404, 502):
+                logger.error(
+                    f"Replay expired: Valve returned {status_code} for match {match_id}. "
+                    "Old replays are deleted from Valve's servers after ~2 weeks."
+                )
+            else:
+                logger.error(f"HTTP error downloading replay: {e}")
+            if bz2_file.exists():
+                bz2_file.unlink()
+            return None
         except requests.RequestException as e:
-            logger.error(f"Failed to download replay: {e}")
+            logger.error(f"Network error downloading replay: {e}")
             if bz2_file.exists():
                 bz2_file.unlink()
             return None
@@ -314,10 +411,11 @@ class ReplayService:
         # Single-pass parse with all collectors
         logger.info(f"Parsing replay {replay_path}")
 
-        result = parser.parse(
-            header=True,
-            game_info=True,
-            combat_log={
+        # Build parse config - attacks is optional (requires python-manta 1.4.5.4+)
+        parse_config = {
+            "header": True,
+            "game_info": True,
+            "combat_log": {
                 "types": [
                     CombatLogType.DAMAGE.value,
                     CombatLogType.HEAL.value,
@@ -330,24 +428,48 @@ class ReplayService:
                     CombatLogType.ABILITY_TRIGGER.value,
                     CombatLogType.NEUTRAL_CAMP_STACK.value,
                     CombatLogType.PICKUP_RUNE.value,
+                    CombatLogType.INTERRUPT_CHANNEL.value,
                 ],
                 "max_entries": 100000,
             },
-            entities={
+            "entities": {
                 "interval_ticks": 900,  # ~30 second snapshots
                 "max_snapshots": 200,
             },
-            game_events={
+            "game_events": {
                 "max_events": 10000,
             },
-            modifiers={
+            "modifiers": {
                 "max_modifiers": 50000,
             },
-            messages={
+            "messages": {
                 "message_types": ['CDOTAMatchMetadataFile'],
                 "max_messages": 0,  # No limit - need to find metadata at end of file
             },
-        )
+        }
+
+        # Check if attacks collector is available (python-manta 1.4.5.4+)
+        import inspect
+        parse_sig = inspect.signature(parser.parse)
+        if 'attacks' in parse_sig.parameters:
+            parse_config["attacks"] = {
+                "max_events": 50000,  # Capture attacks for neutral aggro/tower pressure
+            }
+            logger.info("Attacks collector enabled")
+        else:
+            logger.info("Attacks collector not available (requires python-manta 1.4.5.4+)")
+
+        # Check if entity_deaths collector is available (python-manta 1.4.5.4+)
+        if 'entity_deaths' in parse_sig.parameters:
+            parse_config["entity_deaths"] = {
+                "creeps_only": True,  # Only track creep deaths for wave detection
+                "max_events": 10000,
+            }
+            logger.info("Entity deaths collector enabled")
+        else:
+            logger.info("Entity deaths collector not available (requires python-manta 1.4.5.4+)")
+
+        result = parser.parse(**parse_config)
 
         if not result.success:
             raise ValueError(f"Parsing failed: {result.error}")
@@ -357,6 +479,10 @@ class ReplayService:
 
         logger.info(f"Parsed {len(result.combat_log.entries) if result.combat_log else 0} combat log entries")
         logger.info(f"Parsed {len(result.entities.snapshots) if result.entities else 0} entity snapshots")
+        if hasattr(result, 'attacks') and result.attacks:
+            logger.info(f"Parsed {len(result.attacks.events)} attack events")
+        if hasattr(result, 'entity_deaths') and result.entity_deaths:
+            logger.info(f"Parsed {len(result.entity_deaths.events)} entity death events")
 
         return ParsedReplayData.from_parse_result(
             match_id=match_id,

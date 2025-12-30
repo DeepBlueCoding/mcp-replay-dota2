@@ -53,8 +53,7 @@ class TimelineParser:
         return {
             "match_id": data.metadata.get('match_id') if data.metadata else data.match_id,
             "players": players,
-            "radiant": team_graphs.get("radiant", {}),
-            "dire": team_graphs.get("dire", {}),
+            "team_graphs": team_graphs,
         }
 
     def _extract_player_timeline(self, player: Dict[str, Any], team: str) -> Optional[Dict[str, Any]]:

@@ -5,17 +5,21 @@ NO MCP DEPENDENCIES - can be used from any interface.
 """
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from python_manta import CombatLogType, Team
 
 from ...models.combat_log import (
+    AbilityUsage,
     BarracksKill,
     CombatLogEvent,
     CombatLogFilters,
     CombatLogResponse,
     CourierKill,
     CourierKillsResponse,
+    DetailLevel,
+    FightParticipation,
+    HeroCombatAnalysisResponse,
     HeroDeath,
     HeroDeathsResponse,
     ItemPurchase,
@@ -27,12 +31,19 @@ from ...models.combat_log import (
     TormentorKill,
     TowerKill,
 )
-from ...utils.position_tracker import classify_map_position
+from ...utils.constants_fetcher import constants_fetcher
+from ...utils.position_tracker import PositionClassifier, classify_map_position
 from ..models.combat_data import (
     DamageEvent,
     ObjectiveKill,
 )
 from ..models.replay_data import ParsedReplayData
+
+if TYPE_CHECKING:
+    from src.models.game_context import GameContext
+
+DEFAULT_MAX_EVENTS = 200
+MAX_EVENTS_CAP = 500
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +80,16 @@ class CombatService:
         data: ParsedReplayData,
         hero: str,
         target_time: float,
+        classifier: Optional[PositionClassifier] = None,
     ) -> Tuple[Optional[float], Optional[float], Optional[str]]:
         """
         Get hero position at a specific time from entity snapshots.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            hero: Hero name to find
+            target_time: Game time to find position at
+            classifier: Optional PositionClassifier for version-aware classification
 
         Returns:
             Tuple of (x, y, location_description) or (None, None, None)
@@ -97,7 +115,10 @@ class CombatService:
                 clean_name = hero_name
 
             if hero_lower in clean_name.lower():
-                pos = classify_map_position(hero_snap.x, hero_snap.y)
+                if classifier:
+                    pos = classifier.classify(hero_snap.x, hero_snap.y)
+                else:
+                    pos = classify_map_position(hero_snap.x, hero_snap.y)
                 return (hero_snap.x, hero_snap.y, pos.region)
 
         return (None, None, None)
@@ -114,17 +135,52 @@ class CombatService:
         """
         Normalize ability name for display.
 
-        Converts "dota_unknown" to "attack" for hero autoattacks.
+        Converts internal names to display names:
+        - "dota_unknown" -> "attack" for hero autoattacks
+        - "item_bfury" -> "Battle Fury"
+        - "nevermore_shadowraze1" -> "Shadowraze"
         """
         if not inflictor_name:
             return "attack" if attacker_is_hero else None
         if inflictor_name == "dota_unknown" and attacker_is_hero:
             return "attack"
-        return inflictor_name
+        return constants_fetcher.get_display_name(inflictor_name)
 
     def _is_hero(self, name: str) -> bool:
         """Check if a name represents a hero."""
         return name.startswith("npc_dota_hero_")
+
+    def _get_hero_level_at_time(
+        self,
+        data: ParsedReplayData,
+        hero: str,
+        target_time: float,
+    ) -> Optional[int]:
+        """Get hero level at a specific game time from entity snapshots."""
+        hero_lower = hero.lower()
+        best_snapshot = None
+        min_diff = float('inf')
+
+        for snapshot in data.entity_snapshots:
+            diff = abs(snapshot.game_time - target_time)
+            if diff < min_diff:
+                min_diff = diff
+                best_snapshot = snapshot
+
+        if not best_snapshot or min_diff > 60.0:
+            return None
+
+        for hero_snap in best_snapshot.heroes:
+            hero_name = hero_snap.hero_name or ""
+            if hero_name.startswith("npc_dota_hero_"):
+                clean_name = hero_name[14:]
+            else:
+                clean_name = hero_name
+
+            if hero_lower in clean_name.lower():
+                return hero_snap.level if hasattr(hero_snap, 'level') else None
+
+        return None
 
     def get_hero_deaths(
         self,
@@ -132,6 +188,7 @@ class CombatService:
         hero_filter: Optional[str] = None,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
+        game_context: Optional["GameContext"] = None,
     ) -> List[HeroDeath]:
         """
         Get all hero death events from parsed data.
@@ -141,11 +198,15 @@ class CombatService:
             hero_filter: Only include deaths involving this hero (as killer or victim)
             start_time: Filter deaths after this game time
             end_time: Filter deaths before this game time
+            game_context: Optional GameContext for version-aware position classification
 
         Returns:
             List of HeroDeath events sorted by game time
         """
         deaths = []
+
+        # Get classifier from context if available
+        classifier = game_context.position_classifier if game_context else None
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -171,8 +232,21 @@ class CombatService:
 
             # Get victim position from entity snapshots
             pos_x, pos_y, location_desc = self._get_hero_position_at_time(
-                data, victim, game_time
+                data, victim, game_time, classifier
             )
+
+            # Extract hero levels from combat log entry
+            killer_level = None
+            victim_level = None
+            level_advantage = None
+
+            if hasattr(entry, 'attacker_hero_level') and entry.attacker_hero_level and entry.attacker_hero_level > 0:
+                killer_level = entry.attacker_hero_level
+            if hasattr(entry, 'target_hero_level') and entry.target_hero_level and entry.target_hero_level > 0:
+                victim_level = entry.target_hero_level
+
+            if killer_level is not None and victim_level is not None:
+                level_advantage = killer_level - victim_level
 
             death = HeroDeath(
                 game_time=game_time,
@@ -181,10 +255,13 @@ class CombatService:
                 killer=killer,
                 victim=victim,
                 killer_is_hero=entry.is_attacker_hero,
+                killer_level=killer_level,
+                victim_level=victim_level,
+                level_advantage=level_advantage,
                 ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
                 position_x=pos_x,
                 position_y=pos_y,
-                location_description=location_desc,
+                location=location_desc,
             )
             deaths.append(death)
 
@@ -307,28 +384,60 @@ class CombatService:
             List of RunePickup events sorted by game time
         """
         pickups = []
+        seen_times: dict[tuple[str, float], bool] = {}
+
+        # Rune map for modifier_rune_* inflictor names
+        rune_modifier_map = {
+            "modifier_rune_haste": "haste",
+            "modifier_rune_doubledamage": "double_damage",
+            "modifier_rune_arcane": "arcane",
+            "modifier_rune_regen": "regeneration",
+            "modifier_rune_invis": "invisibility",
+            "modifier_rune_shield": "shield",
+        }
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
-            if entry_type != CombatLogType.PICKUP_RUNE.value:
+
+            # Check PICKUP_RUNE events (type 21)
+            if entry_type == CombatLogType.PICKUP_RUNE.value:
+                hero = self._clean_hero_name(entry.target_name)
+                if hero_filter and hero_filter.lower() not in hero.lower():
+                    continue
+                rune_type = RUNE_TYPE_MAP.get(entry.value, f"unknown_{entry.value}")
+                pickup = RunePickup(
+                    game_time=entry.game_time,
+                    game_time_str=self._format_time(entry.game_time),
+                    tick=entry.tick,
+                    hero=hero,
+                    rune_type=rune_type,
+                )
+                pickups.append(pickup)
                 continue
 
-            hero = self._clean_hero_name(entry.target_name)
+            # Check MODIFIER_ADD events with modifier_rune_* inflictor
+            if entry_type == CombatLogType.MODIFIER_ADD.value:
+                inflictor = getattr(entry, 'inflictor_name', '')
+                if inflictor in rune_modifier_map:
+                    hero = self._clean_hero_name(entry.attacker_name)
+                    if hero_filter and hero_filter.lower() not in hero.lower():
+                        continue
 
-            if hero_filter:
-                if hero_filter.lower() not in hero.lower():
-                    continue
+                    # Dedupe - same hero/time can have duplicate modifier events
+                    key = (hero, round(entry.game_time, 1))
+                    if key in seen_times:
+                        continue
+                    seen_times[key] = True
 
-            rune_type = RUNE_TYPE_MAP.get(entry.value, f"unknown_{entry.value}")
-
-            pickup = RunePickup(
-                game_time=entry.game_time,
-                game_time_str=self._format_time(entry.game_time),
-                tick=entry.tick,
-                hero=hero,
-                rune_type=rune_type,
-            )
-            pickups.append(pickup)
+                    rune_type = rune_modifier_map[inflictor]
+                    pickup = RunePickup(
+                        game_time=entry.game_time,
+                        game_time_str=self._format_time(entry.game_time),
+                        tick=entry.tick,
+                        hero=hero,
+                        rune_type=rune_type,
+                    )
+                    pickups.append(pickup)
 
         pickups.sort(key=lambda p: p.game_time)
         return pickups
@@ -374,11 +483,13 @@ class CombatService:
                 continue
 
             target = entry.target_name.lower()
-            if "tormentor" not in target:
+            # Tormentor is named "npc_dota_miniboss" in replay data
+            if "miniboss" not in target:
                 continue
 
-            # Determine which side's tormentor was killed (radiant or dire side)
-            tormentor_side = "dire" if "badguys" in target else "radiant"
+            # Determine side based on position or team - miniboss doesn't have side in name
+            # Use attacker team to infer which side (enemy tormentor)
+            tormentor_side = "radiant" if entry.attacker_team == Team.RADIANT.value else "dire"
             killer = self._clean_hero_name(entry.attacker_name)
             team = "radiant" if entry.attacker_team == Team.RADIANT.value else "dire"
 
@@ -458,9 +569,22 @@ class CombatService:
 
         return kills
 
-    def get_courier_kills(self, data: ParsedReplayData) -> List[CourierKill]:
-        """Get courier kill events."""
+    def get_courier_kills(
+        self,
+        data: ParsedReplayData,
+        game_context: Optional["GameContext"] = None,
+    ) -> List[CourierKill]:
+        """
+        Get courier kill events.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            game_context: Optional GameContext for version-aware position classification
+        """
         kills = []
+
+        # Get classifier from context if available
+        classifier = game_context.position_classifier if game_context else None
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -490,7 +614,10 @@ class CombatService:
             position = None
             if hasattr(entry, 'location_x') and entry.location_x is not None:
                 from ...models.combat_log import MapLocation
-                pos_info = classify_map_position(entry.location_x, entry.location_y)
+                if classifier:
+                    pos_info = classifier.classify(entry.location_x, entry.location_y)
+                else:
+                    pos_info = classify_map_position(entry.location_x, entry.location_y)
                 position = MapLocation(
                     x=entry.location_x,
                     y=entry.location_y,
@@ -525,19 +652,58 @@ class CombatService:
             CombatLogType.ITEM.value: "ITEM",
             CombatLogType.PURCHASE.value: "PURCHASE",
             CombatLogType.BUYBACK.value: "BUYBACK",
+            CombatLogType.INTERRUPT_CHANNEL.value: "INTERRUPT_CHANNEL",
         }
         return type_map.get(entry_type, f"UNKNOWN_{entry_type}")
 
-    def _is_significant_event(self, entry_type: int) -> bool:
-        """Check if event is 'significant' (ability, death, item, purchase, buyback)."""
-        significant_types = {
-            CombatLogType.DEATH.value,
-            CombatLogType.ABILITY.value,
-            CombatLogType.ITEM.value,
-            CombatLogType.PURCHASE.value,
-            CombatLogType.BUYBACK.value,
-        }
-        return entry_type in significant_types
+    def _passes_detail_level_filter(
+        self,
+        entry_type: int,
+        is_attacker_hero: bool,
+        is_target_hero: bool,
+        detail_level: DetailLevel,
+    ) -> bool:
+        """
+        Check if an event passes the detail level filter.
+
+        NARRATIVE: Deaths (hero), Abilities (hero caster), Items, Purchases, Buybacks, Interrupts
+        TACTICAL: + Hero-to-hero Damage, Modifiers applied to heroes
+        FULL: Everything
+        """
+        if detail_level == DetailLevel.FULL:
+            return True
+
+        if detail_level == DetailLevel.NARRATIVE:
+            if entry_type == CombatLogType.DEATH.value:
+                return is_target_hero
+            if entry_type == CombatLogType.ABILITY.value:
+                return is_attacker_hero
+            if entry_type == CombatLogType.ITEM.value:
+                return is_attacker_hero
+            if entry_type in (CombatLogType.PURCHASE.value, CombatLogType.BUYBACK.value):
+                return True
+            if entry_type == CombatLogType.INTERRUPT_CHANNEL.value:
+                return is_target_hero
+            return False
+
+        if detail_level == DetailLevel.TACTICAL:
+            if entry_type == CombatLogType.DEATH.value:
+                return is_target_hero
+            if entry_type == CombatLogType.ABILITY.value:
+                return is_attacker_hero
+            if entry_type == CombatLogType.ITEM.value:
+                return is_attacker_hero
+            if entry_type in (CombatLogType.PURCHASE.value, CombatLogType.BUYBACK.value):
+                return True
+            if entry_type == CombatLogType.DAMAGE.value:
+                return is_attacker_hero and is_target_hero
+            if entry_type == CombatLogType.MODIFIER_ADD.value:
+                return is_target_hero
+            if entry_type == CombatLogType.INTERRUPT_CHANNEL.value:
+                return is_target_hero
+            return False
+
+        return True
 
     def get_combat_log(
         self,
@@ -545,8 +711,10 @@ class CombatService:
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
-        significant_only: bool = False,
+        ability_filter: Optional[str] = None,
         types: Optional[List[int]] = None,
+        detail_level: DetailLevel = DetailLevel.FULL,
+        max_events: Optional[int] = None,
     ) -> List[CombatLogEvent]:
         """
         Get filtered combat log events.
@@ -556,13 +724,16 @@ class CombatService:
             start_time: Filter events after this game time
             end_time: Filter events before this game time
             hero_filter: Only include events involving this hero
-            significant_only: Only include significant events (abilities, deaths, items)
+            ability_filter: Only include events involving this ability
             types: List of CombatLogType values to include (e.g., [5] for ABILITY)
+            detail_level: Controls verbosity. NARRATIVE (least), TACTICAL, FULL (most).
+            max_events: Maximum number of events to return. None = no limit.
 
         Returns:
             List of CombatLogEvent sorted by game time
         """
         events = []
+        ability_filter_lower = ability_filter.lower() if ability_filter else None
 
         for entry in data.combat_log_entries:
             entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
@@ -578,14 +749,14 @@ class CombatService:
             if end_time is not None and game_time > end_time:
                 continue
 
-            # Significant only filter
-            if significant_only and not self._is_significant_event(entry_type):
+            # Apply detail level filter
+            if not self._passes_detail_level_filter(
+                entry_type,
+                entry.is_attacker_hero,
+                entry.is_target_hero,
+                detail_level,
+            ):
                 continue
-
-            # For significant events, skip non-hero deaths (creep kills etc.)
-            if significant_only and entry_type == CombatLogType.DEATH.value:
-                if not entry.is_target_hero:
-                    continue
 
             attacker = self._clean_hero_name(entry.attacker_name)
             target = self._clean_hero_name(entry.target_name)
@@ -596,10 +767,27 @@ class CombatService:
                 if hero_lower not in attacker.lower() and hero_lower not in target.lower():
                     continue
 
+            # Ability filter
+            if ability_filter_lower:
+                ability = entry.inflictor_name or ""
+                if ability_filter_lower not in ability.lower():
+                    continue
+
             # Determine if ability "hit" (for ABILITY events)
             hit = None
             if entry_type == CombatLogType.ABILITY.value:
                 hit = entry.is_target_hero if hasattr(entry, 'is_target_hero') else None
+
+            # Extract hero levels for DEATH events
+            attacker_level = None
+            target_level = None
+            if entry_type == CombatLogType.DEATH.value and entry.is_target_hero:
+                atk_lvl = getattr(entry, 'attacker_hero_level', None)
+                if atk_lvl and atk_lvl > 0:
+                    attacker_level = atk_lvl
+                tgt_lvl = getattr(entry, 'target_hero_level', None)
+                if tgt_lvl and tgt_lvl > 0:
+                    target_level = tgt_lvl
 
             event = CombatLogEvent(
                 type=self._get_event_type_name(entry_type),
@@ -608,15 +796,26 @@ class CombatService:
                 tick=entry.tick,
                 attacker=attacker,
                 attacker_is_hero=entry.is_attacker_hero,
+                attacker_level=attacker_level,
                 target=target,
                 target_is_hero=entry.is_target_hero,
+                target_level=target_level,
                 ability=self._normalize_ability_name(entry.inflictor_name, entry.is_attacker_hero),
                 value=entry.value if hasattr(entry, 'value') else None,
                 hit=hit,
             )
             events.append(event)
 
+            # Check max_events cap
+            if max_events is not None and len(events) >= max_events:
+                break
+
         events.sort(key=lambda e: e.game_time)
+
+        # Apply max_events after sorting (in case we added unsorted)
+        if max_events is not None and len(events) > max_events:
+            events = events[:max_events]
+
         return events
 
     # ============ Response methods (return API Response models) ============
@@ -628,9 +827,12 @@ class CombatService:
         hero_filter: Optional[str] = None,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
+        game_context: Optional["GameContext"] = None,
     ) -> HeroDeathsResponse:
         """Get hero deaths and return API response model."""
-        deaths = self.get_hero_deaths(data, hero_filter, start_time, end_time)
+        deaths = self.get_hero_deaths(
+            data, hero_filter, start_time, end_time, game_context
+        )
         return HeroDeathsResponse(
             success=True,
             match_id=match_id,
@@ -645,16 +847,26 @@ class CombatService:
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
-        significant_only: bool = False,
+        ability_filter: Optional[str] = None,
+        detail_level: DetailLevel = DetailLevel.NARRATIVE,
+        max_events: int = DEFAULT_MAX_EVENTS,
     ) -> CombatLogResponse:
         """Get combat log and return API response model."""
+        # Cap max_events to prevent abuse
+        effective_max = min(max_events, MAX_EVENTS_CAP)
+
         events = self.get_combat_log(
             data,
             start_time=start_time,
             end_time=end_time,
             hero_filter=hero_filter,
-            significant_only=significant_only,
+            ability_filter=ability_filter,
+            detail_level=detail_level,
+            max_events=effective_max,
         )
+
+        truncated = len(events) >= effective_max
+
         return CombatLogResponse(
             success=True,
             match_id=match_id,
@@ -665,6 +877,8 @@ class CombatService:
                 hero_filter=hero_filter,
             ),
             events=events,
+            truncated=truncated,
+            detail_level=detail_level.value,
         )
 
     def get_item_purchases_response(
@@ -701,9 +915,10 @@ class CombatService:
         self,
         data: ParsedReplayData,
         match_id: int,
+        game_context: Optional["GameContext"] = None,
     ) -> CourierKillsResponse:
         """Get courier kills and return API response model."""
-        kills = self.get_courier_kills(data)
+        kills = self.get_courier_kills(data, game_context)
         return CourierKillsResponse(
             success=True,
             match_id=match_id,
@@ -809,4 +1024,217 @@ class CombatService:
             tormentor_kills=tormentor_kills,
             tower_kills=tower_kills,
             barracks_kills=barracks_kills,
+        )
+
+    def get_hero_combat_analysis(
+        self,
+        data: ParsedReplayData,
+        match_id: int,
+        hero: str,
+        fights: List,
+        ability_filter: Optional[str] = None,
+    ) -> HeroCombatAnalysisResponse:
+        """
+        Analyze a hero's combat involvement across the entire match.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            match_id: Match ID for response
+            hero: Hero name to analyze
+            fights: List of Fight objects from FightService
+            ability_filter: Only show this ability in results
+
+        Returns:
+            HeroCombatAnalysisResponse with match-wide stats and per-fight breakdown
+        """
+        hero_lower = hero.lower()
+        ability_filter_lower = ability_filter.lower() if ability_filter else None
+        hero_fights: List[FightParticipation] = []
+        total_kills = 0
+        total_deaths = 0
+        total_assists = 0
+        total_teamfights = 0
+
+        # Track level advantages for kills/deaths
+        kill_level_advantages: List[int] = []
+        death_level_disadvantages: List[int] = []
+
+        # First pass: count ALL ability usage across the entire match
+        match_ability_casts: dict = {}
+        match_ability_hits: dict = {}
+
+        for entry in data.combat_log_entries:
+            entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
+            attacker = self._clean_hero_name(entry.attacker_name)
+            attacker_lower = attacker.lower()
+            is_our_hero_attacker = hero_lower in attacker_lower
+
+            if entry_type == CombatLogType.ABILITY.value and is_our_hero_attacker:
+                ability = entry.inflictor_name
+                if ability and ability != "dota_unknown":
+                    # Apply ability filter if specified
+                    if ability_filter_lower and ability_filter_lower not in ability.lower():
+                        continue
+                    match_ability_casts[ability] = match_ability_casts.get(ability, 0) + 1
+                    if entry.is_target_hero:
+                        match_ability_hits[ability] = match_ability_hits.get(ability, 0) + 1
+
+            elif entry_type == CombatLogType.MODIFIER_ADD.value:
+                modifier = entry.inflictor_name
+                if modifier and modifier != "dota_unknown" and entry.is_target_hero:
+                    if is_our_hero_attacker or (modifier and hero_lower in modifier.lower()):
+                        for tracked_ability in match_ability_casts.keys():
+                            ability_base = tracked_ability.split("_")[-1]
+                            if ability_base in modifier.lower():
+                                match_ability_hits[tracked_ability] = match_ability_hits.get(tracked_ability, 0) + 1
+                                break
+
+        # Second pass: per-fight breakdown
+        for fight in fights:
+            if not any(hero_lower in p.lower() for p in fight.participants):
+                continue
+
+            fight_start = fight.start_time - 2.0
+            fight_end = fight.end_time + 2.0
+
+            kills = 0
+            deaths = 0
+            assists = 0
+            damage_dealt = 0
+            damage_received = 0
+            ability_casts: dict = {}
+            ability_hits: dict = {}
+            heroes_damaged_by_hero: set = set()
+
+            for entry in data.combat_log_entries:
+                entry_type = entry.type.value if hasattr(entry.type, 'value') else entry.type
+                if entry.game_time < fight_start or entry.game_time > fight_end:
+                    continue
+
+                attacker = self._clean_hero_name(entry.attacker_name)
+                target = self._clean_hero_name(entry.target_name)
+                attacker_lower = attacker.lower()
+                target_lower = target.lower()
+                is_our_hero_attacker = hero_lower in attacker_lower
+                is_our_hero_target = hero_lower in target_lower
+
+                if entry_type == CombatLogType.DEATH.value and entry.is_target_hero:
+                    if is_our_hero_attacker:
+                        kills += 1
+                        # Track level advantage on kills
+                        if hasattr(entry, 'attacker_hero_level') and hasattr(entry, 'target_hero_level'):
+                            attacker_lvl = entry.attacker_hero_level
+                            target_lvl = entry.target_hero_level
+                            if attacker_lvl and attacker_lvl > 0 and target_lvl and target_lvl > 0:
+                                kill_level_advantages.append(attacker_lvl - target_lvl)
+                    elif is_our_hero_target:
+                        deaths += 1
+                        # Track level disadvantage on deaths
+                        if hasattr(entry, 'attacker_hero_level') and hasattr(entry, 'target_hero_level'):
+                            attacker_lvl = entry.attacker_hero_level
+                            target_lvl = entry.target_hero_level
+                            if attacker_lvl and attacker_lvl > 0 and target_lvl and target_lvl > 0:
+                                death_level_disadvantages.append(attacker_lvl - target_lvl)
+                    elif target_lower in heroes_damaged_by_hero:
+                        assists += 1
+
+                elif entry_type == CombatLogType.DAMAGE.value:
+                    if is_our_hero_attacker and entry.is_target_hero:
+                        damage_dealt += entry.value or 0
+                        heroes_damaged_by_hero.add(target_lower)
+                    elif is_our_hero_target and entry.is_attacker_hero:
+                        damage_received += entry.value or 0
+
+                elif entry_type == CombatLogType.ABILITY.value and is_our_hero_attacker:
+                    ability = entry.inflictor_name
+                    if ability and ability != "dota_unknown":
+                        # Apply ability filter if specified
+                        if ability_filter_lower and ability_filter_lower not in ability.lower():
+                            continue
+                        ability_casts[ability] = ability_casts.get(ability, 0) + 1
+                        if entry.is_target_hero:
+                            ability_hits[ability] = ability_hits.get(ability, 0) + 1
+
+                elif entry_type == CombatLogType.MODIFIER_ADD.value:
+                    modifier = entry.inflictor_name
+                    if modifier and modifier != "dota_unknown" and entry.is_target_hero:
+                        if is_our_hero_attacker or (modifier and hero_lower in modifier.lower()):
+                            for tracked_ability in ability_casts.keys():
+                                ability_base = tracked_ability.split("_")[-1]
+                                if ability_base in modifier.lower():
+                                    ability_hits[tracked_ability] = ability_hits.get(tracked_ability, 0) + 1
+                                    break
+
+            abilities_used = []
+            for ability_name, cast_count in ability_casts.items():
+                hits = ability_hits.get(ability_name, 0)
+                hit_rate = (hits / cast_count * 100) if cast_count > 0 else 0.0
+                abilities_used.append(AbilityUsage(
+                    ability=ability_name,
+                    total_casts=cast_count,
+                    hero_hits=hits,
+                    hit_rate=round(hit_rate, 1),
+                ))
+
+            abilities_used.sort(key=lambda a: a.total_casts, reverse=True)
+
+            total_kills += kills
+            total_deaths += deaths
+            total_assists += assists
+            if fight.is_teamfight:
+                total_teamfights += 1
+
+            # Get hero level at fight start
+            hero_level = self._get_hero_level_at_time(data, hero, fight.start_time)
+
+            hero_fights.append(FightParticipation(
+                fight_id=fight.fight_id,
+                fight_start=fight.start_time,
+                fight_start_str=fight.start_time_str,
+                fight_end=fight.end_time,
+                fight_end_str=fight.end_time_str,
+                is_teamfight=fight.is_teamfight,
+                hero_level=hero_level,
+                kills=kills,
+                deaths=deaths,
+                assists=assists,
+                abilities_used=abilities_used,
+                damage_dealt=damage_dealt,
+                damage_received=damage_received,
+            ))
+
+        # Build ability_summary from match-wide stats (not just fights)
+        ability_summary = []
+        for ability_name, cast_count in match_ability_casts.items():
+            hits = match_ability_hits.get(ability_name, 0)
+            hit_rate = (hits / cast_count * 100) if cast_count > 0 else 0.0
+            ability_summary.append(AbilityUsage(
+                ability=ability_name,
+                total_casts=cast_count,
+                hero_hits=hits,
+                hit_rate=round(hit_rate, 1),
+            ))
+        ability_summary.sort(key=lambda a: a.total_casts, reverse=True)
+
+        # Calculate average level advantages
+        avg_kill_advantage = None
+        avg_death_disadvantage = None
+        if kill_level_advantages:
+            avg_kill_advantage = round(sum(kill_level_advantages) / len(kill_level_advantages), 1)
+        if death_level_disadvantages:
+            avg_death_disadvantage = round(sum(death_level_disadvantages) / len(death_level_disadvantages), 1)
+
+        return HeroCombatAnalysisResponse(
+            success=True,
+            match_id=match_id,
+            hero=hero,
+            total_fights=len(hero_fights),
+            total_teamfights=total_teamfights,
+            total_kills=total_kills,
+            total_deaths=total_deaths,
+            total_assists=total_assists,
+            avg_kill_level_advantage=avg_kill_advantage,
+            avg_death_level_disadvantage=avg_death_disadvantage,
+            ability_summary=ability_summary,
+            fights=hero_fights,
         )

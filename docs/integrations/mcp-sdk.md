@@ -23,7 +23,7 @@ async def main():
     server_params = StdioServerParameters(
         command="uv",
         args=["run", "python", "dota_match_mcp_server.py"],
-        cwd="/path/to/mcp_replay_dota2"
+        cwd="/path/to/mcp-replay-dota2"
     )
 
     async with stdio_client(server_params) as (read, write):
@@ -53,7 +53,7 @@ async def call_tool_example():
     server_params = StdioServerParameters(
         command="uv",
         args=["run", "python", "dota_match_mcp_server.py"],
-        cwd="/path/to/mcp_replay_dota2"
+        cwd="/path/to/mcp-replay-dota2"
     )
 
     async with stdio_client(server_params) as (read, write):
@@ -83,7 +83,7 @@ async def read_resource_example():
     server_params = StdioServerParameters(
         command="uv",
         args=["run", "python", "dota_match_mcp_server.py"],
-        cwd="/path/to/mcp_replay_dota2"
+        cwd="/path/to/mcp-replay-dota2"
     )
 
     async with stdio_client(server_params) as (read, write):
@@ -155,7 +155,7 @@ class Dota2MCPClient:
 
 # Usage
 async def main():
-    async with Dota2MCPClient("/path/to/mcp_replay_dota2") as client:
+    async with Dota2MCPClient("/path/to/mcp-replay-dota2") as client:
         deaths = await client.get_hero_deaths(8461956309)
         print(f"Deaths: {deaths['total_deaths']}")
 

@@ -22,53 +22,39 @@ sys.path.insert(0, str(mcp_dir))
 
 from fastmcp import FastMCP
 
-# Create the MCP server instance with coaching instructions
-COACHING_INSTRUCTIONS = """
-You are a Dota 2 coaching assistant analyzing professional and pub match replays.
-Your goal is to provide MEANINGFUL ANALYSIS, not just display raw data.
+# Import coaching constants for server instructions
+from src.coaching.prompts import ANALYSIS_WORKFLOW, COACHING_PERSONA, CORE_PHILOSOPHY
 
-## Analysis Philosophy
-- Never dump raw numbers in tables without context
-- Every statistic must be linked to an explanation of WHY it matters
-- Focus on PATTERNS and TRENDS, not isolated events
-- Provide actionable coaching advice the player can apply in future games
+# Tool selection and rules (server-specific)
+TOOL_INSTRUCTIONS = """
+## Tool Selection
 
-## Workflow for Match Analysis
-1. Start with get_match_info for game context (duration, winner, skill level)
-2. Use get_draft to understand team compositions and expected playstyles
-3. Analyze objectives with get_objective_kills to understand game flow
-4. Review deaths with get_hero_deaths to identify patterns
-5. Use get_timeline for critical game moments and networth swings
+| Question Type | Use This Tool |
+|---------------|---------------|
+| Hero performance, kills, deaths, ability usage | `get_hero_performance` (with ability_filter if needed) |
+| Match winner, duration, teams, players | `get_match_info` |
+| Global death timeline, first blood, death counts | `get_hero_deaths` |
+| Event-by-event fight breakdown at specific time | `get_fight_combat_log` |
+| Laning phase stats, CS comparisons | `get_lane_summary` |
+| Item purchase timings | `get_item_purchases` |
+| Roshan, towers, barracks kills | `get_objective_kills` |
 
-## CRITICAL: Dota 2 Game Knowledge
+## Key Rules
 
-### Laning Phase Roles (0-10 minutes)
-Each position has SPECIFIC responsibilities during laning. Do NOT confuse them:
+1. **get_hero_performance is comprehensive** - Returns kills, deaths, assists, ability stats,
+   AND per-fight breakdowns. One call is usually sufficient for hero questions.
 
-**Position 1 (Carry/Safelane)**: Farm the safelane. Their ONLY job is to get CS and survive.
-They do NOT rotate. They do NOT gank. Deaths in safelane are usually support/mid rotations.
+2. **One tool per question** - Avoid chaining tools. Each tool returns complete data for its purpose.
 
-**Position 2 (Mid)**: Farm mid, contest runes. CAN rotate after rune spawns (2:00, 4:00, 6:00+).
-Mid rotations with haste/DD rune are common gank opportunities.
-
-**Position 3 (Offlane)**: Pressure enemy carry, get levels, survive. They do NOT rotate early.
-Offlaners dying is NORMAL - they're supposed to create space by drawing attention.
-
-**Position 4 (Soft Support)**: Pull camps, rotate to gank mid or offlane, secure runes.
-These are the PRIMARY early-game rotators via smoke or twin gate portals.
-
-**Position 5 (Hard Support)**: Protect carry in lane, stack camps, place wards.
-Can rotate but usually stays to protect carry until 5-7 minutes.
-
-## Parallel Tool Calls for Efficiency
-Many analysis tools are independent and can be called in parallel for faster results.
-
-**Parallelizable tools** (same match, different parameters):
-- get_cs_at_minute: Call for minutes 5, 10, 15 simultaneously
-- get_stats_at_minute: Call for multiple time points at once
-- get_hero_positions: Call for multiple minutes in parallel
-- get_snapshot_at_time: Call for multiple game times at once
+3. **Parallel calls for efficiency** - Tools like get_cs_at_minute, get_stats_at_minute,
+   get_hero_positions can be called in parallel for different time points.
 """
+
+# Assemble full instructions from shared constants + server-specific rules
+COACHING_INSTRUCTIONS = f"""{COACHING_PERSONA}
+{CORE_PHILOSOPHY}
+{ANALYSIS_WORKFLOW}
+{TOOL_INSTRUCTIONS}"""
 
 mcp = FastMCP(
     name="Dota 2 Match Analysis Server",
@@ -76,6 +62,8 @@ mcp = FastMCP(
 )
 
 # Import resources
+# Import prompts
+from src.prompts import register_prompts
 from src.resources.heroes_resources import heroes_resource
 from src.resources.map_resources import get_cached_map_data
 from src.resources.pro_scene_resources import pro_scene_resource
@@ -127,6 +115,9 @@ from src.tools import register_all_tools
 
 register_all_tools(mcp, services)
 
+# Register prompts
+register_prompts(mcp)
+
 
 # Define MCP Resources
 @mcp.resource(
@@ -176,6 +167,63 @@ async def pro_teams_resource() -> Dict[str, Any]:
     return {"total_teams": len(teams), "teams": teams}
 
 
+# Diagnostic tool to check client capabilities
+from fastmcp import Context
+
+
+@mcp.tool()
+async def get_client_capabilities(ctx: Context) -> Dict[str, Any]:
+    """
+    Diagnostic tool to check what MCP capabilities the connected client supports.
+
+    Returns information about sampling, roots, and other client capabilities.
+    """
+    result: Dict[str, Any] = {
+        "sampling_supported": False,
+        "roots_supported": False,
+        "client_info": None,
+        "raw_capabilities": None,
+    }
+
+    try:
+        # Use public ctx.session API (fastmcp 2.13+)
+        session = ctx.session
+        if session is None:
+            result["error"] = "No session available (MCP session not established)"
+            result["client_id"] = ctx.client_id
+            result["session_id"] = ctx.session_id
+            return result
+
+        # Get client params from initialization
+        client_params = getattr(session, "_client_params", None)
+        if client_params is None:
+            client_params = getattr(session, "client_params", None)
+
+        if client_params:
+            client_info = getattr(client_params, "clientInfo", None)
+            result["client_info"] = {
+                "name": getattr(client_info, "name", None) if client_info else None,
+                "version": getattr(client_info, "version", None) if client_info else None,
+            }
+
+            caps = getattr(client_params, "capabilities", None)
+            if caps:
+                result["sampling_supported"] = getattr(caps, "sampling", None) is not None
+                result["roots_supported"] = getattr(caps, "roots", None) is not None
+                result["raw_capabilities"] = str(caps)
+        else:
+            result["note"] = "Client params not accessible via session"
+            result["client_id"] = ctx.client_id
+            result["session_id"] = ctx.session_id
+
+    except Exception as e:
+        result["error"] = str(e)
+        result["client_id"] = ctx.client_id
+        result["session_id"] = ctx.session_id
+
+    return result
+
+
 def main():
     """Main entry point for the server."""
     import argparse
@@ -186,11 +234,23 @@ def main():
     parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio", help="Transport mode")
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8081)), help="Port for SSE")
     parser.add_argument("--host", default="0.0.0.0", help="Host for SSE")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     if args.version:
         print("Dota 2 Match MCP Server v1.0.3")
         return
+
+    # Configure logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+
+    if args.debug:
+        print("Debug logging enabled", file=sys.stderr)
 
     print("Dota 2 Match MCP Server starting...", file=sys.stderr)
     print(f"Transport: {args.transport}", file=sys.stderr)

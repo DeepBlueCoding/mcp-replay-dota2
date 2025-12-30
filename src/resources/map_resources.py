@@ -175,11 +175,11 @@ def get_map_data() -> MapData:
         NeutralCamp(name="radiant_triangle_ancient", side="radiant", tier="ancient",
                     position=MapCoordinate(x=2000, y=-6000)),
         NeutralCamp(name="dire_triangle_large", side="dire", tier="large",
-                    position=MapCoordinate(x=-3700, y=4200)),
+                    position=MapCoordinate(x=3400, y=4600)),
         NeutralCamp(name="dire_triangle_medium", side="dire", tier="medium",
-                    position=MapCoordinate(x=-4800, y=3200)),
+                    position=MapCoordinate(x=4600, y=3400)),
         NeutralCamp(name="dire_triangle_ancient", side="dire", tier="ancient",
-                    position=MapCoordinate(x=-2200, y=5800)),
+                    position=MapCoordinate(x=5800, y=2200)),
     ]
 
     # Rune spawns
@@ -198,7 +198,7 @@ def get_map_data() -> MapData:
         RuneSpawn(name="bounty_dire_jungle", type="bounty",
                   position=MapCoordinate(x=4100, y=1400)),
         RuneSpawn(name="bounty_dire_triangle", type="bounty",
-                  position=MapCoordinate(x=-4300, y=3900)),
+                  position=MapCoordinate(x=4100, y=4100)),
 
         # Wisdom runes
         RuneSpawn(name="wisdom_radiant", type="wisdom",

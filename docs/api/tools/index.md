@@ -1,18 +1,28 @@
 # Tools Reference
 
-??? info "AI Summary"
+??? info "AI Summary - Tool Selection Guide"
 
-    **Match Analysis Tools** (require `match_id`): `download_replay` (call first), `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, `get_rune_pickups`, `get_match_draft`, `get_match_info`, `get_match_heroes`, `get_match_players`.
+    **CRITICAL: Choose the right tool FIRST to avoid redundant calls.**
 
-    **Game State Tools**: `list_fights`, `get_teamfights`, `get_fight`, `get_camp_stacks`, `get_jungle_summary`, `get_lane_summary`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_position_timeline`, `get_fight_replay`.
+    | Question Type | Use This Tool | DO NOT Chain To |
+    |--------------|---------------|-----------------|
+    | Hero/ability performance | `get_hero_performance` | ❌ `get_fight_combat_log`, `get_hero_deaths`, `list_fights` |
+    | Deep fight breakdown | `get_fight_combat_log` | ❌ `get_hero_performance` (if already called) |
+    | All deaths in match | `get_hero_deaths` | ❌ `get_hero_performance` (for same hero) |
+    | Fight overview | `list_fights` or `get_teamfights` | ❌ `get_fight_combat_log` for each fight |
+    | Farming patterns | `get_farming_pattern` | - |
+    | Rotations | `get_rotation_analysis` | - |
 
-    **Farming Analysis**: `get_farming_pattern(hero, start_minute, end_minute)` - THE tool for "how did X farm?" questions. Returns minute-by-minute lane/neutral kills, camp types, positions, transitions (first jungle, first large camp), and summary stats. **Replaces 25+ tool calls with 1 call.**
+    **Primary Tools:**
 
-    **Rotation Analysis**: `get_rotation_analysis(start_minute, end_minute)` - THE tool for "what rotations happened?" questions. Detects when heroes leave assigned lanes, correlates with rune pickups, links outcomes to fight_ids. Returns rotations, power/wisdom rune events, and per-hero statistics.
+    - **`get_hero_performance`**: THE tool for hero/ability questions. Returns kills, deaths, ability stats, per-fight breakdown. Use `ability_filter` for specific abilities, `start_time`/`end_time` for phase-specific analysis. **Call ONCE, don't chain.**
+    - **`get_fight_combat_log`**: Deep event-by-event fight analysis. Use when user asks "what happened in the fight at X?"
+    - **`get_farming_pattern`**: THE tool for farming questions. Returns minute-by-minute data. **Replaces 25+ tool calls.**
+    - **`get_rotation_analysis`**: THE tool for rotation questions. Detects lane departures, correlates with runes.
 
-    **Pro Scene Tools**: `search_pro_player(query)`, `search_team(query)`, `get_pro_player(account_id)`, `get_pro_player_by_name(name)`, `get_team(team_id)`, `get_team_by_name(name)`, `get_team_matches(team_id)`, `get_leagues(tier?)`, `get_pro_matches(limit?, tier?, team_name?, league_name?, days_back?)`, `get_league_matches(league_id)`.
+    **Pro Scene Tools**: `search_pro_player`, `search_team`, `get_pro_player_by_name`, `get_team_by_name`, `get_pro_matches`, `get_league_matches`.
 
-    **Parallel-safe tools**: `get_stats_at_minute`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_fight`, `get_position_timeline`, `get_fight_replay` - call multiple times with different parameters in parallel for efficiency.
+    **Parallel-safe tools**: `get_stats_at_minute`, `get_cs_at_minute`, `get_hero_positions`, `get_snapshot_at_time`, `get_fight`, `get_position_timeline`, `get_fight_replay`.
 
 Tools are functions the LLM can call. All match analysis tools take `match_id` as required parameter.
 
@@ -20,7 +30,7 @@ Tools are functions the LLM can call. All match analysis tools take `match_id` a
 
 | Category | Description | Tools |
 |----------|-------------|-------|
-| [Match Analysis](match-analysis.md) | Query match events, deaths, items, timeline | 14 tools |
+| [Match Analysis](match-analysis.md) | Query match events, deaths, items, timeline | 15 tools |
 | [Pro Scene](pro-scene.md) | Search players, teams, leagues, pro matches | 10 tools |
 | [Game State](game-state.md) | High-resolution positions, snapshots, fights | 11 tools |
 | [Farming & Rotation](farming-rotation.md) | Farming patterns and rotation analysis | 2 tools |
@@ -58,3 +68,94 @@ get_cs_at_minute(match_id=123, minute=10)
 ```
 
 The LLM can issue multiple tool calls in a single response, and the runtime executes them concurrently.
+
+## Filtering
+
+Many tools support **filtering** to narrow down results. Filters use **partial matching** (case-insensitive substring match) for hero names, locations, and abilities.
+
+### Supported Filters
+
+| Tool | Filters |
+|------|---------|
+| `get_hero_performance` | `ability_filter`, `start_time`, `end_time` |
+| `get_hero_deaths` | `killer`, `victim`, `location`, `ability`, `start_time`, `end_time` |
+| `list_fights` | `location`, `min_deaths`, `is_teamfight`, `start_time`, `end_time` |
+| `get_teamfights` | `location`, `min_deaths`, `start_time`, `end_time` |
+
+### Partial Matching
+
+All string filters use **partial matching**:
+
+```python
+# These all match "juggernaut"
+killer="jugg"
+killer="jugger"
+killer="naut"
+
+# These all match "dire_t1_top"
+location="t1"
+location="dire"
+location="top"
+
+# These all match "faceless_void_chronosphere"
+ability="chrono"
+ability="void"
+ability="sphere"
+```
+
+### Filter Examples
+
+**Early game hero performance (0-15 min):**
+```python
+get_hero_performance(match_id=123, hero="spirit_breaker", start_time=0, end_time=900)
+```
+
+**Deaths by a specific hero:**
+```python
+get_hero_deaths(match_id=123, killer="medusa")
+```
+
+**Deaths at Roshan pit:**
+```python
+get_hero_deaths(match_id=123, location="roshan")
+```
+
+**Deaths by Chronosphere after 20 minutes:**
+```python
+get_hero_deaths(match_id=123, ability="chrono", start_time=1200)
+```
+
+**Teamfights at high ground (T3 towers):**
+```python
+list_fights(match_id=123, location="t3", is_teamfight=True)
+```
+
+**Late game teamfights (30+ minutes) with 4+ deaths:**
+```python
+get_teamfights(match_id=123, start_time=1800, min_deaths=4)
+```
+
+**Roshan pit fights:**
+```python
+list_fights(match_id=123, location="roshan")
+```
+
+### Available Locations (37 regions)
+
+Filters can match any of these location names:
+
+- **Towers**: `radiant_t1_top`, `radiant_t1_mid`, `radiant_t1_bot`, `radiant_t2_*`, `radiant_t3_*`, `radiant_t4`, `dire_t1_*`, `dire_t2_*`, `dire_t3_*`, `dire_t4`
+- **Landmarks**: `roshan_pit`, `tormentor_radiant`, `tormentor_dire`
+- **Farming areas**: `radiant_triangle`, `dire_triangle`, `radiant_ancients`, `dire_ancients`
+- **Lanes/Areas**: `river`, `mid_lane`, `radiant_safelane`, `dire_safelane`, `radiant_jungle`, `dire_jungle`
+
+Use partial matching for convenience:
+
+| Filter | Matches |
+|--------|---------|
+| `"t1"` | All T1 tower areas (6 locations) |
+| `"t3"` | All T3 tower areas / high ground (6 locations) |
+| `"dire"` | All Dire-side locations |
+| `"roshan"` | Roshan pit |
+| `"jungle"` | Both jungle areas |
+| `"triangle"` | Both triangle farming areas |

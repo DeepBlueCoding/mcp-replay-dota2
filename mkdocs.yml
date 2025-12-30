@@ -1,8 +1,8 @@
 site_name: MCP Dota 2 Server
 site_description: Give your LLM the ability to analyze Dota 2 matches
-site_url: https://deepbluecoding.github.io/mcp_replay_dota2/
-repo_name: DeepBlueCoding/mcp_replay_dota2
-repo_url: https://github.com/DeepBlueCoding/mcp_replay_dota2
+site_url: https://deepbluecoding.github.io/mcp-replay-dota2/
+repo_name: DeepBlueCoding/mcp-replay-dota2
+repo_url: https://github.com/DeepBlueCoding/mcp-replay-dota2
 
 theme:
   name: material
@@ -30,6 +30,10 @@ theme:
 
 plugins:
   - search
+  - mike:
+      version_selector: true
+      css_dir: css
+      javascript_dir: js
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -45,7 +49,10 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Installation: getting-started/installation.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Docker: getting-started/docker.md
+      - Development: getting-started/development.md
   - Integrations:
       - Overview: integrations/index.md
       - Native MCP:
@@ -69,5 +76,21 @@ nav:
           - Pro Scene: api/tools/pro-scene.md
           - Game State: api/tools/game-state.md
           - Farming & Rotation: api/tools/farming-rotation.md
+          - Lane Analysis: api/tools/lane-analysis.md
       - Resources: api/resources.md
+      - Prompts: api/prompts.md
+      - AI Coaching: api/coaching.md
+  - Architecture: REPLAY_PARSING_ARCHITECTURE.md
   - Changelog: changelog.md
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/DeepBlueCoding/mcp-replay-dota2
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/mcp-replay-dota2/
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/dbcjuanma/mcp_replay_dota2

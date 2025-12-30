@@ -21,7 +21,19 @@ from .farming_data import (
     MinuteFarmingData,
 )
 from .jungle_data import CampStack, JungleSummary
-from .lane_data import HeroLaneStats, HeroPosition, LaneSnapshot, LaneSummary
+from .lane_data import (
+    CreepWave,
+    HeroLanePhase,
+    HeroPosition,
+    LaneHarass,
+    LaneLastHit,
+    LaneRotation,
+    LaneSummaryResponse,
+    NeutralAggro,
+    TowerPressure,
+    TowerProximityEvent,
+    WaveNuke,
+)
 from .replay_data import ParsedReplayData, ProgressCallback
 from .rotation_data import (
     HeroRotationStats,
@@ -48,10 +60,17 @@ __all__ = [
     "ObjectiveKill",
     "CampStack",
     "JungleSummary",
-    "HeroLaneStats",
+    "CreepWave",
+    "HeroLanePhase",
     "HeroPosition",
-    "LaneSnapshot",
-    "LaneSummary",
+    "LaneHarass",
+    "LaneLastHit",
+    "LaneRotation",
+    "LaneSummaryResponse",
+    "NeutralAggro",
+    "TowerPressure",
+    "TowerProximityEvent",
+    "WaveNuke",
     "FightReplay",
     "GameSnapshot",
     "HeroSnapshot",

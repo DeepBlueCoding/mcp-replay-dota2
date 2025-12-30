@@ -1,0 +1,71 @@
+name: Seed Test Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: 'Match ID to download and parse'
+        required: true
+        default: '8594217096'
+
+jobs:
+  seed-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOTA_REPLAY_CACHE: ${{ github.workspace }}/replays
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Restore existing replay cache
+        uses: actions/cache/restore@v4
+        with:
+          path: replays
+          key: replays-v2-${{ github.event.inputs.match_id }}
+          restore-keys: |
+            replays-v2-
+
+      - name: Download replay from GCP bucket
+        run: |
+          mkdir -p $DOTA_REPLAY_CACHE
+          MATCH_ID=${{ github.event.inputs.match_id }}
+          if [ ! -f $DOTA_REPLAY_CACHE/${MATCH_ID}.dem ]; then
+            echo "Downloading replay ${MATCH_ID} from GCP bucket..."
+            curl -sL "https://storage.googleapis.com/dota-replays/${MATCH_ID}.dem" -o $DOTA_REPLAY_CACHE/${MATCH_ID}.dem
+          else
+            echo "Replay ${MATCH_ID} already cached"
+          fi
+          ls -lh $DOTA_REPLAY_CACHE/
+
+      - name: Parse replay
+        timeout-minutes: 15
+        run: |
+          MATCH_ID=${{ github.event.inputs.match_id }}
+          echo "Parsing replay ${MATCH_ID}..."
+          uv run python -c "
+          import asyncio
+          from src.services.replay.replay_service import ReplayService
+          rs = ReplayService()
+          data = asyncio.run(rs.get_parsed_data(${MATCH_ID}))
+          print(f'Parsed {len(data.combat_log_entries)} combat log entries')
+          "
+          echo "Parse complete"
+
+      - name: Save replay cache
+        uses: actions/cache/save@v4
+        with:
+          path: replays
+          key: replays-v2-${{ github.event.inputs.match_id }}

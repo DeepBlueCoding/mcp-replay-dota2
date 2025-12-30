@@ -6,6 +6,32 @@
 
 This MCP server can connect to any LLM that supports the Model Context Protocol or tool calling.
 
+## Feature Support by Client
+
+Different MCP clients support different features:
+
+| Client | Tools | Resources | Prompts | Notes |
+|--------|:-----:|:---------:|:-------:|-------|
+| **Claude Desktop** | ✅ | ✅ | ❌ | No prompts support |
+| **Claude Code CLI** | ✅ | ✅ | ✅ | Resources via `@`, prompts via `/mcp__` |
+| **Cursor** | ✅ | ❌ | ❌ | Tools only |
+| **Windsurf** | ✅ | ❌ | ❌ | Tools only |
+| **Zed** | ✅ | ✅ | ❌ | No prompts |
+| **Continue.dev** | ✅ | ✅ | ❌ | No prompts |
+| **VS Code + Copilot** | ✅ | ✅ | ⚠️ | Partial support |
+| **LangChain** | ✅ | ✅ | ⚠️ | Manual prompt loading |
+| **OpenAI API** | ✅ | ❌ | ❌ | Tools via function calling |
+
+**Legend:**
+
+- ✅ Supported
+- ⚠️ Partial/manual implementation
+- ❌ Not supported
+
+See [Prompts](../api/prompts.md) for available coaching prompts.
+
+Sources: [Claude Code MCP Docs](https://code.claude.com/docs/en/mcp), [MCP Sampling Status](https://modelcontextprotocol.info/docs/concepts/sampling/)
+
 ## Native MCP Support
 
 These clients have built-in MCP support:

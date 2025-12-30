@@ -39,6 +39,13 @@ class ConstantsFetcher:
         "order_types.json",
     ]
 
+    # Mapping from item ability names to item keys (for abilities without dname)
+    # Combat log uses ability names like "ability_lamp_use" but items.json uses "panic_button"
+    ITEM_ABILITY_TO_ITEM = {
+        "ability_lamp_use": "panic_button",  # Magic Lamp
+        "ability_pluck_famango": "famango",  # Mango Tree
+    }
+
     # Combat log types from Valve protobuf (DOTA_COMBATLOG_TYPES)
     COMBATLOG_TYPES = {
         -1: "INVALID",
@@ -105,6 +112,9 @@ class ConstantsFetcher:
         # Ensure constants directory exists
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
+        # In-memory cache for frequently accessed constants
+        self._cache: Dict[str, Any] = {}
+
     async def fetch_constants_file(self, filename: str) -> Optional[Dict[str, Any]]:
         """
         Fetch a single constants file from the repository.
@@ -169,7 +179,7 @@ class ConstantsFetcher:
 
     def load_local_constants(self, filename: str) -> Optional[Dict[str, Any]]:
         """
-        Load constants from local cache.
+        Load constants from local cache (with in-memory caching).
 
         Args:
             filename: Name of the constants file
@@ -177,12 +187,19 @@ class ConstantsFetcher:
         Returns:
             Dictionary containing the constants data, or None if not found
         """
+        # Check in-memory cache first
+        if filename in self._cache:
+            return self._cache[filename]
+
         local_file = self.data_dir / filename
 
         try:
             if local_file.exists():
                 with open(local_file, 'r') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                # Store in memory cache
+                self._cache[filename] = data
+                return data
             else:
                 logger.warning(f"Local constants file not found: {filename}")
                 return None
@@ -407,6 +424,51 @@ class ConstantsFetcher:
             List of item names (empty string for empty slots)
         """
         return [self.get_item_name(item_id) or "" for item_id in item_ids]
+
+    def get_display_name(self, internal_name: Optional[str]) -> Optional[str]:
+        """
+        Convert internal item/ability name to human-readable display name.
+
+        Handles:
+        - Item names: "item_bfury" -> "Battle Fury"
+        - Ability names: "nevermore_shadowraze1" -> "Shadowraze"
+        - Special cases: "dota_unknown" -> "attack", None -> None
+
+        Args:
+            internal_name: Internal name from combat log (e.g., "item_bfury", "nevermore_shadowraze1")
+
+        Returns:
+            Human-readable display name, or original name if no translation found
+        """
+        if not internal_name:
+            return None
+
+        if internal_name == "dota_unknown":
+            return "attack"
+
+        # Handle item names (item_<name>)
+        if internal_name.startswith("item_"):
+            item_key = internal_name[5:]  # Remove "item_" prefix
+            items = self.get_items_constants()
+            if items and item_key in items:
+                return items[item_key].get("dname", internal_name)
+            return internal_name
+
+        # Handle ability names
+        abilities = self.get_abilities_constants()
+        if abilities and internal_name in abilities:
+            dname = abilities[internal_name].get("dname")
+            if dname:
+                return dname
+
+        # Check if this is an item ability that maps to an item
+        if internal_name in self.ITEM_ABILITY_TO_ITEM:
+            item_key = self.ITEM_ABILITY_TO_ITEM[internal_name]
+            items = self.get_items_constants()
+            if items and item_key in items:
+                return items[item_key].get("dname", internal_name)
+
+        return internal_name
 
 
 # Create a singleton instance

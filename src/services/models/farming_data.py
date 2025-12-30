@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.models.types import CoercedInt
+
 
 class CreepKill(BaseModel):
     """A single creep kill event."""
@@ -51,6 +53,19 @@ class CampClear(BaseModel):
     camp: str = Field(description="Camp type (e.g., 'large_troll', 'medium_satyr')")
     tier: str = Field(description="Camp tier: small, medium, large, or ancient")
     area: str = Field(description="Map area where camp was cleared")
+    position_x: Optional[float] = Field(default=None, description="X coordinate")
+    position_y: Optional[float] = Field(default=None, description="Y coordinate")
+    creeps_killed: int = Field(default=1, description="Number of creeps killed in this camp")
+
+
+class WaveClear(BaseModel):
+    """A lane creep wave clear event (grouped lane creeps killed in quick succession)."""
+
+    time_str: str = Field(description="Game time when wave was cleared (M:SS)")
+    creeps_killed: int = Field(description="Number of lane creeps killed in this wave")
+    position_x: Optional[float] = Field(default=None, description="X coordinate")
+    position_y: Optional[float] = Field(default=None, description="Y coordinate")
+    area: str = Field(description="Map area (e.g., 'radiant_safelane', 'mid_lane')")
 
 
 class MultiCampClear(BaseModel):
@@ -59,14 +74,14 @@ class MultiCampClear(BaseModel):
     time_str: str = Field(description="Game time when multi-camp clear started (M:SS)")
     camps: List[str] = Field(description="List of camp types cleared together")
     duration_seconds: float = Field(description="Time span of all kills in this clear")
-    creeps_killed: int = Field(description="Total creeps killed across all camps")
+    creeps_killed: CoercedInt = Field(description="Total creeps killed across all camps")
     area: str = Field(description="Map area where multi-camp clear occurred")
 
 
 class MinuteFarmingData(BaseModel):
     """Farming data for a single minute."""
 
-    minute: int = Field(description="Game minute")
+    minute: CoercedInt = Field(description="Game minute")
 
     # Position at minute boundaries
     position_at_start: Optional[MapPositionSnapshot] = Field(
@@ -76,30 +91,34 @@ class MinuteFarmingData(BaseModel):
         default=None, description="Hero position at the end of this minute (X:59)"
     )
 
-    # Ordered camp sequence - shows farming route
+    # Ordered farming events - shows farming route with positions
     camp_sequence: List[CampClear] = Field(
         default_factory=list,
         description="Ordered sequence of neutral camps cleared during this minute"
     )
+    wave_clears: List[WaveClear] = Field(
+        default_factory=list,
+        description="Lane wave clear events during this minute"
+    )
 
     # Summary counts
-    lane_creeps_killed: int = Field(
+    lane_creeps_killed: CoercedInt = Field(
         default=0, description="Lane creeps killed during this minute"
     )
-    camps_cleared: int = Field(
+    camps_cleared: CoercedInt = Field(
         default=0, description="Number of neutral camps cleared during this minute"
     )
 
     # Stats at end of minute
-    gold: int = Field(default=0, description="Net worth at end of minute")
-    last_hits: int = Field(default=0, description="Total last hits at end of minute")
-    level: int = Field(default=1, description="Hero level at end of minute")
+    gold: CoercedInt = Field(default=0, description="Net worth at end of minute")
+    last_hits: CoercedInt = Field(default=0, description="Total last hits at end of minute")
+    level: CoercedInt = Field(default=1, description="Hero level at end of minute")
 
 
 class LevelTiming(BaseModel):
     """Timing for when a hero reached a specific level."""
 
-    level: int = Field(description="Hero level reached")
+    level: CoercedInt = Field(description="Hero level reached")
     time: float = Field(description="Game time in seconds")
     time_str: str = Field(description="Game time formatted as M:SS")
 
@@ -138,10 +157,10 @@ class FarmingTransitions(BaseModel):
 class FarmingSummary(BaseModel):
     """Summary statistics for farming pattern."""
 
-    total_lane_creeps: int = Field(
+    total_lane_creeps: CoercedInt = Field(
         default=0, description="Total lane creeps killed in the time range"
     )
-    total_neutral_creeps: int = Field(
+    total_neutral_creeps: CoercedInt = Field(
         default=0, description="Total neutral creeps killed in the time range"
     )
     jungle_percentage: float = Field(
@@ -155,7 +174,7 @@ class FarmingSummary(BaseModel):
         default_factory=dict,
         description="Total neutral kills by camp type"
     )
-    multi_camp_clears: int = Field(
+    multi_camp_clears: CoercedInt = Field(
         default=0, description="Number of times hero farmed 2+ camps simultaneously"
     )
 
@@ -166,8 +185,8 @@ class FarmingPatternResponse(BaseModel):
     success: bool
     match_id: int
     hero: str = Field(description="Hero name analyzed")
-    start_minute: int = Field(description="Start of analysis range")
-    end_minute: int = Field(description="End of analysis range")
+    start_minute: CoercedInt = Field(description="Start of analysis range")
+    end_minute: CoercedInt = Field(description="End of analysis range")
 
     # Power spike tracking
     level_timings: List[LevelTiming] = Field(
@@ -193,12 +212,16 @@ class FarmingPatternResponse(BaseModel):
         default_factory=FarmingSummary,
         description="Summary statistics"
     )
-    creep_kills: List[CreepKill] = Field(
-        default_factory=list,
-        description="All creep kills in chronological order"
-    )
     multi_camp_clears: List[MultiCampClear] = Field(
         default_factory=list,
         description="Events where hero farmed 2+ camps simultaneously (stacked/adjacent)"
+    )
+    deaths_in_window: CoercedInt = Field(
+        default=0,
+        description="Number of hero deaths during the analysis window"
+    )
+    coaching_analysis: Optional[str] = Field(
+        default=None,
+        description="LLM-generated coaching analysis (requires MCP sampling support)"
     )
     error: Optional[str] = Field(default=None)

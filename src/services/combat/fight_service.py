@@ -8,6 +8,7 @@ Uses combat-intensity based detection to catch fights without deaths.
 import logging
 from typing import List, Optional, Set
 
+from ...models.combat_log import DetailLevel
 from ..analyzers.fight_analyzer import FightAnalyzer
 from ..analyzers.fight_detector import FightDetector
 from ..models.combat_data import Fight, FightResult, HeroDeath
@@ -66,7 +67,7 @@ class FightService:
             FightResult with detected fights
         """
         # Get all combat events (DAMAGE, ABILITY, ITEM)
-        all_events = self._combat.get_combat_log(data, significant_only=False)
+        all_events = self._combat.get_combat_log(data, detail_level=DetailLevel.FULL)
         deaths = self._combat.get_hero_deaths(data)
         return self._detector.detect_fights_from_combat(all_events, deaths)
 
@@ -129,6 +130,24 @@ class FightService:
         result = self.get_all_fights(data)
         return [f for f in result.fights if f.total_deaths >= min_deaths]
 
+    def _get_fight_location(self, fight: Fight) -> Optional[str]:
+        """
+        Get the location where a fight took place based on first death position.
+
+        Args:
+            fight: Fight with deaths
+
+        Returns:
+            Location string (e.g., "radiant_jungle", "dire_t1_mid") or None if no position data
+        """
+        from ...utils.position_tracker import classify_map_position
+
+        for death in fight.deaths:
+            if death.position_x is not None and death.position_y is not None:
+                position = classify_map_position(death.position_x, death.position_y)
+                return position.region
+        return None
+
     def get_fight_summary(self, data: ParsedReplayData) -> dict:
         """
         Get a summary of all fights in the match.
@@ -137,7 +156,7 @@ class FightService:
             data: ParsedReplayData from ReplayService
 
         Returns:
-            Dictionary with fight statistics
+            Dictionary with fight statistics and full fight data
         """
         result = self.get_all_fights(data)
 
@@ -149,10 +168,25 @@ class FightService:
             "fights": [
                 {
                     "fight_id": f.fight_id,
-                    "start_time": f.start_time_str,
-                    "deaths": f.total_deaths,
+                    "start_time": f.start_time,
+                    "start_time_str": f.start_time_str,
+                    "end_time": f.end_time,
+                    "end_time_str": f.end_time_str,
+                    "duration_seconds": round(f.duration, 1),
+                    "total_deaths": f.total_deaths,
                     "participants": f.participants,
                     "is_teamfight": f.is_teamfight,
+                    "location": self._get_fight_location(f),
+                    "deaths": [
+                        {
+                            "game_time": d.game_time,
+                            "game_time_str": d.game_time_str,
+                            "killer": d.killer,
+                            "victim": d.victim,
+                            "ability": d.ability,
+                        }
+                        for d in f.deaths
+                    ],
                 }
                 for f in result.fights
             ],
@@ -201,6 +235,60 @@ class FightService:
             if any(hero_lower in p.lower() for p in f.participants)
         ]
 
+    def _filter_events_by_detail_level(
+        self,
+        events: List,
+        detail_level: DetailLevel,
+        max_events: Optional[int] = None,
+    ) -> List:
+        """
+        Filter already-loaded CombatLogEvent list by detail level.
+
+        Args:
+            events: Pre-filtered CombatLogEvent list (already time-filtered)
+            detail_level: NARRATIVE, TACTICAL, or FULL
+            max_events: Maximum events to return
+
+        Returns:
+            Filtered list of events
+        """
+        if detail_level == DetailLevel.FULL:
+            filtered = events
+        else:
+            filtered = []
+            for e in events:
+                if detail_level == DetailLevel.NARRATIVE:
+                    if e.type == "DEATH" and e.target_is_hero:
+                        filtered.append(e)
+                    elif e.type == "ABILITY" and e.attacker_is_hero:
+                        filtered.append(e)
+                    elif e.type == "ITEM" and e.attacker_is_hero:
+                        filtered.append(e)
+                    elif e.type in ("PURCHASE", "BUYBACK"):
+                        filtered.append(e)
+                    elif e.type == "INTERRUPT_CHANNEL" and e.target_is_hero:
+                        filtered.append(e)
+                elif detail_level == DetailLevel.TACTICAL:
+                    if e.type == "DEATH" and e.target_is_hero:
+                        filtered.append(e)
+                    elif e.type == "ABILITY" and e.attacker_is_hero:
+                        filtered.append(e)
+                    elif e.type == "ITEM" and e.attacker_is_hero:
+                        filtered.append(e)
+                    elif e.type in ("PURCHASE", "BUYBACK"):
+                        filtered.append(e)
+                    elif e.type == "DAMAGE" and e.attacker_is_hero and e.target_is_hero:
+                        filtered.append(e)
+                    elif e.type == "MODIFIER_ADD" and e.target_is_hero:
+                        filtered.append(e)
+                    elif e.type == "INTERRUPT_CHANNEL" and e.target_is_hero:
+                        filtered.append(e)
+
+        if max_events is not None and len(filtered) > max_events:
+            filtered = filtered[:max_events]
+
+        return filtered
+
     def _get_team_heroes(self, data: ParsedReplayData) -> tuple:
         """
         Extract radiant and dire hero sets from entity snapshots.
@@ -241,6 +329,8 @@ class FightService:
         reference_time: float,
         hero: Optional[str] = None,
         use_combat_detection: bool = True,
+        detail_level: DetailLevel = DetailLevel.NARRATIVE,
+        max_events: Optional[int] = None,
     ) -> Optional[dict]:
         """
         Get fight boundaries, combat log, and highlights for a fight at a given time.
@@ -253,12 +343,17 @@ class FightService:
             reference_time: Game time to anchor the fight search
             hero: Optional hero name to anchor fight detection
             use_combat_detection: Use combat-based detection (default True)
+            detail_level: Controls verbosity of returned events (NARRATIVE, TACTICAL, FULL)
+            max_events: Maximum events to return (None = no limit)
 
         Returns:
             Dictionary with fight info, combat events, and highlights, or None if no fight found
         """
-        # Get all combat events for detection
-        all_events = self._combat.get_combat_log(data, significant_only=False)
+        # Get all combat events ONCE for detection, response, and highlights
+        # This avoids iterating over the entire combat log 3 times
+        all_events = self._combat.get_combat_log(
+            data, detail_level=DetailLevel.FULL
+        )
         deaths = self._combat.get_hero_deaths(data)
 
         if use_combat_detection:
@@ -277,20 +372,16 @@ class FightService:
         start_time = fight.start_time - 2.0
         end_time = fight.end_time + 2.0
 
-        # Get significant events for the response
-        significant_events = self._combat.get_combat_log(
-            data,
-            start_time=start_time,
-            end_time=end_time,
-            significant_only=True,
-        )
+        # Filter events from already-loaded all_events instead of re-iterating combat log
+        # This is O(n) on the already-loaded list, not O(n) on raw combat log entries
+        highlight_events = [
+            e for e in all_events
+            if start_time <= e.game_time <= end_time
+        ]
 
-        # Get ALL events for highlight detection (fight already includes initiation)
-        highlight_events = self._combat.get_combat_log(
-            data,
-            start_time=start_time,
-            end_time=end_time,
-            significant_only=False,
+        # Apply detail level filter for response events
+        response_events = self._filter_events_by_detail_level(
+            highlight_events, detail_level, max_events
         )
 
         # Get team rosters for ace detection
@@ -315,7 +406,8 @@ class FightService:
             "deaths": fight.deaths,
             "total_deaths": fight.total_deaths,
             "is_teamfight": fight.is_teamfight,
-            "total_events": len(significant_events),
-            "events": significant_events,
+            "total_events": len(response_events),
+            "events": response_events,
             "highlights": highlights,
+            "detail_level": detail_level.value,
         }

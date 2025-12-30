@@ -1,6 +1,6 @@
 """Match-related MCP tools: match info, timeline, stats, draft, players."""
 
-from typing import Dict, Optional
+from typing import Dict, Literal, Optional
 
 from fastmcp import Context
 
@@ -54,6 +54,25 @@ def register_match_tools(mcp, services):
             pass
         return pro_names
 
+    def _get_expected_lane_from_position(
+        position: Optional[int],
+    ) -> Optional[Literal["safelane", "mid", "offlane"]]:
+        """Derive expected lane from position (1-5) for draft analysis.
+
+        Position 1 (Carry) + Position 5 (Hard Support) → safelane
+        Position 2 (Mid) → mid
+        Position 3 (Offlane) + Position 4 (Soft Support) → offlane
+        """
+        if position is None:
+            return None
+        if position in (1, 5):
+            return "safelane"
+        if position == 2:
+            return "mid"
+        if position in (3, 4):
+            return "offlane"
+        return None
+
     @mcp.tool
     async def get_match_timeline(
         match_id: int, ctx: Optional[Context] = None
@@ -106,11 +125,13 @@ def register_match_tools(mcp, services):
         team_graphs_data = timeline.get("team_graphs")
         team_graphs = None
         if team_graphs_data:
+            radiant_data = team_graphs_data.get("radiant", {})
+            dire_data = team_graphs_data.get("dire", {})
             team_graphs = TeamGraphs(
-                radiant_xp=team_graphs_data.get("radiant_xp", []),
-                dire_xp=team_graphs_data.get("dire_xp", []),
-                radiant_gold=team_graphs_data.get("radiant_gold", []),
-                dire_gold=team_graphs_data.get("dire_gold", []),
+                radiant_xp=radiant_data.get("graph_experience", []),
+                dire_xp=dire_data.get("graph_experience", []),
+                radiant_gold=radiant_data.get("graph_gold_earned", []),
+                dire_gold=dire_data.get("graph_gold_earned", []),
             )
 
         return MatchTimelineResponse(
@@ -164,11 +185,30 @@ def register_match_tools(mcp, services):
             success=True, match_id=match_id, minute=minute, players=players
         )
 
+    async def _get_hero_positions_from_opendota(match_id: int) -> Dict[int, int]:
+        """Fetch hero positions (1-5) from OpenDota API."""
+        hero_positions: Dict[int, int] = {}
+        try:
+            match_data = await match_fetcher.get_match(match_id)
+            if match_data and "players" in match_data:
+                from ..utils.match_fetcher import assign_positions
+                players = match_data["players"]
+                assign_positions(players)
+                for player in players:
+                    hero_id = player.get("hero_id")
+                    position = player.get("position")
+                    if hero_id and position:
+                        hero_positions[hero_id] = position
+        except Exception:
+            pass
+        return hero_positions
+
     @mcp.tool
     async def get_match_draft(
         match_id: int, ctx: Optional[Context] = None
     ) -> MatchDraftResponse:
-        """Get the complete draft (picks and bans) for a Dota 2 match."""
+        """Get the complete draft (picks and bans) for a Dota 2 match with drafting context."""
+        from ..models.match_info import DraftTiming
         from ..utils.match_info_parser import match_info_parser
 
         async def progress_callback(current: int, total: int, message: str) -> None:
@@ -180,11 +220,32 @@ def register_match_tools(mcp, services):
         except ValueError as e:
             return MatchDraftResponse(success=False, match_id=match_id, error=str(e))
 
-        draft = match_info_parser.get_draft(data)
+        hero_positions = await _get_hero_positions_from_opendota(match_id)
+        try:
+            draft = match_info_parser.get_draft(data, hero_positions=hero_positions)
+        except Exception as e:
+            return MatchDraftResponse(
+                success=False, match_id=match_id, error=f"Exception parsing draft: {e}"
+            )
         if not draft:
             return MatchDraftResponse(
-                success=False, match_id=match_id, error="Could not parse draft"
+                success=False, match_id=match_id, error="get_draft returned None (no game_info?)"
             )
+
+        enhanced_info = await match_fetcher.get_enhanced_match_info(match_id)
+        if enhanced_info and enhanced_info.get("draft_timings"):
+            draft.draft_timings = [
+                DraftTiming(
+                    order=dt.get("order", 0),
+                    is_pick=dt.get("pick", False),
+                    active_team=dt.get("active_team", "radiant"),
+                    hero_id=dt.get("hero_id", 0),
+                    player_slot=dt.get("player_slot"),
+                    extra_time=dt.get("extra_time"),
+                    total_time_taken=dt.get("total_time_taken"),
+                )
+                for dt in enhanced_info["draft_timings"]
+            ]
 
         return MatchDraftResponse(success=True, match_id=match_id, draft=draft)
 
@@ -193,6 +254,7 @@ def register_match_tools(mcp, services):
         match_id: int, ctx: Optional[Context] = None
     ) -> MatchInfoResponse:
         """Get match metadata and player information for a Dota 2 match."""
+        from ..models.match_info import LeagueInfo
         from ..utils.match_info_parser import match_info_parser
 
         async def progress_callback(current: int, total: int, message: str) -> None:
@@ -204,10 +266,15 @@ def register_match_tools(mcp, services):
         except ValueError as e:
             return MatchInfoResponse(success=False, match_id=match_id, error=str(e))
 
-        match_info = match_info_parser.get_match_info(data)
+        try:
+            match_info = match_info_parser.get_match_info(data)
+        except Exception as e:
+            return MatchInfoResponse(
+                success=False, match_id=match_id, error=f"Exception parsing match info: {e}"
+            )
         if not match_info:
             return MatchInfoResponse(
-                success=False, match_id=match_id, error="Could not parse match info"
+                success=False, match_id=match_id, error="get_match_info returned None (no game_info?)"
             )
 
         pro_names = await _get_pro_names_from_opendota(match_id)
@@ -221,6 +288,29 @@ def register_match_tools(mcp, services):
             for player in match_info.dire_players:
                 if player.steam_id and player.steam_id in pro_names:
                     player.player_name = pro_names[player.steam_id]
+
+        enhanced_info = await match_fetcher.get_enhanced_match_info(match_id)
+        if enhanced_info:
+            if enhanced_info.get("radiant_team"):
+                rt = enhanced_info["radiant_team"]
+                match_info.radiant_team.logo_url = rt.get("logo_url")
+                if rt.get("name") and not match_info.radiant_team.team_name:
+                    match_info.radiant_team.team_name = rt.get("name")
+            if enhanced_info.get("dire_team"):
+                dt = enhanced_info["dire_team"]
+                match_info.dire_team.logo_url = dt.get("logo_url")
+                if dt.get("name") and not match_info.dire_team.team_name:
+                    match_info.dire_team.team_name = dt.get("name")
+            if enhanced_info.get("league"):
+                lg = enhanced_info["league"]
+                match_info.league = LeagueInfo(
+                    league_id=lg.get("leagueid", 0),
+                    name=lg.get("name"),
+                    tier=lg.get("tier"),
+                )
+            match_info.comeback = enhanced_info.get("comeback")
+            match_info.stomp = enhanced_info.get("stomp")
+            match_info.pre_game_duration = enhanced_info.get("pre_game_duration")
 
         return MatchInfoResponse(success=True, match_id=match_id, info=match_info)
 
@@ -237,6 +327,8 @@ def register_match_tools(mcp, services):
                     team="radiant",
                     player_name=h.get("player_name"),
                     pro_name=h.get("pro_name"),
+                    position=h.get("position"),
+                    rank_tier=h.get("rank_tier"),
                     kills=h.get("kills", 0),
                     deaths=h.get("deaths", 0),
                     assists=h.get("assists", 0),
@@ -248,12 +340,20 @@ def register_match_tools(mcp, services):
                     hero_damage=h.get("hero_damage", 0),
                     tower_damage=h.get("tower_damage", 0),
                     hero_healing=h.get("hero_healing", 0),
+                    teamfight_participation=h.get("teamfight_participation"),
+                    stuns=h.get("stuns"),
+                    camps_stacked=h.get("camps_stacked"),
+                    obs_placed=h.get("obs_placed"),
+                    sen_placed=h.get("sen_placed"),
                     lane=h.get("lane_name"),
+                    expected_lane=_get_expected_lane_from_position(h.get("position")),
+                    lane_efficiency=h.get("lane_efficiency"),
                     role=h.get("role"),
                     items=constants_fetcher.convert_item_ids_to_names(
                         [h.get(f"item_{i}") for i in range(6)]
                     ),
                     item_neutral=constants_fetcher.get_item_name(h.get("item_neutral")),
+                    item_neutral2=constants_fetcher.get_item_name(h.get("item_neutral2")),
                 )
                 for h in heroes
                 if h.get("team") == "radiant"
@@ -266,6 +366,8 @@ def register_match_tools(mcp, services):
                     team="dire",
                     player_name=h.get("player_name"),
                     pro_name=h.get("pro_name"),
+                    position=h.get("position"),
+                    rank_tier=h.get("rank_tier"),
                     kills=h.get("kills", 0),
                     deaths=h.get("deaths", 0),
                     assists=h.get("assists", 0),
@@ -277,12 +379,20 @@ def register_match_tools(mcp, services):
                     hero_damage=h.get("hero_damage", 0),
                     tower_damage=h.get("tower_damage", 0),
                     hero_healing=h.get("hero_healing", 0),
+                    teamfight_participation=h.get("teamfight_participation"),
+                    stuns=h.get("stuns"),
+                    camps_stacked=h.get("camps_stacked"),
+                    obs_placed=h.get("obs_placed"),
+                    sen_placed=h.get("sen_placed"),
                     lane=h.get("lane_name"),
+                    expected_lane=_get_expected_lane_from_position(h.get("position")),
+                    lane_efficiency=h.get("lane_efficiency"),
                     role=h.get("role"),
                     items=constants_fetcher.convert_item_ids_to_names(
                         [h.get(f"item_{i}") for i in range(6)]
                     ),
                     item_neutral=constants_fetcher.get_item_name(h.get("item_neutral")),
+                    item_neutral2=constants_fetcher.get_item_name(h.get("item_neutral2")),
                 )
                 for h in heroes
                 if h.get("team") == "dire"
@@ -309,9 +419,11 @@ def register_match_tools(mcp, services):
                     player_name=h.get("player_name", ""),
                     pro_name=h.get("pro_name"),
                     account_id=h.get("account_id"),
+                    rank_tier=h.get("rank_tier"),
                     hero_id=h.get("hero_id", 0),
                     hero_name=h.get("hero_name", ""),
                     localized_name=h.get("localized_name", ""),
+                    position=h.get("position"),
                 )
                 for h in heroes
                 if h.get("team") == "radiant"
@@ -321,9 +433,11 @@ def register_match_tools(mcp, services):
                     player_name=h.get("player_name", ""),
                     pro_name=h.get("pro_name"),
                     account_id=h.get("account_id"),
+                    rank_tier=h.get("rank_tier"),
                     hero_id=h.get("hero_id", 0),
                     hero_name=h.get("hero_name", ""),
                     localized_name=h.get("localized_name", ""),
+                    position=h.get("position"),
                 )
                 for h in heroes
                 if h.get("team") == "dire"

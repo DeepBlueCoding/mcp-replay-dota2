@@ -1,19 +1,19 @@
 # Docker Deployment
 
-The Dota 2 Match MCP Server can be run in Docker for faster startup times and consistent deployment.
+The Dota 2 Match MCP Server is available on DockerHub for easy deployment.
 
 ## Quick Start
 
-### Build the Image
+### Pull from DockerHub
 
 ```bash
-docker build -t dota2-mcp-server .
+docker pull dbcjuanma/mcp_replay_dota2
 ```
 
-### Run with SSE Transport (Recommended for Docker)
+### Run with SSE Transport (Recommended)
 
 ```bash
-docker run -p 8081:8081 dota2-mcp-server --transport sse
+docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
 ```
 
 The server will be available at `http://localhost:8081/sse`.
@@ -21,7 +21,21 @@ The server will be available at `http://localhost:8081/sse`.
 ### Run with Docker Compose
 
 ```bash
-docker compose up
+# SSE transport (default)
+docker compose up mcp-server
+
+# STDIO transport
+docker compose --profile stdio run --rm mcp-server-stdio
+```
+
+## Building Locally (Contributors Only)
+
+If you want to build from source:
+
+```bash
+git clone https://github.com/DeepBlueCoding/mcp-replay-dota2.git
+cd mcp-replay-dota2
+docker build -t dbcjuanma/mcp_replay_dota2 .
 ```
 
 ## Transport Modes
@@ -31,7 +45,7 @@ docker compose up
 SSE transport runs an HTTP server, which is ideal for Docker deployments:
 
 ```bash
-docker run -p 8081:8081 dota2-mcp-server --transport sse --port 8081
+docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse --port 8081
 ```
 
 Configure your MCP client to connect to `http://localhost:8081/sse`.
@@ -41,7 +55,7 @@ Configure your MCP client to connect to `http://localhost:8081/sse`.
 STDIO transport is the default for local development but requires interactive mode in Docker:
 
 ```bash
-docker run -i dota2-mcp-server
+docker run -i dbcjuanma/mcp_replay_dota2
 ```
 
 ## Persistent Cache
@@ -51,7 +65,7 @@ Replay files are large (50-400MB) and take time to download and parse. Mount a v
 ```bash
 docker run -p 8081:8081 \
   -v dota2-replay-cache:/app/.cache/mcp_dota2 \
-  dota2-mcp-server --transport sse
+  dbcjuanma/mcp_replay_dota2 --transport sse
 ```
 
 ## Environment Variables
@@ -62,13 +76,26 @@ docker run -p 8081:8081 \
 
 ## Claude Desktop Configuration
 
-For Claude Desktop with Docker SSE transport:
+### SSE Transport (Recommended)
 
 ```json
 {
   "mcpServers": {
     "dota2": {
       "url": "http://localhost:8081/sse"
+    }
+  }
+}
+```
+
+### STDIO Transport
+
+```json
+{
+  "mcpServers": {
+    "dota2": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "dota2-replay-cache:/app/.cache/mcp_dota2", "dbcjuanma/mcp_replay_dota2"]
     }
   }
 }
@@ -83,13 +110,13 @@ The Docker image uses several optimizations for fast startup:
 3. **Layer caching** - Dependencies are installed in a separate layer for faster rebuilds
 4. **No runtime dependency resolution** - Uses locked dependencies from `uv.lock`
 
-## Building for Production
+## Production Deployment
 
 For production deployments, consider:
 
-1. **Use a specific tag** instead of `latest`:
+1. **Use a specific version tag** instead of `latest`:
    ```bash
-   docker build -t dota2-mcp-server:1.0.0 .
+   docker pull dbcjuanma/mcp_replay_dota2:1.1.0
    ```
 
 2. **Set resource limits**:
@@ -97,7 +124,7 @@ For production deployments, consider:
    docker run -p 8081:8081 \
      --memory=2g \
      --cpus=2 \
-     dota2-mcp-server --transport sse
+     dbcjuanma/mcp_replay_dota2 --transport sse
    ```
 
 3. **Health checks** are included in `docker-compose.yml`

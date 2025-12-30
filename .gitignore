@@ -87,9 +87,8 @@ dota2/
 # Cached constants - committed to repo for CI
 # data/constants/*.json
 
-# Temp/test files
-test_*.py
-!tests/test_*.py
+# Temp/test files (standalone scripts, not in tests/ directory)
+/test_*.py
 scratch/
 tmp/
 
@@ -122,3 +121,10 @@ data/temp/
 data/pro_scene/pro_players.json
 data/pro_scene/teams.json
 data/pro_scene/leagues.json
+
+# YouTube transcriptions (local coaching content)
+data/transcripts/
+
+# Transcription scripts (not part of core MCP server)
+scripts/transcribe_*.py
+scripts/requirements-transcribe.txt

@@ -2,12 +2,61 @@
 
 from fastmcp import Context
 
-from ..models.combat_log import DownloadReplayResponse
+from ..models.combat_log import DeleteReplayResponse, DownloadReplayResponse
 
 
 def register_replay_tools(mcp, services):
     """Register replay-related tools with the MCP server."""
     replay_service = services["replay_service"]
+
+    @mcp.tool
+    async def delete_replay(match_id: int) -> DeleteReplayResponse:
+        """
+        Delete cached replay file and parsed data for a match.
+
+        Use this tool when:
+        - A replay appears to be corrupted and needs to be re-downloaded
+        - You want to force a fresh download of a replay
+        - Cached parsed data seems incorrect or outdated
+
+        After deletion, the next analysis request for this match will
+        trigger a fresh download and parse.
+
+        Args:
+            match_id: The Dota 2 match ID to delete cached data for
+
+        Returns:
+            DeleteReplayResponse with deletion status
+        """
+        file_deleted = False
+        cache_deleted = False
+
+        # Delete replay file
+        replay_path = replay_service._replay_dir / f"{match_id}.dem"
+        if replay_path.exists():
+            replay_path.unlink()
+            file_deleted = True
+
+        # Delete parsed cache
+        cache_deleted = replay_service._cache.delete(match_id)
+
+        if file_deleted or cache_deleted:
+            parts = []
+            if file_deleted:
+                parts.append("replay file")
+            if cache_deleted:
+                parts.append("parsed cache")
+            message = f"Deleted {' and '.join(parts)} for match {match_id}"
+        else:
+            message = f"No cached data found for match {match_id}"
+
+        return DeleteReplayResponse(
+            success=True,
+            match_id=match_id,
+            file_deleted=file_deleted,
+            cache_deleted=cache_deleted,
+            message=message,
+        )
 
     @mcp.tool
     async def download_replay(match_id: int, ctx: Context) -> DownloadReplayResponse:

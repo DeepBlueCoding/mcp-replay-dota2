@@ -1,17 +1,26 @@
 """Combat-related MCP tools: deaths, combat log, objectives, items, couriers, runes."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastmcp import Context
 
+from ..coaching import (
+    get_death_analysis_prompt,
+    get_hero_performance_prompt,
+    try_coaching_analysis,
+)
 from ..models.combat_log import (
     CombatLogResponse,
     CourierKillsResponse,
+    DetailLevel,
+    HeroCombatAnalysisResponse,
     HeroDeathsResponse,
     ItemPurchasesResponse,
     ObjectiveKillsResponse,
     RunePickupsResponse,
 )
+from ..models.filters import DeathFilters, HeroPerformanceFilters
+from ..models.game_context import GameContext
 
 
 def register_combat_tools(mcp, services):
@@ -20,23 +29,30 @@ def register_combat_tools(mcp, services):
     combat_service = services["combat_service"]
 
     @mcp.tool
-    async def get_hero_deaths(match_id: int, ctx: Optional[Context] = None) -> HeroDeathsResponse:
+    async def get_hero_deaths(
+        match_id: int,
+        killer: Optional[str] = None,
+        victim: Optional[str] = None,
+        location: Optional[str] = None,
+        ability: Optional[str] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        ctx: Optional[Context] = None,
+    ) -> HeroDeathsResponse:
         """
-        Get all hero deaths in a Dota 2 match.
+        Get chronological list of ALL hero deaths in a match.
 
-        Returns a list of hero death events with:
-        - game_time: Seconds since game start
-        - game_time_str: Formatted as M:SS
-        - killer: Hero or unit that got the kill
-        - victim: Hero that died
-        - killer_is_hero: Whether the killer was a hero
-        - ability: Ability or item that dealt the killing blow (if available)
+        Returns all deaths with killer, victim, time, location, and ability used.
+        Use for global death timeline, first blood, or death pattern analysis.
 
         Args:
             match_id: The Dota 2 match ID
-
-        Returns:
-            HeroDeathsResponse with list of hero death events
+            killer: Filter by killer hero (partial match, e.g. 'jugg')
+            victim: Filter by victim hero (partial match)
+            location: Filter by map location (partial match, e.g. 't1', 'roshan')
+            ability: Filter by killing ability (partial match)
+            start_time: Filter deaths after this game time (seconds)
+            end_time: Filter deaths before this game time (seconds)
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
@@ -44,61 +60,85 @@ def register_combat_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            return combat_service.get_hero_deaths_response(data, match_id)
+            game_context = GameContext.from_parsed_data(data)
+            response = combat_service.get_hero_deaths_response(
+                data, match_id, game_context=game_context
+            )
+
+            # Apply filters
+            filters = DeathFilters.from_params(
+                killer=killer,
+                victim=victim,
+                location=location,
+                ability=ability,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            response.deaths = filters.apply(response.deaths)
+            response.total_deaths = len(response.deaths)
+
+            if response.success and len(response.deaths) >= 3:
+                hero_positions = {}
+                for death in response.deaths:
+                    victim_name = death.victim.lower()
+                    if victim_name not in hero_positions:
+                        hero_positions[victim_name] = "?"
+
+                deaths_data = [
+                    {
+                        "victim": d.victim,
+                        "killer": d.killer,
+                        "game_time": d.game_time,
+                        "ability": d.ability,
+                    }
+                    for d in response.deaths
+                ]
+                prompt = get_death_analysis_prompt(deaths_data, hero_positions)
+                coaching = await try_coaching_analysis(ctx, prompt, max_tokens=700)
+                response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return HeroDeathsResponse(success=False, match_id=match_id, error=str(e))
 
     @mcp.tool
-    async def get_combat_log(
+    async def get_raw_combat_events(
         match_id: int,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
         hero_filter: Optional[str] = None,
-        significant_only: bool = False,
+        ability_filter: Optional[str] = None,
+        detail_level: Literal["narrative", "tactical", "full"] = "narrative",
+        max_events: int = 200,
         ctx: Optional[Context] = None,
     ) -> CombatLogResponse:
         """
-        Get combat log events from a Dota 2 match with optional filters.
+        Get raw combat events for a specific time window.
 
-        Returns combat events including damage, abilities, modifiers (buffs/debuffs), and deaths.
-
-        Each event contains:
-        - type: DAMAGE, MODIFIER_ADD, ABILITY, DEATH, ITEM, PURCHASE, BUYBACK, etc.
-        - game_time: Seconds since game start
-        - game_time_str: Formatted as M:SS
-        - attacker: Source of the event (hero name without prefix)
-        - attacker_is_hero: Whether attacker is a hero
-        - target: Target of the event
-        - target_is_hero: Whether target is a hero
-        - ability: Ability or item involved (if any)
-        - value: Damage amount or other numeric value
+        Use for analyzing non-fight moments (e.g., Roshan attempts, specific plays).
+        detail_level: "narrative" (deaths/abilities), "tactical" (+damage), "full" (all).
 
         Args:
             match_id: The Dota 2 match ID
-            start_time: Filter events after this game time in seconds. **NOTE**: Pre-game purchases
-                       (wards, tangos, etc.) happen at NEGATIVE times (~-80s during strategy phase).
-                       Use start_time=-90 to include pre-game, or omit entirely to get all events.
-                       start_time=0 excludes pre-game purchases. (optional)
-            end_time: Filter events before this game time in seconds (optional)
-            hero_filter: Only include events involving this hero, e.g. "earthshaker" (optional)
-            significant_only: **IMPORTANT**: Controls event filtering. True = only story-telling events
-                             (abilities, deaths, items, purchases, buybacks). False = ALL events including
-                             every damage tick and modifier application.
-                             **WARNING**: False with time ranges >5 minutes produces 50,000+ events and
-                             WILL FAIL with "result too large". Always use True for ranges >300 seconds.
-                             Default: False (use True for any broad analysis)
-
-        Returns:
-            CombatLogResponse with list of combat log events
+            start_time: Start of time window in seconds
+            end_time: End of time window in seconds
+            hero_filter: Filter to specific hero
+            ability_filter: Filter to specific ability
+            detail_level: "narrative", "tactical", or "full"
+            max_events: Maximum events to return
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
                 await ctx.report_progress(current, total)
 
         try:
+            level = DetailLevel(detail_level)
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
             return combat_service.get_combat_log_response(
-                data, match_id, start_time, end_time, hero_filter, significant_only
+                data, match_id, start_time, end_time, hero_filter,
+                ability_filter=ability_filter,
+                detail_level=level,
+                max_events=max_events,
             )
         except ValueError as e:
             return CombatLogResponse(success=False, match_id=match_id, error=str(e))
@@ -167,7 +207,10 @@ def register_combat_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            return combat_service.get_courier_kills_response(data, match_id)
+            game_context = GameContext.from_parsed_data(data)
+            return combat_service.get_courier_kills_response(
+                data, match_id, game_context=game_context
+            )
         except ValueError as e:
             return CourierKillsResponse(success=False, match_id=match_id, error=str(e))
 
@@ -241,3 +284,113 @@ def register_combat_tools(mcp, services):
             return combat_service.get_rune_pickups_response(data, match_id)
         except ValueError as e:
             return RunePickupsResponse(success=False, match_id=match_id, error=str(e))
+
+    fight_service = services["fight_service"]
+
+    @mcp.tool
+    async def get_hero_performance(
+        match_id: int,
+        hero: str,
+        ability_filter: Optional[str] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        ctx: Optional[Context] = None,
+    ) -> HeroCombatAnalysisResponse:
+        """
+        Get comprehensive performance data for a hero.
+
+        Returns kills, deaths, assists, ability stats (casts, hit rate), and
+        per-fight breakdowns. Use ability_filter for specific ability analysis.
+
+        Time filtering: Use start_time/end_time to analyze specific game phases.
+        Common time ranges:
+        - Early game: start_time=0, end_time=900 (0-15 min)
+        - Mid game: start_time=900, end_time=1800 (15-30 min)
+        - Late game: start_time=1800 (30+ min)
+
+        Args:
+            match_id: The Dota 2 match ID
+            hero: Hero name (e.g., "jakiro", "mars", "batrider")
+            ability_filter: Filter to specific ability (e.g., "ice_path", "flaming_lasso")
+            start_time: Filter fights starting after this game time (seconds)
+            end_time: Filter fights starting before this game time (seconds)
+        """
+        from ..utils.match_fetcher import match_fetcher
+
+        async def progress_callback(current: int, total: int, message: str) -> None:
+            if ctx:
+                await ctx.report_progress(current, total)
+
+        try:
+            data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
+            fight_result = fight_service.get_all_fights(data)
+            response = combat_service.get_hero_combat_analysis(
+                data, match_id, hero, fight_result.fights,
+                ability_filter=ability_filter,
+            )
+
+            # Apply time filters if specified
+            filters = HeroPerformanceFilters.from_params(
+                ability=ability_filter,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            if not filters.is_empty() and response.success:
+                filtered_fights = filters.apply_to_fights(response.fights)
+                response.fights = filtered_fights
+                totals = filters.recalculate_totals(filtered_fights)
+                response.total_kills = totals["total_kills"]
+                response.total_deaths = totals["total_deaths"]
+                response.total_assists = totals["total_assists"]
+                response.total_teamfights = totals["total_teamfights"]
+                response.total_fights = totals["total_fights"]
+                response.ability_summary = filters.recalculate_ability_summary(filtered_fights)
+
+            if response.success:
+                position = None
+                try:
+                    match_data = await match_fetcher.get_match(match_id)
+                    if match_data and "players" in match_data:
+                        from ..utils.constants_fetcher import constants_fetcher
+                        from ..utils.match_fetcher import assign_positions
+                        players = match_data["players"]
+                        assign_positions(players)
+                        hero_lower = hero.lower()
+                        for p in players:
+                            hero_id = p.get("hero_id")
+                            if hero_id:
+                                hero_name = constants_fetcher.get_hero_name(hero_id)
+                                if hero_name and hero_lower in hero_name.lower():
+                                    position = p.get("position")
+                                    break
+                except Exception:
+                    pass
+
+                response.position = position
+
+                ability_stats = "N/A"
+                if response.ability_summary:
+                    ability_stats = ", ".join([
+                        f"{a.ability}: {a.total_casts} casts ({a.hit_rate:.0f}% hit)"
+                        for a in response.ability_summary[:5]
+                    ])
+
+                raw_data = {
+                    "kills": response.total_kills,
+                    "deaths": response.total_deaths,
+                    "assists": response.total_assists,
+                    "fights_participated": response.total_fights,
+                    "total_fights": response.total_fights + response.total_teamfights,
+                    "ability_stats": ability_stats,
+                }
+
+                if position:
+                    prompt = get_hero_performance_prompt(hero, position, raw_data)
+                    coaching = await try_coaching_analysis(ctx, prompt, max_tokens=700)
+                    response.coaching_analysis = coaching
+
+            return response
+        except ValueError as e:
+            return HeroCombatAnalysisResponse(
+                success=False, match_id=match_id, hero=hero, error=str(e)
+            )

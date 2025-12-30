@@ -9,6 +9,7 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from src.models.match_info import DraftResult, MatchInfoResult
+from src.models.types import CoercedInt, CoercedIntList
 
 # =============================================================================
 # Match Timeline Tools
@@ -19,10 +20,10 @@ class KDASnapshot(BaseModel):
     """KDA snapshot at a specific game time."""
 
     game_time: float = Field(description="Game time in seconds")
-    kills: int = Field(description="Kills at this time")
-    deaths: int = Field(description="Deaths at this time")
-    assists: int = Field(description="Assists at this time")
-    level: int = Field(description="Hero level at this time")
+    kills: CoercedInt = Field(description="Kills at this time")
+    deaths: CoercedInt = Field(description="Deaths at this time")
+    assists: CoercedInt = Field(description="Assists at this time")
+    level: CoercedInt = Field(description="Hero level at this time")
 
 
 class PlayerTimeline(BaseModel):
@@ -30,18 +31,18 @@ class PlayerTimeline(BaseModel):
 
     hero: str = Field(description="Hero name")
     team: Literal["radiant", "dire"] = Field(description="Player's team")
-    net_worth: List[int] = Field(description="Net worth values (sampled every 30 seconds)")
-    hero_damage: List[int] = Field(description="Cumulative hero damage values")
+    net_worth: CoercedIntList = Field(description="Net worth values (sampled every 30 seconds)")
+    hero_damage: CoercedIntList = Field(description="Cumulative hero damage values")
     kda_timeline: List[KDASnapshot] = Field(description="KDA snapshots over time")
 
 
 class TeamGraphs(BaseModel):
     """Team-level timeline graphs."""
 
-    radiant_xp: List[int] = Field(description="Radiant team XP over time")
-    dire_xp: List[int] = Field(description="Dire team XP over time")
-    radiant_gold: List[int] = Field(description="Radiant team gold over time")
-    dire_gold: List[int] = Field(description="Dire team gold over time")
+    radiant_xp: CoercedIntList = Field(description="Radiant team XP over time")
+    dire_xp: CoercedIntList = Field(description="Dire team XP over time")
+    radiant_gold: CoercedIntList = Field(description="Radiant team gold over time")
+    dire_gold: CoercedIntList = Field(description="Dire team gold over time")
 
 
 class MatchTimelineResponse(BaseModel):
@@ -59,12 +60,12 @@ class PlayerStatsAtMinute(BaseModel):
 
     hero: str = Field(description="Hero name")
     team: Literal["radiant", "dire"] = Field(description="Player's team")
-    net_worth: int = Field(description="Net worth at this minute")
-    hero_damage: int = Field(description="Cumulative hero damage")
-    kills: int = Field(description="Kills")
-    deaths: int = Field(description="Deaths")
-    assists: int = Field(description="Assists")
-    level: int = Field(description="Hero level")
+    net_worth: CoercedInt = Field(description="Net worth at this minute")
+    hero_damage: CoercedInt = Field(description="Cumulative hero damage")
+    kills: CoercedInt = Field(description="Kills")
+    deaths: CoercedInt = Field(description="Deaths")
+    assists: CoercedInt = Field(description="Assists")
+    level: CoercedInt = Field(description="Hero level")
 
 
 class StatsAtMinuteResponse(BaseModel):
@@ -103,27 +104,40 @@ class MatchInfoResponse(BaseModel):
 class HeroStats(BaseModel):
     """Detailed hero statistics from a match."""
 
-    hero_id: int = Field(description="Hero ID")
+    hero_id: CoercedInt = Field(description="Hero ID")
     hero_name: str = Field(description="Hero internal name")
     localized_name: str = Field(description="Hero display name")
     team: Literal["radiant", "dire"] = Field(description="Team")
     player_name: Optional[str] = Field(default=None, description="Player name")
     pro_name: Optional[str] = Field(default=None, description="Pro player name if known")
-    kills: int = Field(description="Kills")
-    deaths: int = Field(description="Deaths")
-    assists: int = Field(description="Assists")
-    last_hits: int = Field(description="Last hits")
-    denies: int = Field(description="Denies")
-    gpm: int = Field(description="Gold per minute")
-    xpm: int = Field(description="XP per minute")
-    net_worth: int = Field(description="Final net worth")
-    hero_damage: int = Field(description="Total hero damage")
-    tower_damage: int = Field(description="Total tower damage")
-    hero_healing: int = Field(description="Total hero healing")
-    lane: Optional[str] = Field(default=None, description="Lane assignment")
+    position: Optional[CoercedInt] = Field(default=None, description="Position 1-5")
+    rank_tier: Optional[CoercedInt] = Field(default=None, description="Player rank tier")
+    kills: CoercedInt = Field(description="Kills")
+    deaths: CoercedInt = Field(description="Deaths")
+    assists: CoercedInt = Field(description="Assists")
+    last_hits: CoercedInt = Field(description="Last hits")
+    denies: CoercedInt = Field(description="Denies")
+    gpm: CoercedInt = Field(description="Gold per minute")
+    xpm: CoercedInt = Field(description="XP per minute")
+    net_worth: CoercedInt = Field(description="Final net worth")
+    hero_damage: CoercedInt = Field(description="Total hero damage")
+    tower_damage: CoercedInt = Field(description="Total tower damage")
+    hero_healing: CoercedInt = Field(description="Total hero healing")
+    teamfight_participation: Optional[float] = Field(default=None, description="Teamfight participation %")
+    stuns: Optional[float] = Field(default=None, description="Total stun duration dealt in seconds")
+    camps_stacked: Optional[CoercedInt] = Field(default=None, description="Neutral camps stacked")
+    obs_placed: Optional[CoercedInt] = Field(default=None, description="Observer wards placed")
+    sen_placed: Optional[CoercedInt] = Field(default=None, description="Sentry wards placed")
+    lane: Optional[str] = Field(default=None, description="Actual lane played (from OpenDota)")
+    expected_lane: Optional[Literal["safelane", "mid", "offlane"]] = Field(
+        default=None,
+        description="Expected lane based on position (pos1/5=safelane, pos2=mid, pos3/4=offlane)"
+    )
+    lane_efficiency: Optional[float] = Field(default=None, description="Lane efficiency (0.0-1.0)")
     role: Optional[str] = Field(default=None, description="Role (core/support)")
     items: List[str] = Field(default_factory=list, description="Final items")
     item_neutral: Optional[str] = Field(default=None, description="Neutral item")
+    item_neutral2: Optional[str] = Field(default=None, description="Second neutral item (7.40+)")
 
 
 class MatchHeroesResponse(BaseModel):
@@ -142,9 +156,11 @@ class MatchPlayerInfo(BaseModel):
     player_name: str = Field(description="Steam display name")
     pro_name: Optional[str] = Field(default=None, description="Pro player name if known")
     account_id: Optional[int] = Field(default=None, description="Steam account ID")
+    rank_tier: Optional[int] = Field(default=None, description="Player rank tier (e.g., 85=Divine 5, 80+=Immortal)")
     hero_id: int = Field(description="Hero ID")
     hero_name: str = Field(description="Hero internal name")
     localized_name: str = Field(description="Hero display name")
+    position: Optional[int] = Field(default=None, description="Position 1-5")
 
 
 class MatchPlayersResponse(BaseModel):
@@ -168,7 +184,10 @@ class FightDeath(BaseModel):
     game_time: float = Field(description="Game time in seconds")
     game_time_str: str = Field(description="Game time as M:SS")
     killer: str = Field(description="Hero that got the kill")
+    killer_level: Optional[int] = Field(default=None, description="Killer's hero level")
     victim: str = Field(description="Hero that died")
+    victim_level: Optional[int] = Field(default=None, description="Victim's hero level")
+    level_advantage: Optional[int] = Field(default=None, description="Killer's level advantage")
     ability: Optional[str] = Field(default=None, description="Killing ability")
 
 
@@ -183,6 +202,7 @@ class FightSummary(BaseModel):
     duration_seconds: float = Field(description="Fight duration")
     total_deaths: int = Field(description="Number of deaths in fight")
     is_teamfight: bool = Field(description="True if 3+ deaths")
+    location: Optional[str] = Field(default=None, description="Map region where the fight took place")
     participants: List[str] = Field(default_factory=list, description="Heroes involved")
     deaths: List[FightDeath] = Field(default_factory=list, description="Deaths in the fight")
 
@@ -208,6 +228,10 @@ class TeamfightsResponse(BaseModel):
     min_deaths_threshold: int = Field(default=3, description="Minimum deaths to classify as teamfight")
     total_teamfights: int = Field(default=0)
     teamfights: List[FightSummary] = Field(default_factory=list)
+    coaching_analysis: Optional[str] = Field(
+        default=None,
+        description="AI coaching analysis of teamfights (requires sampling-capable client)"
+    )
     error: Optional[str] = None
 
 
@@ -218,7 +242,10 @@ class FightDeathDetail(BaseModel):
     game_time_str: str = Field(description="Game time as M:SS")
     killer: str = Field(description="Hero that got the kill")
     killer_is_hero: bool = Field(description="Whether killer was a hero")
+    killer_level: Optional[int] = Field(default=None, description="Killer's hero level")
     victim: str = Field(description="Hero that died")
+    victim_level: Optional[int] = Field(default=None, description="Victim's hero level")
+    level_advantage: Optional[int] = Field(default=None, description="Killer's level advantage")
     ability: Optional[str] = Field(default=None, description="Killing ability")
     position_x: Optional[float] = Field(default=None, description="X coordinate")
     position_y: Optional[float] = Field(default=None, description="Y coordinate")
@@ -305,14 +332,15 @@ class HeroLaneStats(BaseModel):
     lane: Optional[str] = Field(default=None, description="Lane (top/mid/bot)")
     role: Optional[str] = Field(default=None, description="Role")
     team: Literal["radiant", "dire"] = Field(description="Team")
-    last_hits_5min: int = Field(default=0, description="Last hits at 5 minutes")
-    last_hits_10min: int = Field(default=0, description="Last hits at 10 minutes")
-    denies_5min: int = Field(default=0, description="Denies at 5 minutes")
-    denies_10min: int = Field(default=0, description="Denies at 10 minutes")
-    gold_5min: int = Field(default=0, description="Gold at 5 minutes")
-    gold_10min: int = Field(default=0, description="Gold at 10 minutes")
-    level_5min: int = Field(default=0, description="Level at 5 minutes")
-    level_10min: int = Field(default=0, description="Level at 10 minutes")
+    last_hits_5min: CoercedInt = Field(default=0, description="Last hits at 5 minutes")
+    last_hits_10min: CoercedInt = Field(default=0, description="Last hits at 10 minutes")
+    denies_5min: CoercedInt = Field(default=0, description="Denies at 5 minutes")
+    denies_10min: CoercedInt = Field(default=0, description="Denies at 10 minutes")
+    gold_5min: CoercedInt = Field(default=0, description="Gold at 5 minutes")
+    gold_10min: CoercedInt = Field(default=0, description="Gold at 10 minutes")
+    level_5min: CoercedInt = Field(default=0, description="Level at 5 minutes")
+    level_10min: CoercedInt = Field(default=0, description="Level at 10 minutes")
+    lane_efficiency: Optional[float] = Field(default=None, description="Lane efficiency (0.0-1.0)")
 
 
 class LaneSummaryResponse(BaseModel):
@@ -323,6 +351,10 @@ class LaneSummaryResponse(BaseModel):
     lane_winners: Optional[LaneWinners] = None
     team_scores: Optional[TeamScores] = None
     hero_stats: List[HeroLaneStats] = Field(default_factory=list)
+    coaching_analysis: Optional[str] = Field(
+        default=None,
+        description="AI coaching analysis of laning phase (requires sampling-capable client)"
+    )
     error: Optional[str] = None
 
 
@@ -331,10 +363,10 @@ class HeroCSData(BaseModel):
 
     hero: str = Field(description="Hero name")
     team: Literal["radiant", "dire"] = Field(description="Team")
-    last_hits: int = Field(description="Last hits")
-    denies: int = Field(description="Denies")
-    gold: int = Field(description="Net worth")
-    level: int = Field(description="Hero level")
+    last_hits: CoercedInt = Field(description="Last hits")
+    denies: CoercedInt = Field(description="Denies")
+    gold: CoercedInt = Field(description="Net worth")
+    level: CoercedInt = Field(description="Hero level")
 
 
 class CSAtMinuteResponse(BaseModel):
@@ -377,14 +409,14 @@ class HeroSnapshot(BaseModel):
 
     hero: str = Field(description="Hero name")
     team: Literal["radiant", "dire"] = Field(description="Team")
-    player_id: int = Field(description="Player slot ID")
+    player_id: CoercedInt = Field(description="Player slot ID")
     x: float = Field(description="X coordinate")
     y: float = Field(description="Y coordinate")
-    health: int = Field(description="Current health")
-    max_health: int = Field(description="Maximum health")
-    mana: int = Field(description="Current mana")
-    max_mana: int = Field(description="Maximum mana")
-    level: int = Field(description="Hero level")
+    health: CoercedInt = Field(description="Current health")
+    max_health: CoercedInt = Field(description="Maximum health")
+    mana: CoercedInt = Field(description="Current mana")
+    max_mana: CoercedInt = Field(description="Maximum mana")
+    level: CoercedInt = Field(description="Hero level")
     alive: bool = Field(description="Whether hero is alive")
 
 
@@ -393,11 +425,11 @@ class SnapshotAtTimeResponse(BaseModel):
 
     success: bool
     match_id: int
-    tick: int = Field(default=0, description="Game tick")
+    tick: CoercedInt = Field(default=0, description="Game tick")
     game_time: float = Field(default=0.0, description="Game time in seconds")
     game_time_str: str = Field(default="0:00", description="Game time as M:SS")
-    radiant_gold: int = Field(default=0, description="Radiant total gold")
-    dire_gold: int = Field(default=0, description="Dire total gold")
+    radiant_gold: CoercedInt = Field(default=0, description="Radiant total gold")
+    dire_gold: CoercedInt = Field(default=0, description="Dire total gold")
     heroes: List[HeroSnapshot] = Field(default_factory=list)
     error: Optional[str] = None
 
@@ -405,7 +437,7 @@ class SnapshotAtTimeResponse(BaseModel):
 class PositionPoint(BaseModel):
     """A position at a specific tick."""
 
-    tick: int = Field(description="Game tick")
+    tick: CoercedInt = Field(description="Game tick")
     game_time: float = Field(description="Game time in seconds")
     x: float = Field(description="X coordinate")
     y: float = Field(description="Y coordinate")
@@ -439,15 +471,15 @@ class FightSnapshotHero(BaseModel):
     team: Literal["radiant", "dire"] = Field(description="Team")
     x: float = Field(description="X coordinate")
     y: float = Field(description="Y coordinate")
-    health: int = Field(description="Current health")
-    max_health: int = Field(description="Maximum health")
+    health: CoercedInt = Field(description="Current health")
+    max_health: CoercedInt = Field(description="Maximum health")
     alive: bool = Field(description="Whether hero is alive")
 
 
 class FightSnapshot(BaseModel):
     """A snapshot during a fight."""
 
-    tick: int = Field(description="Game tick")
+    tick: CoercedInt = Field(description="Game tick")
     game_time: float = Field(description="Game time in seconds")
     game_time_str: str = Field(description="Game time as M:SS")
     heroes: List[FightSnapshotHero] = Field(default_factory=list)
@@ -458,13 +490,13 @@ class FightReplayResponse(BaseModel):
 
     success: bool
     match_id: int
-    start_tick: int = Field(default=0)
-    end_tick: int = Field(default=0)
+    start_tick: CoercedInt = Field(default=0)
+    end_tick: CoercedInt = Field(default=0)
     start_time: float = Field(default=0.0)
     start_time_str: str = Field(default="0:00")
     end_time: float = Field(default=0.0)
     end_time_str: str = Field(default="0:00")
     interval_seconds: float = Field(default=0.5)
-    total_snapshots: int = Field(default=0)
+    total_snapshots: CoercedInt = Field(default=0)
     snapshots: List[FightSnapshot] = Field(default_factory=list)
     error: Optional[str] = None

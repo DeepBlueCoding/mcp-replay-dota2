@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class HeroesResource:
     """Resource class for managing Dota 2 hero data using dotaconstants."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the heroes resource."""
         self.replay_downloader = ReplayDownloader()
         self.constants = constants_fetcher

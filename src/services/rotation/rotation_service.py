@@ -8,7 +8,7 @@ NO MCP DEPENDENCIES.
 import logging
 import math
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from ..combat.combat_service import CombatService
 from ..combat.fight_service import FightService
@@ -26,13 +26,16 @@ from ..models.rotation_data import (
     WisdomRuneEvent,
 )
 
+if TYPE_CHECKING:
+    from src.models.game_context import GameContext
+
 logger = logging.getLogger(__name__)
 
-# Lane boundaries (approximate, based on position_tracker.py)
-LANE_BOUNDARIES = {
-    "top": {"x_min": -8000, "x_max": 0, "y_min": 2000, "y_max": 8000},
-    "mid": {"x_min": -3500, "x_max": 3500, "y_min": -3500, "y_max": 3500},
-    "bot": {"x_min": 0, "x_max": 8000, "y_min": -8000, "y_max": -2000},
+# Default lane boundaries (fallback when no GameContext provided)
+DEFAULT_LANE_BOUNDARIES: Dict[str, Dict[str, float]] = {
+    "top": {"x_min": -8000.0, "x_max": 0.0, "y_min": 2000.0, "y_max": 8000.0},
+    "mid": {"x_min": -3500.0, "x_max": 3500.0, "y_min": -3500.0, "y_max": 3500.0},
+    "bot": {"x_min": 0.0, "x_max": 8000.0, "y_min": -8000.0, "y_max": -2000.0},
 }
 
 # Rune positions
@@ -89,21 +92,47 @@ class RotationService:
         """Calculate distance between two points."""
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
-    def _classify_lane(self, x: float, y: float) -> str:
+    def _get_lane_boundaries(
+        self,
+        game_context: Optional["GameContext"] = None,
+    ) -> Dict[str, Dict[str, float]]:
+        """Get lane boundaries from GameContext or use defaults."""
+        if game_context is None:
+            return DEFAULT_LANE_BOUNDARIES
+
+        # Extract boundaries from MapData
+        boundaries = {}
+        for boundary in game_context.map_data.lane_boundaries:
+            boundaries[boundary.name] = {
+                "x_min": boundary.x_min,
+                "x_max": boundary.x_max,
+                "y_min": boundary.y_min,
+                "y_max": boundary.y_max,
+            }
+        return boundaries if boundaries else DEFAULT_LANE_BOUNDARIES
+
+    def _classify_lane(
+        self,
+        x: float,
+        y: float,
+        lane_boundaries: Optional[Dict[str, Dict[str, float]]] = None,
+    ) -> str:
         """Classify position to a lane."""
+        boundaries = lane_boundaries or DEFAULT_LANE_BOUNDARIES
+
         # Check mid first (smallest area)
-        if (LANE_BOUNDARIES["mid"]["x_min"] <= x <= LANE_BOUNDARIES["mid"]["x_max"] and
-                LANE_BOUNDARIES["mid"]["y_min"] <= y <= LANE_BOUNDARIES["mid"]["y_max"]):
+        if (boundaries["mid"]["x_min"] <= x <= boundaries["mid"]["x_max"] and
+                boundaries["mid"]["y_min"] <= y <= boundaries["mid"]["y_max"]):
             return "mid"
 
         # Check top
-        if (LANE_BOUNDARIES["top"]["x_min"] <= x <= LANE_BOUNDARIES["top"]["x_max"] and
-                LANE_BOUNDARIES["top"]["y_min"] <= y <= LANE_BOUNDARIES["top"]["y_max"]):
+        if (boundaries["top"]["x_min"] <= x <= boundaries["top"]["x_max"] and
+                boundaries["top"]["y_min"] <= y <= boundaries["top"]["y_max"]):
             return "top"
 
         # Check bot
-        if (LANE_BOUNDARIES["bot"]["x_min"] <= x <= LANE_BOUNDARIES["bot"]["x_max"] and
-                LANE_BOUNDARIES["bot"]["y_min"] <= y <= LANE_BOUNDARIES["bot"]["y_max"]):
+        if (boundaries["bot"]["x_min"] <= x <= boundaries["bot"]["x_max"] and
+                boundaries["bot"]["y_min"] <= y <= boundaries["bot"]["y_max"]):
             return "bot"
 
         return "jungle"
@@ -111,9 +140,14 @@ class RotationService:
     def _get_lane_assignments(
         self,
         data: ParsedReplayData,
+        lane_boundaries: Optional[Dict[str, Dict[str, float]]] = None,
     ) -> Dict[str, Tuple[str, str]]:
         """
         Determine lane assignments from minute 2-3 positions.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            lane_boundaries: Optional lane boundaries for version-aware classification
 
         Returns:
             Dict mapping hero name to (lane, role)
@@ -135,7 +169,7 @@ class RotationService:
                 if not hero:
                     continue
 
-                lane = self._classify_lane(hero_snap.x, hero_snap.y)
+                lane = self._classify_lane(hero_snap.x, hero_snap.y, lane_boundaries)
                 lane_counts[hero][lane] += 1
 
         # Assign each hero to their most common lane
@@ -163,9 +197,16 @@ class RotationService:
         data: ParsedReplayData,
         hero: str,
         target_time: float,
+        lane_boundaries: Optional[Dict[str, Dict[str, float]]] = None,
     ) -> Optional[Tuple[float, float, str]]:
         """
         Get hero position at a specific time.
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            hero: Hero name to find
+            target_time: Game time to find position at
+            lane_boundaries: Optional lane boundaries for version-aware classification
 
         Returns:
             Tuple of (x, y, lane) or None if not found
@@ -186,7 +227,7 @@ class RotationService:
         for hero_snap in best_snapshot.heroes:
             player_hero = self._clean_hero_name(hero_snap.hero_name)
             if hero_lower in player_hero.lower():
-                lane = self._classify_lane(hero_snap.x, hero_snap.y)
+                lane = self._classify_lane(hero_snap.x, hero_snap.y, lane_boundaries)
                 return (hero_snap.x, hero_snap.y, lane)
 
         return None
@@ -284,6 +325,7 @@ class RotationService:
         fights: List[Fight],
         start_minute: int,
         end_minute: int,
+        lane_boundaries: Optional[Dict[str, Dict[str, float]]] = None,
     ) -> List[Rotation]:
         """
         Detect all rotations in the time range.
@@ -292,6 +334,16 @@ class RotationService:
         - Sample positions every 30 seconds
         - Track when hero is not in assigned lane
         - Create rotation when hero is away for MIN_ROTATION_DURATION
+
+        Args:
+            data: ParsedReplayData from ReplayService
+            lane_assignments: Dict mapping hero to (lane, role)
+            rune_pickups: List of rune pickup events
+            deaths: List of hero death events
+            fights: List of fight events
+            start_minute: Start of analysis range
+            end_minute: End of analysis range
+            lane_boundaries: Optional lane boundaries for version-aware classification
         """
         rotations = []
         rotation_counter = 0
@@ -306,7 +358,9 @@ class RotationService:
         current_time = start_time
         while current_time <= end_time:
             for hero, (assigned_lane, role) in lane_assignments.items():
-                pos = self._get_hero_position_at_time(data, hero, current_time)
+                pos = self._get_hero_position_at_time(
+                    data, hero, current_time, lane_boundaries
+                )
                 if not pos:
                     continue
 
@@ -540,6 +594,7 @@ class RotationService:
         data: ParsedReplayData,
         start_minute: int = 0,
         end_minute: int = 20,
+        game_context: Optional["GameContext"] = None,
     ) -> RotationAnalysisResponse:
         """
         Analyze rotations in a match.
@@ -548,12 +603,15 @@ class RotationService:
             data: ParsedReplayData from ReplayService
             start_minute: Start of analysis range (default: 0)
             end_minute: End of analysis range (default: 20)
+            game_context: Optional GameContext for version-aware lane classification
 
         Returns:
             RotationAnalysisResponse with all rotation data
         """
+        lane_boundaries = self._get_lane_boundaries(game_context)
+
         # Get lane assignments from early game
-        lane_assignments = self._get_lane_assignments(data)
+        lane_assignments = self._get_lane_assignments(data, lane_boundaries)
 
         if not lane_assignments:
             return RotationAnalysisResponse(
@@ -566,14 +624,14 @@ class RotationService:
 
         # Get supporting data
         rune_pickups = self._combat.get_rune_pickups(data)
-        deaths = self._combat.get_hero_deaths(data)
+        deaths = self._combat.get_hero_deaths(data, game_context=game_context)
         fight_result = self._fight.get_all_fights(data)
         fights = fight_result.fights
 
         # Detect rotations
         rotations = self._detect_rotations(
             data, lane_assignments, rune_pickups, deaths, fights,
-            start_minute, end_minute,
+            start_minute, end_minute, lane_boundaries,
         )
 
         # Build rune events

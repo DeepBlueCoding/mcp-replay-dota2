@@ -5,7 +5,7 @@ Uses v2 ParsedReplayData which contains game_info from python-manta.
 """
 
 import logging
-from typing import Optional
+from typing import Dict, Literal, Optional
 
 from python_manta import Team
 
@@ -54,12 +54,9 @@ GAME_MODES = {
 class MatchInfoParser:
     """Parses match info and draft data from Dota 2 replays."""
 
-    def __init__(self):
-        pass
-
     def _get_hero_info(self, hero_id: int) -> tuple[str, str]:
         """Get hero internal name and localized name from hero_id."""
-        heroes = constants_fetcher.get_heroes_constants()
+        heroes = constants_fetcher.get_heroes_constants() or {}
         hero_data = heroes.get(str(hero_id), {})
 
         name = hero_data.get("name", f"npc_dota_hero_{hero_id}")
@@ -77,12 +74,36 @@ class MatchInfoParser:
         secs = int(seconds % 60)
         return f"{minutes}:{secs:02d}"
 
-    def get_draft(self, data: ParsedReplayData) -> Optional[DraftResult]:
+    def _get_lane_from_position(
+        self, position: Optional[int]
+    ) -> Optional[Literal["safelane", "mid", "offlane"]]:
+        """Derive expected lane from position (1-5).
+
+        Position 1 (Carry) + Position 5 (Hard Support) → safelane
+        Position 2 (Mid) → mid
+        Position 3 (Offlane) + Position 4 (Soft Support) → offlane
+        """
+        if position is None:
+            return None
+        if position in (1, 5):
+            return "safelane"
+        if position == 2:
+            return "mid"
+        if position in (3, 4):
+            return "offlane"
+        return None
+
+    def get_draft(
+        self,
+        data: ParsedReplayData,
+        hero_positions: Optional[Dict[int, int]] = None
+    ) -> Optional[DraftResult]:
         """
         Get draft information from parsed replay data.
 
         Args:
             data: ParsedReplayData from ReplayService
+            hero_positions: Optional mapping of hero_id -> position (1-5) from OpenDota
 
         Returns:
             DraftResult with all picks and bans in order, or None on error
@@ -93,7 +114,7 @@ class MatchInfoParser:
                 logger.error("No game info in parsed data")
                 return None
 
-            actions = []
+            hero_positions = hero_positions or {}
             radiant_picks = []
             radiant_bans = []
             dire_picks = []
@@ -102,6 +123,7 @@ class MatchInfoParser:
             for i, pb in enumerate(game_info.picks_bans):
                 team = "radiant" if pb.team == Team.RADIANT.value else "dire"
                 hero_name, hero_localized = self._get_hero_info(pb.hero_id)
+                position = hero_positions.get(pb.hero_id) if pb.is_pick else None
 
                 action = DraftAction(
                     order=i + 1,
@@ -110,8 +132,9 @@ class MatchInfoParser:
                     hero_id=pb.hero_id,
                     hero_name=hero_name,
                     localized_name=hero_localized,
+                    position=position,
+                    lane=self._get_lane_from_position(position),
                 )
-                actions.append(action)
 
                 if pb.is_pick:
                     if team == "radiant":
@@ -128,7 +151,6 @@ class MatchInfoParser:
                 match_id=game_info.match_id,
                 game_mode=game_info.game_mode,
                 game_mode_name=GAME_MODES.get(game_info.game_mode, f"Unknown ({game_info.game_mode})"),
-                actions=actions,
                 radiant_picks=radiant_picks,
                 radiant_bans=radiant_bans,
                 dire_picks=dire_picks,
@@ -136,8 +158,8 @@ class MatchInfoParser:
             )
 
         except Exception as e:
-            logger.error(f"Error parsing draft: {e}")
-            return None
+            logger.error(f"Error parsing draft: {e}", exc_info=True)
+            raise  # Re-raise to show actual error in MCP response
 
     def get_match_info(self, data: ParsedReplayData) -> Optional[MatchInfoResult]:
         """
@@ -181,7 +203,7 @@ class MatchInfoParser:
                     hero_internal = hero_name
 
                 _, hero_localized = self._get_hero_info(0)
-                heroes = constants_fetcher.get_heroes_constants()
+                heroes = constants_fetcher.get_heroes_constants() or {}
                 for hid, hdata in heroes.items():
                     if hdata.get("name") == p.hero_name:
                         hero_localized = hdata.get("localized_name", hero_internal.replace("_", " ").title())
@@ -235,8 +257,8 @@ class MatchInfoParser:
             )
 
         except Exception as e:
-            logger.error(f"Error parsing match info: {e}")
-            return None
+            logger.error(f"Error parsing match info: {e}", exc_info=True)
+            raise  # Re-raise to show actual error in MCP response
 
 
 match_info_parser = MatchInfoParser()

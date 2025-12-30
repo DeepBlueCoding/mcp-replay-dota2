@@ -4,6 +4,8 @@ from typing import List, Optional
 
 from fastmcp import Context
 
+from ..coaching import get_farming_analysis_prompt, get_lane_analysis_prompt, try_coaching_analysis
+from ..models.game_context import GameContext
 from ..models.tool_responses import (
     CampStack,
     CampStacksResponse,
@@ -110,7 +112,8 @@ def register_analysis_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            summary = lane_service.get_lane_summary(data)
+            game_context = GameContext.from_parsed_data(data)
+            summary = lane_service.get_lane_summary(data, game_context=game_context)
 
             opendota_players = await match_fetcher.get_players(match_id)
             opendota_lanes = {}
@@ -122,6 +125,7 @@ def register_analysis_tools(mcp, services):
                         opendota_lanes[hero_name.lower()] = {
                             "lane_name": p.get("lane_name"),
                             "role": p.get("role"),
+                            "lane_efficiency": p.get("lane_efficiency"),
                         }
 
             hero_stats = []
@@ -141,10 +145,11 @@ def register_analysis_tools(mcp, services):
                         gold_10min=s.gold_10min,
                         level_5min=s.level_5min,
                         level_10min=s.level_10min,
+                        lane_efficiency=od_data.get("lane_efficiency"),
                     )
                 )
 
-            return LaneSummaryResponse(
+            response = LaneSummaryResponse(
                 success=True,
                 match_id=match_id,
                 lane_winners=LaneWinners(
@@ -158,6 +163,29 @@ def register_analysis_tools(mcp, services):
                 ),
                 hero_stats=hero_stats,
             )
+
+            lane_data = {
+                "top_winner": summary.top_winner,
+                "mid_winner": summary.mid_winner,
+                "bot_winner": summary.bot_winner,
+                "radiant_score": round(summary.radiant_laning_score, 1),
+                "dire_score": round(summary.dire_laning_score, 1),
+            }
+            hero_stats_data = [
+                {
+                    "hero": hs.hero,
+                    "team": hs.team,
+                    "lane": hs.lane,
+                    "last_hits_10min": hs.last_hits_10min,
+                    "level_10min": hs.level_10min,
+                }
+                for hs in hero_stats
+            ]
+            prompt = get_lane_analysis_prompt(lane_data, hero_stats_data)
+            coaching = await try_coaching_analysis(ctx, prompt, max_tokens=800)
+            response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return LaneSummaryResponse(success=False, match_id=match_id, error=str(e))
         except Exception as e:
@@ -280,6 +308,7 @@ def register_analysis_tools(mcp, services):
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
+            game_context = GameContext.from_parsed_data(data)
             match_heroes = await heroes_resource.get_match_heroes(match_id)
             hero_lower = hero.lower()
             hero_id = None
@@ -311,7 +340,49 @@ def register_analysis_tools(mcp, services):
                 start_minute=start_minute,
                 end_minute=end_minute,
                 item_timings=item_timings_list,
+                game_context=game_context,
             )
+
+            # Get hero position for coaching analysis
+            if result.success:
+                position = None
+                try:
+                    from ..utils.match_fetcher import assign_positions
+                    match_data = await match_fetcher.get_match(match_id)
+                    if match_data and "players" in match_data:
+                        players = match_data["players"]
+                        assign_positions(players)
+                        for p in players:
+                            p_hero_id = p.get("hero_id")
+                            if p_hero_id and p_hero_id == hero_id:
+                                position = p.get("position")
+                                break
+                except Exception:
+                    pass
+
+                # Add coaching analysis if position found (primarily for pos1)
+                if position:
+                    total_camps = sum(result.summary.camps_cleared.values()) if result.summary.camps_cleared else 0
+                    farming_data = {
+                        "cs_per_min": result.summary.cs_per_min if result.summary else 0,
+                        "total_camps": total_camps,
+                        "deaths": result.deaths_in_window or 0,
+                        "item_timings": [
+                            {"item": it.item, "time_str": it.time_str}
+                            for it in (result.item_timings or [])
+                        ],
+                        "level_timings": [
+                            {"level": lt.level, "time_str": lt.time_str}
+                            for lt in (result.level_timings or [])
+                        ],
+                        "multi_camp_clears": len(result.multi_camp_clears or []),
+                        "start_minute": start_minute,
+                        "end_minute": end_minute,
+                    }
+                    prompt = get_farming_analysis_prompt(hero, position, farming_data)
+                    coaching = await try_coaching_analysis(ctx, prompt, max_tokens=800)
+                    result.coaching_analysis = coaching
+
             return result
         except ValueError as e:
             return FarmingPatternResponse(
@@ -339,17 +410,23 @@ def register_analysis_tools(mcp, services):
         end_minute: int = 20,
         ctx: Optional[Context] = None,
     ) -> RotationAnalysisResponse:
-        """Analyze hero rotations - movement patterns between lanes and outcomes."""
+        """
+        Analyze hero rotations - movement patterns between lanes and outcomes.
+
+        Returns rotation events, gank attempts, and their success rates.
+        """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
                 await ctx.report_progress(current, total)
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
+            game_context = GameContext.from_parsed_data(data)
             result = rotation_service.get_rotation_analysis(
                 data=data,
                 start_minute=start_minute,
                 end_minute=end_minute,
+                game_context=game_context,
             )
             return result
         except ValueError as e:

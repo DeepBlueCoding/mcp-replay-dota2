@@ -1,13 +1,15 @@
 """Fight-related MCP tools: fight detection, teamfights, fight replay."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastmcp import Context
 
+from ..coaching import get_teamfight_analysis_prompt, try_coaching_analysis
 from ..models.combat_log import (
     CombatLogEvent as CombatLogEventModel,
 )
 from ..models.combat_log import (
+    DetailLevel,
     FightCombatLogResponse,
 )
 from ..models.combat_log import (
@@ -22,6 +24,7 @@ from ..models.combat_log import (
 from ..models.combat_log import (
     TeamWipe as TeamWipeModel,
 )
+from ..models.filters import FightFilters
 from ..models.tool_responses import (
     FightDeath,
     FightDeathDetail,
@@ -46,36 +49,35 @@ def register_fight_tools(mcp, services):
         match_id: int,
         reference_time: float,
         hero: Optional[str] = None,
+        detail_level: Literal["narrative", "tactical", "full"] = "narrative",
+        max_events: int = 200,
         ctx: Optional[Context] = None,
     ) -> FightCombatLogResponse:
         """
-        Get combat log for a fight leading up to a specific moment (e.g., a death).
+        Get detailed event-by-event combat log for a specific fight.
 
-        Automatically detects fight boundaries by analyzing combat activity and participant
-        connectivity. Separate skirmishes happening simultaneously in different lanes are
-        correctly identified as distinct fights.
-
-        **NEW: Includes fight highlights** - key moments that determined the fight outcome:
-        - Multi-hero abilities: "4-man Chronosphere", "3-man Black Hole", etc.
-        - Kill streaks: Double Kill, Triple Kill, Ultra Kill, Rampage
-        - Team wipes: When all 5 heroes of one team die
-        - Fight initiation: Who started the fight and with what ability
+        Automatically detects the fight around reference_time and returns
+        the sequence of deaths, abilities, and key moments.
 
         Args:
             match_id: The Dota 2 match ID
-            reference_time: Reference game time in seconds (e.g., death time from get_hero_deaths)
-            hero: Optional hero name to anchor fight detection, e.g. "earthshaker".
-
-        Returns:
-            FightCombatLogResponse with fight boundaries, participants, combat events, and highlights
+            reference_time: Game time in seconds (e.g., 1530 for 25:30)
+            hero: Optional hero to anchor fight detection
+            detail_level: "narrative" (default), "tactical", or "full"
+            max_events: Maximum events to return
         """
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
                 await ctx.report_progress(current, total)
 
         try:
+            level = DetailLevel(detail_level)
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
-            result = fight_service.get_fight_combat_log(data, reference_time, hero)
+            result = fight_service.get_fight_combat_log(
+                data, reference_time, hero,
+                detail_level=level,
+                max_events=max_events,
+            )
 
             if not result:
                 return FightCombatLogResponse(
@@ -157,14 +159,45 @@ def register_fight_tools(mcp, services):
             return FightCombatLogResponse(success=False, match_id=match_id, error=str(e))
 
     @mcp.tool
-    async def list_fights(match_id: int, ctx: Context) -> FightListResponse:
-        """List all fights in a Dota 2 match."""
+    async def list_fights(
+        match_id: int,
+        location: Optional[str] = None,
+        min_deaths: Optional[int] = None,
+        is_teamfight: Optional[bool] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        ctx: Optional[Context] = None,
+    ) -> FightListResponse:
+        """
+        List all fights/skirmishes in a match with death summaries.
+
+        Returns fight count, timing, participants, and deaths for each fight.
+
+        Args:
+            match_id: The Dota 2 match ID
+            location: Filter by map location (partial match, e.g. 't1', 'roshan_pit')
+            min_deaths: Filter to fights with at least this many deaths
+            is_teamfight: Filter to teamfights only (True) or skirmishes only (False)
+            start_time: Filter fights starting after this game time (seconds)
+            end_time: Filter fights starting before this game time (seconds)
+        """
         async def progress_callback(current: int, total: int, message: str) -> None:
-            await ctx.report_progress(current, total)
+            if ctx:
+                await ctx.report_progress(current, total)
 
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
             summary = fight_service.get_fight_summary(data)
+
+            # Apply filters
+            filters = FightFilters.from_params(
+                location=location,
+                min_deaths=min_deaths,
+                is_teamfight=is_teamfight,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            fight_data = filters.apply(summary.get("fights", []))
 
             fights = [
                 FightSummary(
@@ -176,6 +209,7 @@ def register_fight_tools(mcp, services):
                     duration_seconds=f.get("duration_seconds", 0.0),
                     total_deaths=f.get("total_deaths", 0),
                     is_teamfight=f.get("is_teamfight", False),
+                    location=f.get("location"),
                     participants=f.get("participants", []),
                     deaths=[
                         FightDeath(
@@ -188,16 +222,16 @@ def register_fight_tools(mcp, services):
                         for d in f.get("deaths", [])
                     ],
                 )
-                for f in summary.get("fights", [])
+                for f in fight_data
             ]
 
             return FightListResponse(
                 success=True,
                 match_id=match_id,
-                total_fights=summary.get("total_fights", 0),
-                teamfights=summary.get("teamfights", 0),
-                skirmishes=summary.get("skirmishes", 0),
-                total_deaths=summary.get("total_deaths", 0),
+                total_fights=len(fights),
+                teamfights=len([f for f in fights if f.is_teamfight]),
+                skirmishes=len([f for f in fights if not f.is_teamfight]),
+                total_deaths=sum(f.total_deaths for f in fights),
                 fights=fights,
             )
         except ValueError as e:
@@ -209,9 +243,33 @@ def register_fight_tools(mcp, services):
     async def get_teamfights(
         match_id: int,
         min_deaths: int = 3,
+        location: Optional[str] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
         ctx: Optional[Context] = None,
     ) -> TeamfightsResponse:
-        """Get only teamfights from a Dota 2 match."""
+        """
+        Get major teamfights (3+ deaths) with coaching analysis.
+
+        Returns teamfight timing, participants, death sequences, and analysis.
+
+        Args:
+            match_id: The Dota 2 match ID
+            min_deaths: Minimum deaths to classify as teamfight (default 3)
+            location: Filter by map location (partial match, e.g. 't1', 'roshan_pit')
+            start_time: Filter teamfights starting after this game time (seconds)
+            end_time: Filter teamfights starting before this game time (seconds)
+        """
+        from ..utils.position_tracker import classify_map_position
+
+        def get_fight_location(fight) -> Optional[str]:
+            """Get location from first death with position data."""
+            for death in fight.deaths:
+                if death.position_x is not None and death.position_y is not None:
+                    pos = classify_map_position(death.position_x, death.position_y)
+                    return pos.region
+            return None
+
         async def progress_callback(current: int, total: int, message: str) -> None:
             if ctx:
                 await ctx.report_progress(current, total)
@@ -219,6 +277,22 @@ def register_fight_tools(mcp, services):
         try:
             data = await replay_service.get_parsed_data(match_id, progress=progress_callback)
             teamfights = fight_service.get_teamfights(data, min_deaths=min_deaths)
+
+            # Apply filters using FightFilters
+            filters = FightFilters.from_params(
+                location=location,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            if not filters.is_empty():
+                # Convert Fight objects to dicts for filter.apply(), then back
+                fight_dicts = [
+                    {"start_time": f.start_time, "total_deaths": f.total_deaths,
+                     "is_teamfight": True, "location": get_fight_location(f), "_obj": f}
+                    for f in teamfights
+                ]
+                filtered = filters.apply(fight_dicts)
+                teamfights = [d["_obj"] for d in filtered]
 
             fights = [
                 FightSummary(
@@ -230,13 +304,17 @@ def register_fight_tools(mcp, services):
                     duration_seconds=round(f.duration, 1),
                     total_deaths=f.total_deaths,
                     is_teamfight=True,
+                    location=get_fight_location(f),
                     participants=f.participants,
                     deaths=[
                         FightDeath(
                             game_time=d.game_time,
                             game_time_str=d.game_time_str,
                             killer=d.killer,
+                            killer_level=d.killer_level,
                             victim=d.victim,
+                            victim_level=d.victim_level,
+                            level_advantage=d.level_advantage,
                             ability=d.ability,
                         )
                         for d in f.deaths
@@ -245,13 +323,37 @@ def register_fight_tools(mcp, services):
                 for f in teamfights
             ]
 
-            return TeamfightsResponse(
+            response = TeamfightsResponse(
                 success=True,
                 match_id=match_id,
                 min_deaths_threshold=min_deaths,
                 total_teamfights=len(teamfights),
                 teamfights=fights,
             )
+
+            if teamfights and len(teamfights) >= 1:
+                biggest_fight = max(teamfights, key=lambda f: f.total_deaths)
+                fight_data = {
+                    "start_time_str": biggest_fight.start_time_str,
+                    "end_time_str": biggest_fight.end_time_str,
+                    "duration": biggest_fight.duration,
+                    "total_deaths": biggest_fight.total_deaths,
+                    "participants": biggest_fight.participants,
+                }
+                deaths_data = [
+                    {
+                        "game_time_str": d.game_time_str,
+                        "killer": d.killer,
+                        "victim": d.victim,
+                        "ability": d.ability,
+                    }
+                    for d in biggest_fight.deaths
+                ]
+                prompt = get_teamfight_analysis_prompt(fight_data, deaths_data)
+                coaching = await try_coaching_analysis(ctx, prompt, max_tokens=700)
+                response.coaching_analysis = coaching
+
+            return response
         except ValueError as e:
             return TeamfightsResponse(success=False, match_id=match_id, error=str(e))
         except Exception as e:
@@ -285,7 +387,10 @@ def register_fight_tools(mcp, services):
                     game_time_str=d.game_time_str,
                     killer=d.killer,
                     killer_is_hero=d.killer_is_hero,
+                    killer_level=d.killer_level,
                     victim=d.victim,
+                    victim_level=d.victim_level,
+                    level_advantage=d.level_advantage,
                     ability=d.ability,
                     position_x=d.position_x,
                     position_y=d.position_y,

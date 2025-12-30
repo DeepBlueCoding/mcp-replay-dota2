@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MCP Server with SSE transport (for remote/web clients)
   mcp-server:
@@ -14,7 +12,7 @@ services:
     volumes:
       # Persist replay cache between restarts
       - replay-cache:/app/.cache/mcp_dota2
-    command: ["python", "dota_match_mcp_server.py", "--transport", "sse"]
+    command: ["--transport", "sse"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/sse')"]
       interval: 30s

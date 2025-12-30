@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY src/ /app/src/
 COPY data/ /app/data/
 COPY dota_match_mcp_server.py /app/
-COPY pyproject.toml uv.lock /app/
+COPY pyproject.toml uv.lock README.md /app/
 
 # Install the project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -41,6 +41,7 @@ COPY --from=builder /app/pyproject.toml /app/
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=0
+ENV DOTA_REPLAY_CACHE=/app/.cache/mcp_dota2/replays
 
 # Create cache directories
 RUN mkdir -p /app/.cache/mcp_dota2/replays \

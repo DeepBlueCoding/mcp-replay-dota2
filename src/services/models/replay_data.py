@@ -21,6 +21,18 @@ from python_manta import (
     Team,
 )
 
+# AttacksResult is available but not exported in __all__ - import from main module
+try:
+    from python_manta import AttacksResult
+except ImportError:
+    AttacksResult = None  # type: ignore[misc, assignment]
+
+# EntityDeathsResult is available in python-manta 1.4.5.4+
+try:
+    from python_manta import EntityDeathsResult
+except ImportError:
+    EntityDeathsResult = None  # type: ignore[misc, assignment]
+
 
 class ProgressCallback(Protocol):
     """Protocol for progress reporting callbacks."""
@@ -59,6 +71,8 @@ class ParsedReplayData:
     entities: Optional[EntityParseResult] = None
     game_events: Optional[GameEventsResult] = None
     modifiers: Optional[ModifiersResult] = None
+    attacks: Optional[AttacksResult] = None
+    entity_deaths: Optional[EntityDeathsResult] = None
 
     # Metadata from CDOTAMatchMetadataFile (for timeline data)
     metadata: Optional[Dict[str, Any]] = None
@@ -136,6 +150,8 @@ class ParsedReplayData:
             "entities": self.entities.model_dump() if self.entities else None,
             "game_events": self.game_events.model_dump() if self.game_events else None,
             "modifiers": self.modifiers.model_dump() if self.modifiers else None,
+            "attacks": self.attacks.model_dump() if self.attacks else None,
+            "entity_deaths": self.entity_deaths.model_dump() if self.entity_deaths else None,
             "metadata": self.metadata,
             "demo_index": self.demo_index.model_dump() if self.demo_index else None,
         }
@@ -153,6 +169,12 @@ class ParsedReplayData:
             entities=EntityParseResult(**data["entities"]) if data.get("entities") else None,
             game_events=GameEventsResult(**data["game_events"]) if data.get("game_events") else None,
             modifiers=ModifiersResult(**data["modifiers"]) if data.get("modifiers") else None,
+            attacks=AttacksResult(**data["attacks"]) if data.get("attacks") and AttacksResult else None,
+            entity_deaths=(
+                EntityDeathsResult(**data["entity_deaths"])
+                if data.get("entity_deaths") and EntityDeathsResult
+                else None
+            ),
             metadata=data.get("metadata"),
             demo_index=DemoIndex(**data["demo_index"]) if data.get("demo_index") else None,
         )
@@ -167,6 +189,10 @@ class ParsedReplayData:
         demo_index: Optional[DemoIndex] = None,
     ) -> "ParsedReplayData":
         """Create from python-manta v2 ParseResult."""
+        # Handle attacks - only available in python-manta 1.4.5.4+
+        attacks_data = getattr(result, 'attacks', None)
+        # Handle entity_deaths - only available in python-manta 1.4.5.4+
+        entity_deaths_data = getattr(result, 'entity_deaths', None)
         return cls(
             match_id=match_id,
             replay_path=replay_path,
@@ -176,6 +202,8 @@ class ParsedReplayData:
             entities=result.entities,
             game_events=result.game_events,
             modifiers=result.modifiers,
+            attacks=attacks_data,
+            entity_deaths=entity_deaths_data,
             metadata=metadata,
             demo_index=demo_index,
         )

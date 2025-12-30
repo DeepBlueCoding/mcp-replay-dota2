@@ -2,7 +2,7 @@
 
 ??? info "AI Summary"
 
-    MCP server for Dota 2 match analysis. **Tools** (LLM calls these): `get_match_heroes`, `get_match_players`, `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, plus pro scene tools. **Game State Tools**: `list_fights`, `get_teamfights`, `get_fight`, `get_lane_summary`, `get_cs_at_minute`, `get_snapshot_at_time`, `get_farming_pattern`. **Resources** (static context): `dota2://heroes/all`, `dota2://map`, `dota2://pro/players`, `dota2://pro/teams`. Many tools are **parallel-safe** for efficient multi-point analysis. Connects to Claude Desktop, Claude Code, LangChain, LangGraph, CrewAI, or direct API integration.
+    MCP server for Dota 2 match analysis. **Install from PyPI** (`uv add mcp-replay-dota2`) or **DockerHub** (`docker pull dbcjuanma/mcp_replay_dota2`). **Tools** (LLM calls these): `get_match_heroes`, `get_match_players`, `get_hero_deaths`, `get_combat_log`, `get_fight_combat_log`, `get_item_purchases`, `get_objective_kills`, `get_match_timeline`, `get_stats_at_minute`, `get_courier_kills`, plus pro scene tools. **Game State Tools**: `list_fights`, `get_teamfights`, `get_fight`, `get_lane_summary`, `get_cs_at_minute`, `get_snapshot_at_time`, `get_farming_pattern`. **Resources** (static context): `dota2://heroes/all`, `dota2://map`, `dota2://pro/players`, `dota2://pro/teams`. Many tools are **parallel-safe** for efficient multi-point analysis. Connects to Claude Desktop, Claude Code, LangChain, LangGraph, CrewAI, or direct API integration.
 
 A Model Context Protocol (MCP) server that gives LLMs the ability to analyze Dota 2 matches by parsing replay files and querying the OpenDota API.
 
@@ -55,23 +55,30 @@ The LLM reads the replay data and provides analysis based on actual game events,
 
 ## Quick Start
 
-### Option A: Local Install
+### Option A: PyPI (Recommended)
 
 ```bash
-git clone https://github.com/DeepBlueCoding/mcp_replay_dota2.git
-cd mcp_replay_dota2
-uv sync
-uv run python dota_match_mcp_server.py
+uv add mcp-replay-dota2
+uv run mcp-replay-dota2
 ```
 
 ### Option B: Docker
 
 ```bash
-docker build -t dota2-mcp-server .
-docker run -p 8081:8081 dota2-mcp-server --transport sse
+docker pull dbcjuanma/mcp_replay_dota2
+docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
 ```
 
 Connect to `http://localhost:8081/sse`. See [Docker Guide](getting-started/docker.md) for details.
+
+### Option C: From Source (Contributors)
+
+```bash
+git clone https://github.com/DeepBlueCoding/mcp-replay-dota2.git
+cd mcp-replay-dota2
+uv sync
+uv run python dota_match_mcp_server.py
+```
 
 ### 2. Connect to Your LLM
 
@@ -140,7 +147,7 @@ The LLM will automatically call the appropriate tools and synthesize an analysis
 | `get_team` | Get team details + roster |
 | `get_team_matches` | Team match history with series grouping |
 | `get_leagues` | All leagues/tournaments |
-| `get_pro_matches` | Recent pro matches with series grouping |
+| `get_pro_matches` | Recent pro matches with series grouping (supports head-to-head filtering) |
 | `get_league_matches` | Matches from a specific league |
 
 ## Available Resources

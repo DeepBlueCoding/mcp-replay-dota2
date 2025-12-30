@@ -4,10 +4,42 @@ High-resolution game state analysis tools. Many of these are **parallel-safe** a
 
 ## list_fights
 
-List all fights in a match. Fights are grouped by deaths occurring within 15 seconds of each other.
+List all fights/skirmishes in a match with death summaries.
+
+!!! warning "When NOT to use"
+    - You already called `get_hero_performance` → It includes `fights[]` array
+    - Asking about specific hero → Use `get_hero_performance` instead
+
+**Use for:**
+
+- "How many fights happened?" / "List all teamfights"
+- "When were the major fights?" (overview, not hero-specific)
+- "Where did most fights take place?" (uses `location` field)
+- "Show me fights at Roshan" / "tower dives" (use `location` filter)
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `match_id` | int | The Dota 2 match ID |
+| `location` | str (optional) | Filter by location. Partial match: `"t1"`, `"roshan"`, `"radiant"` |
+| `min_deaths` | int (optional) | Filter to fights with at least this many deaths |
+| `is_teamfight` | bool (optional) | Filter to teamfights only (True) or skirmishes only (False) |
+| `start_time` | float (optional) | Filter fights starting after this game time (seconds) |
+| `end_time` | float (optional) | Filter fights starting before this game time (seconds) |
 
 ```python
+# All fights
 list_fights(match_id=8461956309)
+
+# Only T1 tower fights
+list_fights(match_id=8461956309, location="t1")
+
+# Roshan pit fights
+list_fights(match_id=8461956309, location="roshan_pit")
+
+# Teamfights only after 20 minutes
+list_fights(match_id=8461956309, is_teamfight=True, start_time=1200)
 ```
 
 **Returns:**
@@ -23,20 +55,64 @@ list_fights(match_id=8461956309)
       "fight_id": "fight_1",
       "start_time": "4:48",
       "total_deaths": 2,
+      "location": "dire_t1_top",
       "participants": ["earthshaker", "disruptor"]
     }
   ]
 }
 ```
 
+**Available Locations (37 regions):**
+
+- **Towers**: `radiant_t1_top`, `radiant_t1_mid`, `radiant_t1_bot`, `radiant_t2_*`, `radiant_t3_*`, `radiant_t4`, `dire_t1_*`, etc.
+- **Landmarks**: `roshan_pit`, `tormentor_radiant`, `tormentor_dire`
+- **Farming areas**: `radiant_triangle`, `dire_triangle`, `radiant_ancients`, `dire_ancients`
+- **Lanes/Areas**: `river`, `mid_lane`, `radiant_safelane`, `dire_safelane`, `radiant_jungle`, etc.
+
 ---
 
 ## get_teamfights
 
-Get only major teamfights (3+ deaths by default).
+Get major teamfights (3+ deaths) with coaching analysis.
+
+!!! warning "When NOT to use"
+    - You already called `get_hero_performance` → It includes teamfight participation
+    - Asking about specific hero → Use `get_hero_performance` instead
+
+**Use for:**
+
+- "What were the big teamfights?" / "Analyze the teamfights"
+- General teamfight overview (not hero-specific)
+- Filter teamfights by location (e.g., "high ground fights")
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `match_id` | int | The Dota 2 match ID |
+| `min_deaths` | int | Minimum deaths to classify as teamfight (default 3) |
+| `location` | str (optional) | Filter by location. Partial match: `"t3"`, `"roshan"` |
+| `start_time` | float (optional) | Filter teamfights starting after this game time (seconds) |
+| `end_time` | float (optional) | Filter teamfights starting before this game time (seconds) |
 
 ```python
 get_teamfights(match_id=8461956309, min_deaths=3)
+
+# High ground teamfights only
+get_teamfights(match_id=8461956309, location="t3")
+
+# Late game teamfights (after 30 min)
+get_teamfights(match_id=8461956309, start_time=1800)
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "total_teamfights": 5,
+  "teamfights": [...],
+  "coaching_analysis": "AI analysis of the biggest teamfight (if client supports sampling)"
+}
 ```
 
 ---
@@ -111,7 +187,7 @@ get_jungle_summary(match_id=8461956309)
 
 ## get_lane_summary
 
-Laning phase analysis (first 10 minutes).
+Laning phase analysis (first 10 minutes) with coaching analysis.
 
 ```python
 get_lane_summary(match_id=8461956309)
@@ -134,7 +210,8 @@ get_lane_summary(match_id=8461956309)
       "gold_10min": 4850,
       "level_10min": 10
     }
-  ]
+  ],
+  "coaching_analysis": "AI analysis of laning phase (if client supports sampling)"
 }
 ```
 

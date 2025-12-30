@@ -187,22 +187,62 @@ Get recent professional matches with series grouping. By default returns ALL mat
 |-----------|------|-------------|
 | `limit` | int | Maximum matches to return (default: 100) |
 | `tier` | string | Filter by league tier: `"premium"` (TI, Majors), `"professional"`, or `"amateur"` |
-| `team_name` | string | Fuzzy match team name (e.g., "OG", "Spirit", "Navi") |
-| `league_name` | string | Contains match on league name (e.g., "SLAM", "ESL", "DreamLeague") |
+| `team1_name` | string | Filter by first team (fuzzy match). Alone: returns all matches for that team |
+| `team2_name` | string | Filter by second team (fuzzy match). With team1: returns head-to-head matches |
+| `league_name` | string | Fuzzy match on league name with alias expansion (see below) |
 | `days_back` | int | Only return matches from the last N days |
+
+**Team Filtering:**
+
+- **Single team** (`team1_name` only): Returns all matches involving that team (either radiant or dire)
+- **Head-to-head** (`team1_name` + `team2_name`): Returns only matches where both teams played against each other, regardless of which side (radiant/dire) they were on
+
+**League Name Fuzzy Search:**
+
+The `league_name` parameter supports fuzzy matching with common abbreviations:
+
+| Query | Matches |
+|-------|---------|
+| `"TI 2025"` | "The International 2025" |
+| `"ESL"` | "ESL One Kuala Lumpur", "ESL One Birmingham" |
+| `"DPC"` | "Dota Pro Circuit" leagues |
+| `"blast"` or `"slam"` | "BLAST Slam V" |
+| `"dreamleague"` | "DreamLeague Season 24" |
+| `"PGL"` | "PGL Wallachia Season 6" |
+| `"wallachia"` | "PGL Wallachia Season 6" |
+| `"riyadh"` | "Riyadh Masters 2025" |
+| `"bali"` | "Bali Major 2025" |
+
+Partial names also work: `"wallachia 6"` matches "PGL Wallachia Season 6".
+
+**Data Blending:** When team filters are provided, this tool automatically blends data from two sources:
+
+1. **Team-specific endpoint** (`/teams/{id}/matches`) - captures matches that OpenDota's `/proMatches` often misses (e.g., major tournaments like SLAM)
+2. **General pro matches** (`/proMatches`) - provides broader coverage
+
+This ensures comprehensive results when searching for specific teams.
 
 ```python
 # Get top-tier tournament matches only
 get_pro_matches(tier="premium")
 
-# Find matches for a specific team
-get_pro_matches(team_name="OG")
+# Find all matches for a specific team
+get_pro_matches(team1_name="Tundra", days_back=7)
 
-# Find matches in a specific tournament
-get_pro_matches(league_name="SLAM")
+# Find head-to-head matches between two teams
+get_pro_matches(team1_name="Team Spirit", team2_name="OG")
 
-# Combine filters
-get_pro_matches(tier="premium", team_name="Team Spirit", days_back=30)
+# Head-to-head at a specific tournament (fuzzy league name)
+get_pro_matches(team1_name="Spirit", team2_name="OG", league_name="TI 2025")
+
+# Find matches using abbreviations
+get_pro_matches(league_name="TI 2025")      # The International 2025
+get_pro_matches(league_name="PGL")          # PGL tournaments
+get_pro_matches(league_name="wallachia 6")  # PGL Wallachia Season 6
+get_pro_matches(league_name="ESL")          # ESL One tournaments
+
+# Combine filters: team matches at premium tournaments
+get_pro_matches(tier="premium", team1_name="Team Spirit", days_back=30)
 ```
 
 **Returns:**
@@ -225,6 +265,96 @@ get_pro_matches(tier="premium", team_name="Team Spirit", days_back=30)
   ]
 }
 ```
+
+---
+
+## get_tournament_series
+
+Get tournament series with bracket/game details. Use for tournament progression analysis: series results, Bo3/Bo5 outcomes, team advancement.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `league_name` | string | Filter by league/tournament name (fuzzy match with alias expansion) |
+| `league_id` | int | Filter by specific league ID |
+| `team_name` | string | Filter series involving this team (fuzzy match) |
+| `limit` | int | Maximum series to return (default: 20) |
+| `days_back` | int | Only return series from the last N days |
+
+**League Name Fuzzy Search:**
+
+Same alias expansion as `get_pro_matches` - "TI" matches "The International", "ESL" matches ESL tournaments, etc.
+
+```python
+# Get recent series from a tournament
+get_tournament_series(league_name="TI 2025", limit=10)
+
+# Get all series involving a specific team
+get_tournament_series(team_name="Team Spirit", days_back=30)
+
+# Get series from a specific league ID
+get_tournament_series(league_id=15728)
+
+# Combine filters: team at a specific tournament
+get_tournament_series(league_name="ESL One", team_name="Tundra")
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "total_series": 5,
+  "series": [
+    {
+      "series_id": 12345,
+      "series_type": "bo3",
+      "radiant_team_id": 8599101,
+      "radiant_team_name": "Team Spirit",
+      "dire_team_id": 7391077,
+      "dire_team_name": "Tundra Esports",
+      "radiant_wins": 2,
+      "dire_wins": 1,
+      "winner_team_id": 8599101,
+      "winner_team_name": "Team Spirit",
+      "league_id": 15728,
+      "league_name": "The International 2024",
+      "games": [
+        {
+          "match_id": 8461956309,
+          "game_number": 1,
+          "radiant_win": true,
+          "duration": 2847
+        },
+        {
+          "match_id": 8461956310,
+          "game_number": 2,
+          "radiant_win": false,
+          "duration": 3102
+        },
+        {
+          "match_id": 8461956311,
+          "game_number": 3,
+          "radiant_win": true,
+          "duration": 2456
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Key Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `series_type` | `"bo1"`, `"bo3"`, or `"bo5"` |
+| `radiant_wins` / `dire_wins` | Games won by each team in the series |
+| `winner_team_id` | Team that won the series |
+| `games` | Array of individual matches with results |
+
+!!! tip "Series vs Matches"
+    Use `get_tournament_series` for bracket analysis (who advanced, series scores). Use `get_pro_matches` for individual match details.
 
 ---
 
