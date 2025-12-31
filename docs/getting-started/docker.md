@@ -4,19 +4,13 @@ The Dota 2 Match MCP Server is available on DockerHub for easy deployment.
 
 ## Quick Start
 
-### Pull from DockerHub
-
-```bash
-docker pull dbcjuanma/mcp_replay_dota2
-```
-
 ### Run with SSE Transport (Recommended)
 
 ```bash
-docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
+docker run --pull=always -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
 ```
 
-The server will be available at `http://localhost:8081/sse`.
+The `--pull=always` flag ensures you always get the latest image. The server will be available at `http://localhost:8081/sse`.
 
 ### Run with Docker Compose
 
@@ -45,7 +39,7 @@ docker build -t dbcjuanma/mcp_replay_dota2 .
 SSE transport runs an HTTP server, which is ideal for Docker deployments:
 
 ```bash
-docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse --port 8081
+docker run --pull=always -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse --port 8081
 ```
 
 Configure your MCP client to connect to `http://localhost:8081/sse`.
@@ -55,7 +49,7 @@ Configure your MCP client to connect to `http://localhost:8081/sse`.
 STDIO transport is the default for local development but requires interactive mode in Docker:
 
 ```bash
-docker run -i dbcjuanma/mcp_replay_dota2
+docker run --pull=always -i dbcjuanma/mcp_replay_dota2
 ```
 
 ## Persistent Cache
@@ -63,7 +57,7 @@ docker run -i dbcjuanma/mcp_replay_dota2
 Replay files are large (50-400MB) and take time to download and parse. Mount a volume to persist the cache:
 
 ```bash
-docker run -p 8081:8081 \
+docker run --pull=always -p 8081:8081 \
   -v dota2-replay-cache:/app/.cache/mcp_dota2 \
   dbcjuanma/mcp_replay_dota2 --transport sse
 ```
@@ -95,11 +89,13 @@ docker run -p 8081:8081 \
   "mcpServers": {
     "dota2": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "-v", "dota2-replay-cache:/app/.cache/mcp_dota2", "dbcjuanma/mcp_replay_dota2"]
+      "args": ["run", "--pull=always", "-i", "--rm", "-v", "dota2-replay-cache:/app/.cache/mcp_dota2", "dbcjuanma/mcp_replay_dota2"]
     }
   }
 }
 ```
+
+The `--pull=always` flag ensures you always get the latest image on each restart.
 
 ## Startup Optimization
 
@@ -114,14 +110,14 @@ The Docker image uses several optimizations for fast startup:
 
 For production deployments, consider:
 
-1. **Use a specific version tag** instead of `latest`:
+1. **Use a specific version tag** instead of `latest` for reproducibility:
    ```bash
-   docker pull dbcjuanma/mcp_replay_dota2:1.1.0
+   docker run --pull=always -p 8081:8081 dbcjuanma/mcp_replay_dota2:1.2.0 --transport sse
    ```
 
 2. **Set resource limits**:
    ```bash
-   docker run -p 8081:8081 \
+   docker run --pull=always -p 8081:8081 \
      --memory=2g \
      --cpus=2 \
      dbcjuanma/mcp_replay_dota2 --transport sse

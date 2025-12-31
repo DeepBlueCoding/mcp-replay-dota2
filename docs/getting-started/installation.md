@@ -2,43 +2,30 @@
 
 ??? info "AI Summary"
 
-    Install from **PyPI** (`uv add mcp-replay-dota2`) or **DockerHub** (`docker pull dbcjuanma/mcp_replay_dota2`). Git clone only needed for contributors.
+    Run with **uvx** (`uvx dota2-match-analysis@latest`) or **Docker** (`docker run --pull=always dbcjuanma/mcp_replay_dota2`). The `@latest` and `--pull=always` flags ensure you always get the most recent version. Git clone only needed for contributors.
 
-## Option 1: PyPI (Recommended)
+## Option 1: uvx (Recommended)
 
-Install the package directly from PyPI:
-
-```bash
-# Using uv (recommended)
-uv add mcp-replay-dota2
-
-# Or using pip
-pip install mcp-replay-dota2
-```
-
-Run the server:
+Run the server directly without installation:
 
 ```bash
-# Using uv
-uv run mcp-replay-dota2
-
-# Or directly if installed with pip
-mcp-replay-dota2
+uvx dota2-match-analysis@latest
 ```
+
+The `@latest` suffix ensures you always get the most recent version from PyPI.
+
+!!! tip "Why @latest?"
+    Without `@latest`, uvx caches the first version it downloads. Using `@latest` ensures you always pull the newest release automatically.
 
 ## Option 2: Docker
-
-Pull the image from DockerHub:
-
-```bash
-docker pull dbcjuanma/mcp_replay_dota2
-```
 
 Run with SSE transport (recommended for Docker):
 
 ```bash
-docker run -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
+docker run --pull=always -p 8081:8081 dbcjuanma/mcp_replay_dota2 --transport sse
 ```
+
+The `--pull=always` flag ensures Docker always pulls the latest image before running.
 
 See [Docker Guide](docker.md) for persistent cache, STDIO mode, and compose examples.
 

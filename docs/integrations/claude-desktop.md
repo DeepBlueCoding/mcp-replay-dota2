@@ -1,8 +1,8 @@
 # Claude Desktop
 
-??? info "🤖 AI Summary"
+??? info "AI Summary"
 
-    Add to `claude_desktop_config.json`: `{"mcpServers": {"dota2": {"command": "uv", "args": ["run", "--frozen", "--project", "/path/to/repo", "python", "/path/to/repo/dota_match_mcp_server.py"]}}}`. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".
+    Add to `claude_desktop_config.json`: `{"mcpServers": {"dota2": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}`. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".
 
 The simplest way to use this MCP server - just configure and chat.
 
@@ -14,47 +14,36 @@ Add to your Claude Desktop config file:
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-=== "Linux/macOS"
+=== "uvx (Recommended)"
 
     ```json
     {
       "mcpServers": {
         "dota2": {
-          "command": "uv",
-          "args": [
-            "run",
-            "--frozen",
-            "--project", "/home/user/projects/mcp-replay-dota2",
-            "python",
-            "/home/user/projects/mcp-replay-dota2/dota_match_mcp_server.py"
-          ]
+          "command": "uvx",
+          "args": ["dota2-match-analysis@latest"]
         }
       }
     }
     ```
 
-=== "Windows"
+=== "Docker"
 
     ```json
     {
       "mcpServers": {
         "dota2": {
-          "command": "uv",
-          "args": [
-            "run",
-            "--frozen",
-            "--project", "C:\\Users\\username\\projects\\mcp-replay-dota2",
-            "python",
-            "C:\\Users\\username\\projects\\mcp-replay-dota2\\dota_match_mcp_server.py"
-          ]
+          "command": "docker",
+          "args": ["run", "--pull=always", "-i", "--rm", "dbcjuanma/mcp_replay_dota2"]
         }
       }
     }
     ```
 
-!!! tip "Why `--frozen --project`?"
-    - `--frozen` ensures dependencies are locked (no unexpected updates)
-    - `--project` explicitly sets the project path (avoids working directory issues)
+!!! tip "Why @latest and --pull=always?"
+    - `@latest` ensures uvx always downloads the newest version from PyPI
+    - `--pull=always` ensures Docker always pulls the newest image
+    - Both flags guarantee you're always running the most recent release
 
 ## Restart Claude Desktop
 
@@ -89,14 +78,17 @@ Claude will automatically:
 **No hammer icon?**
 
 - Check the config file path is correct
-- Ensure `uv` is in your PATH
+- Ensure `uvx` is in your PATH (or `docker` for Docker method)
 - Check Claude Desktop logs for errors
 
 **Tools not working?**
 
-- Verify the `--project` path points to the cloned repository
 - Test manually:
 
 ```bash
-uv run --frozen --project /path/to/mcp-replay-dota2 python /path/to/mcp-replay-dota2/dota_match_mcp_server.py
+# Test uvx
+uvx dota2-match-analysis@latest
+
+# Test Docker
+docker run --pull=always -i --rm dbcjuanma/mcp_replay_dota2
 ```

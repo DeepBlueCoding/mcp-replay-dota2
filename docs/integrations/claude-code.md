@@ -1,8 +1,8 @@
 # Claude Code CLI
 
-??? info "🤖 AI Summary"
+??? info "AI Summary"
 
-    Add to `.mcp.json` (project) or `~/.claude/settings.json` (global): `{"mcpServers": {"dota2": {"command": "uv", "args": ["run", "--frozen", "--project", "/path/to/repo", "python", "/path/to/repo/dota_match_mcp_server.py"]}}}`. Verify with `/tools`. Ask: "Analyze match 8461956309". Can also generate scripts using real match data.
+    Add to `.mcp.json` (project) or `~/.claude/settings.json` (global): `{"mcpServers": {"dota2": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}`. Verify with `/mcp`. Ask: "Analyze match 8461956309". Can also generate scripts using real match data.
 
 Use the Dota 2 MCP server within Claude Code for development workflows.
 
@@ -10,22 +10,31 @@ Use the Dota 2 MCP server within Claude Code for development workflows.
 
 Add to your project's `.mcp.json`:
 
-```json
-{
-  "mcpServers": {
-    "dota2": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--frozen",
-        "--project", "/absolute/path/to/mcp-replay-dota2",
-        "python",
-        "/absolute/path/to/mcp-replay-dota2/dota_match_mcp_server.py"
-      ]
+=== "uvx (Recommended)"
+
+    ```json
+    {
+      "mcpServers": {
+        "dota2": {
+          "command": "uvx",
+          "args": ["dota2-match-analysis@latest"]
+        }
+      }
     }
-  }
-}
-```
+    ```
+
+=== "Docker"
+
+    ```json
+    {
+      "mcpServers": {
+        "dota2": {
+          "command": "docker",
+          "args": ["run", "--pull=always", "-i", "--rm", "dbcjuanma/mcp_replay_dota2"]
+        }
+      }
+    }
+    ```
 
 ## Global Setup
 
@@ -35,22 +44,15 @@ Add to `~/.claude/settings.json` to make it available in all projects:
 {
   "mcpServers": {
     "dota2": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--frozen",
-        "--project", "/absolute/path/to/mcp-replay-dota2",
-        "python",
-        "/absolute/path/to/mcp-replay-dota2/dota_match_mcp_server.py"
-      ]
+      "command": "uvx",
+      "args": ["dota2-match-analysis@latest"]
     }
   }
 }
 ```
 
-!!! tip "Why `--frozen --project`?"
-    - `--frozen` ensures dependencies are locked (no unexpected updates)
-    - `--project` explicitly sets the project path (avoids working directory issues)
+!!! tip "Why @latest?"
+    The `@latest` suffix ensures uvx always downloads the newest version from PyPI. Without it, uvx caches the first version it downloads.
 
 ## Verify
 
@@ -58,7 +60,7 @@ Run Claude Code and check available tools:
 
 ```bash
 claude
-> /tools
+> /mcp
 ```
 
 You should see the Dota 2 tools listed.
