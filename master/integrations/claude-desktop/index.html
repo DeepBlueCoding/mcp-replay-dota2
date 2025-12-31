@@ -1815,7 +1815,7 @@
 <h1 id="claude-desktop">Claude Desktop<a class="headerlink" href="#claude-desktop" title="Permanent link">&para;</a></h1>
 <details class="info">
 <summary>AI Summary</summary>
-<p>Add to <code>claude_desktop_config.json</code>: <code>{"mcpServers": {"dota2": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}</code>. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".</p>
+<p>Add to <code>claude_desktop_config.json</code>: <code>{"mcpServers": {"dota2-match-analysis": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}</code>. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".</p>
 </details>
 <p>The simplest way to use this MCP server - just configure and chat.</p>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
@@ -1827,7 +1827,7 @@
 <div class="highlight"><pre><span></span><code>```json
 {
   &quot;mcpServers&quot;: {
-    &quot;dota2&quot;: {
+    &quot;dota2-match-analysis&quot;: {
       &quot;command&quot;: &quot;uvx&quot;,
       &quot;args&quot;: [&quot;dota2-match-analysis@latest&quot;]
     }
@@ -1839,7 +1839,7 @@
 <div class="highlight"><pre><span></span><code>```json
 {
   &quot;mcpServers&quot;: {
-    &quot;dota2&quot;: {
+    &quot;dota2-match-analysis&quot;: {
       &quot;command&quot;: &quot;docker&quot;,
       &quot;args&quot;: [&quot;run&quot;, &quot;--pull=always&quot;, &quot;-i&quot;, &quot;--rm&quot;, &quot;dbcjuanma/mcp_replay_dota2&quot;]
     }
