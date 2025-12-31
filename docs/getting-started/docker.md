@@ -75,7 +75,7 @@ docker run --pull=always -p 8081:8081 \
 ```json
 {
   "mcpServers": {
-    "dota2": {
+    "dota2-match-analysis": {
       "url": "http://localhost:8081/sse"
     }
   }
@@ -87,7 +87,7 @@ docker run --pull=always -p 8081:8081 \
 ```json
 {
   "mcpServers": {
-    "dota2": {
+    "dota2-match-analysis": {
       "command": "docker",
       "args": ["run", "--pull=always", "-i", "--rm", "-v", "dota2-replay-cache:/app/.cache/mcp_dota2", "dbcjuanma/mcp_replay_dota2"]
     }

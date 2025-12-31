@@ -2,7 +2,7 @@
 
 ??? info "AI Summary"
 
-    Add to `claude_desktop_config.json`: `{"mcpServers": {"dota2": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}`. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".
+    Add to `claude_desktop_config.json`: `{"mcpServers": {"dota2-match-analysis": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}`. Restart Claude Desktop. Look for hammer icon (🔨) to verify. Ask naturally: "Analyze match 8461956309".
 
 The simplest way to use this MCP server - just configure and chat.
 
@@ -19,7 +19,7 @@ Add to your Claude Desktop config file:
     ```json
     {
       "mcpServers": {
-        "dota2": {
+        "dota2-match-analysis": {
           "command": "uvx",
           "args": ["dota2-match-analysis@latest"]
         }
@@ -32,7 +32,7 @@ Add to your Claude Desktop config file:
     ```json
     {
       "mcpServers": {
-        "dota2": {
+        "dota2-match-analysis": {
           "command": "docker",
           "args": ["run", "--pull=always", "-i", "--rm", "dbcjuanma/mcp_replay_dota2"]
         }

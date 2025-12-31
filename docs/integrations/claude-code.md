@@ -2,7 +2,7 @@
 
 ??? info "AI Summary"
 
-    Add to `.mcp.json` (project) or `~/.claude/settings.json` (global): `{"mcpServers": {"dota2": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}`. Verify with `/mcp`. Ask: "Analyze match 8461956309". Can also generate scripts using real match data.
+    Add to `.mcp.json` (project) or `~/.claude/settings.json` (global): `{"mcpServers": {"dota2-match-analysis": {"command": "uvx", "args": ["dota2-match-analysis@latest"]}}}`. Verify with `/mcp`. Ask: "Analyze match 8461956309". Can also generate scripts using real match data.
 
 Use the Dota 2 MCP server within Claude Code for development workflows.
 
@@ -15,7 +15,7 @@ Add to your project's `.mcp.json`:
     ```json
     {
       "mcpServers": {
-        "dota2": {
+        "dota2-match-analysis": {
           "command": "uvx",
           "args": ["dota2-match-analysis@latest"]
         }
@@ -28,7 +28,7 @@ Add to your project's `.mcp.json`:
     ```json
     {
       "mcpServers": {
-        "dota2": {
+        "dota2-match-analysis": {
           "command": "docker",
           "args": ["run", "--pull=always", "-i", "--rm", "dbcjuanma/mcp_replay_dota2"]
         }
@@ -43,7 +43,7 @@ Add to `~/.claude/settings.json` to make it available in all projects:
 ```json
 {
   "mcpServers": {
-    "dota2": {
+    "dota2-match-analysis": {
       "command": "uvx",
       "args": ["dota2-match-analysis@latest"]
     }
